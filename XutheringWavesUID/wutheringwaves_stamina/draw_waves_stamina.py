@@ -190,22 +190,18 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         pile = await get_random_waves_role_pile(pile_id)
         has_bg = False
 
-    # [修改逻辑] 尺寸修正为 1150x770，黏贴位置不变 (0, 40)
     if ShowConfig.get_config("MrUseBG") and has_bg:
-        # 缩放到正好不少于1150x770
         bg_w, bg_h = pile.size
-        target_w, target_h = 1150, 770 # 这里修正为770
+        target_w, target_h = 1150, 850
         ratio = max(target_w / bg_w, target_h / bg_h)
         new_size = (int(bg_w * ratio), int(bg_h * ratio))
         pile = pile.resize(new_size, Image.LANCZOS)
         
-        # 切中心的1150x770
         left = (pile.width - target_w) // 2
         top = (pile.height - target_h) // 2
         pile = pile.crop((left, top, left + target_w, top + target_h))
         
-        # 黏贴在img的中心 (img整体高度850，中间留给背景的是770，上下各40padding)
-        img.paste(pile, (0, 40))
+        img.paste(pile, (0, 0))
         
         info = Image.open(TEXT_PATH / "main_bar_bg.png").convert("RGBA")
 
@@ -301,13 +297,13 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     max_len = 345
     
     if ShowConfig.get_config("MrUseBG") and has_bg:
-        dark_bg_color = (16, 26, 54, 200)
+        dark_bg_color = (16, 26, 54, int(0.4 * 255))
         # 体力 (Y=115)
-        active_draw.rounded_rectangle((344 - 19 * len(f"{daily_info.energyData.cur}"), 98, 430, 135), radius=15, fill=dark_bg_color)
+        active_draw.rounded_rectangle((342 - 18 * len(f"{daily_info.energyData.cur}"), 98, 430, 135), radius=15, fill=dark_bg_color)
         # 结晶 (Y=230)
-        active_draw.rounded_rectangle((344 - 19 * len(f"{account_info.storeEnergy}"), 213, 430, 250), radius=15, fill=dark_bg_color)
+        active_draw.rounded_rectangle((342 - 18 * len(f"{account_info.storeEnergy}"), 213, 430, 250), radius=15, fill=dark_bg_color)
         # 活跃度 (Y=350)
-        active_draw.rounded_rectangle((344 - 19 * len(f"{daily_info.livenessData.cur}"), 333, 430, 370), radius=15, fill=dark_bg_color)
+        active_draw.rounded_rectangle((342 - 18 * len(f"{daily_info.livenessData.cur}"), 333, 430, 370), radius=15, fill=dark_bg_color)
 
     # 体力
     active_draw.text(
@@ -360,7 +356,6 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     img.alpha_composite(status_img, (70, 80))
     if ShowConfig.get_config("MrUseBG") and has_bg:
         img.alpha_composite(status_img, (70, 80))
-        img.alpha_composite(status_img, (70, 80))
 
     # 活跃状态
     status_img2 = Image.new("RGBA", (230, 40), (255, 255, 255, 0))
@@ -371,7 +366,6 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     img.alpha_composite(status_img2, (70, 140))
     if ShowConfig.get_config("MrUseBG") and has_bg:
         img.alpha_composite(status_img2, (70, 140))
-        img.alpha_composite(status_img2, (70, 140))
 
     # pile 放在背景上
     # 如果不是自定义背景，则按原样贴立绘
@@ -380,9 +374,8 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
 
     # 贴个bar_down
     img.alpha_composite(bar_down, (0, 0))
-    # [新增逻辑] 自定义背景下，加深 bar_down 颜色
-    if ShowConfig.get_config("MrUseBG") and has_bg:
-        img.alpha_composite(bar_down, (0, 0))
+    # if ShowConfig.get_config("MrUseBG") and has_bg:
+    #     img.alpha_composite(bar_down, (0, 0))
 
     # info 放在背景上
     img.paste(info, (0, 190), info)

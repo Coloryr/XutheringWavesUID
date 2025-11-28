@@ -37,7 +37,7 @@ def get_target_package():
         logger.error(f"不支持的Python版本: {py_ver}")
     
     is_android = 'ANDROID_ROOT' in os.environ or 'ANDROID_DATA' in os.environ
-    if is_android or (system == 'linux' and 'aarch64' in machine):
+    if is_android:
         return "android-aarch64-ndk"
 
     if system == 'win32':
@@ -49,6 +49,8 @@ def get_target_package():
     elif system == 'linux':
         if 'x86_64' in machine:
             return f"linux-x86_64-{py_ver}"
+        elif 'aarch64' in machine:
+            return f"linux-aarch64-{py_ver}"
         else:
             logger.error("暂不支持非x86_64架构的Linux")
 

@@ -42,7 +42,7 @@ git clone https://github.com/Loping151/XutheringWavesUID.git
 win_amd64: python3.10-3.13<br>
 win_arm64: no<br>
 linux_x86_64: python3.10-3.13<br>
-linux_aarch64: python3.10-3.13<br>
+linux_aarch64: python3.11-3.13<br>
 macos_intel: no<br>
 macos_apple: python3.10-3.13<br>
 android_termux(?): python3.12<br>
