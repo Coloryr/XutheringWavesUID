@@ -157,8 +157,16 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         ev.user_id, ev.bot_id, "uid", daily_info.roleId
     )
     pile_id = None
+    force_use_bg = False
+    force_not_use_bg = False
+    force_not_use_custom = False
+    
     if user and user.stamina_bg_value:
-        char_id = char_name_to_char_id(user.stamina_bg_value)
+        force_use_bg = "背景" in user.stamina_bg_value
+        force_not_use_bg = "立绘" in user.stamina_bg_value
+        force_not_use_custom = "官方" in user.stamina_bg_value
+        stamina_bg_value = user.stamina_bg_value.replace("背景", "").replace("立绘", "").replace("官方", "").strip()
+        char_id = char_name_to_char_id(stamina_bg_value)
         if char_id in SPECIAL_CHAR:
             ck = await waves_api.get_self_waves_ck(
                 daily_info.roleId, ev.user_id, ev.bot_id
@@ -184,10 +192,15 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         else:
             pile_id = char_id
     
-    if ShowConfig.get_config("MrUseBG"):
-        pile, has_bg = await get_random_waves_bg(pile_id)
+    if force_use_bg:
+        pile, has_bg = await get_random_waves_bg(pile_id, force_not_use_custom=force_not_use_custom)
+    elif force_not_use_bg:
+        pile = await get_random_waves_role_pile(pile_id, force_not_use_custom=force_not_use_custom)
+        has_bg = False
+    elif ShowConfig.get_config("MrUseBG"):
+        pile, has_bg = await get_random_waves_bg(pile_id, force_not_use_custom=force_not_use_custom)
     else:
-        pile = await get_random_waves_role_pile(pile_id)
+        pile = await get_random_waves_role_pile(pile_id, force_not_use_custom=force_not_use_custom)
         has_bg = False
 
     if ShowConfig.get_config("MrUseBG") and has_bg:
@@ -350,7 +363,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     # 签到状态
     status_img = Image.new("RGBA", (230, 40), (255, 255, 255, 0))
     status_img_draw = ImageDraw.Draw(status_img)
-    status_img_draw.rounded_rectangle([0, 0, 230, 40], fill=(0, 0, 0, int(0.3 * 255)))
+    status_img_draw.rounded_rectangle([0, 0, 230, 40], radius=15, fill=(0, 0, 0, int(0.3 * 255)))
     status_img.alpha_composite(sign_in_icon, (0, 0))
     status_img_draw.text((50, 20), f"{sing_in_text}", "white", waves_font_30, "lm")
     img.alpha_composite(status_img, (70, 80))
@@ -360,7 +373,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     # 活跃状态
     status_img2 = Image.new("RGBA", (230, 40), (255, 255, 255, 0))
     status_img2_draw = ImageDraw.Draw(status_img2)
-    status_img2_draw.rounded_rectangle([0, 0, 230, 40], fill=(0, 0, 0, int(0.3 * 255)))
+    status_img2_draw.rounded_rectangle([0, 0, 230, 40], radius=15, fill=(0, 0, 0, int(0.3 * 255)))
     status_img2.alpha_composite(active_icon, (0, 0))
     status_img2_draw.text((50, 20), f"{active_text}", "white", waves_font_30, "lm")
     img.alpha_composite(status_img2, (70, 140))
@@ -378,7 +391,10 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     #     img.alpha_composite(bar_down, (0, 0))
 
     # info 放在背景上
-    img.paste(info, (0, 190), info)
+    if ShowConfig.get_config("MrUseBG") and has_bg:
+        img.paste(info, info.split()[-1].point(lambda x: x * 0.75), (0, 190))
+    else:
+        img.paste(info, (0, 190), info)
     # base_info 放在背景上
     img.paste(base_info_bg, (40, 570), base_info_bg)
     # avatar_ring 放在背景上
