@@ -99,6 +99,7 @@ def init_dir():
         ANN_CARD_PATH,
         ALIAS_PATH,
         CUSTOM_MR_CARD_PATH,
+        CUSTOM_MR_BG_PATH,
     ]:
         i.mkdir(parents=True, exist_ok=True)
 

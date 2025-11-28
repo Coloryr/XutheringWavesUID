@@ -29,3 +29,14 @@ if 'WutheringWavesUID' in cfg_text and not 'XutheringWavesUID' in cfg_text:
     with open(cfg_path, 'w', encoding='utf-8') as f:
         f.write(cfg_text)
     Path(MAIN_PATH / 'config_backup.json').unlink()
+    
+show_cfg_path = MAIN_PATH / 'XutheringWavesUID' / 'show_config.json'
+with open(show_cfg_path, 'r', encoding='utf-8') as f:
+    show_cfg_text = f.read()
+if 'WutheringWavesUID' in show_cfg_text and not 'XutheringWavesUID' in show_cfg_text:
+    logger.info("正在更新显示配置文件中的插件名称...")
+    shutil.copyfile(show_cfg_path, MAIN_PATH / 'show_config_back.json')
+    show_cfg_text = show_cfg_text.replace('WutheringWavesUID', 'XutheringWavesUID')
+    with open(show_cfg_path, 'w', encoding='utf-8') as f:
+        f.write(show_cfg_text)
+    Path(MAIN_PATH / 'config_backup.json').unlink()

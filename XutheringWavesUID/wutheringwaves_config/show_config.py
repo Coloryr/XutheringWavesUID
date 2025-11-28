@@ -45,7 +45,7 @@ SHOW_CONIFG: Dict[str, GSC] = {
     ),
     "MrUseBG": GsBoolConfig(
         "自定义每日使用立绘还是背景",
-        "False为使用立绘，True为使用背景，没有背景时使用立绘",
+        "False为使用立绘，True为使用背景，没有背景时使用立绘，存放在custom_mr_bg内",
         False,
     ),
 }
