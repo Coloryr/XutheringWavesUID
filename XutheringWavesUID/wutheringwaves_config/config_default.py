@@ -189,7 +189,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "开启限制库洛服务器访问次数",
         False,
     ),
-    "LimitMode": GsListStrConfig(
+    "LimitMode": GsStrConfig(
         "限制库洛服务器访问方式",
         "限制库洛服务器访问方式",
         "每分钟",
