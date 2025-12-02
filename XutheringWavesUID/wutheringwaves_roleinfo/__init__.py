@@ -8,9 +8,9 @@ from ..utils.database.models import WavesBind
 from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103, WAVES_CODE_108
 from ..utils.hint import error_reply
 from ..utils.waves_api import waves_api
+from ..utils import hint
 from ..utils.limit_request import check_request_rate_limit
 from .draw_role_info import draw_role_img
-from XutheringWavesUID.utils import hint
 
 waves_role_info = SV("waves查询信息")
 
