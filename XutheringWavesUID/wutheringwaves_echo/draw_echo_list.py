@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw
 from pydantic import BaseModel
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -17,7 +18,7 @@ from ..utils.api.model import (
 from ..utils.calc import WuWaCalc
 from ..utils.calculate import calc_phantom_score, get_calc_map, get_valid_color
 from ..utils.char_info_utils import get_all_role_detail_info
-from ..utils.error_reply import WAVES_CODE_102
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
 from ..utils.fonts.waves_fonts import (
     waves_font_24,
     waves_font_25,
@@ -57,6 +58,8 @@ class WavesEchoRank(BaseModel):
 
 
 async def get_draw_list(ev: Event, uid: str, user_id: str) -> Union[str, bytes]:
+    if check_request_rate_limit():
+        return hint.error_reply(WAVES_CODE_108)
     _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return hint.error_reply(WAVES_CODE_102)

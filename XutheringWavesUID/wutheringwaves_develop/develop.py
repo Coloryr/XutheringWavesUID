@@ -4,6 +4,7 @@ from typing import Dict, List
 
 from PIL import Image, ImageDraw
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -21,7 +22,7 @@ from ..utils.api.model import (
 )
 from ..utils.char_info_utils import get_all_role_detail_info_list
 from ..utils.database.models import WavesBind
-from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103, WAVES_CODE_108
 from ..utils.fonts.waves_fonts import (
     waves_font_20,
     waves_font_32,
@@ -125,6 +126,8 @@ skill_index_kuro = {
 
 
 async def calc_develop_cost(ev: Event, develop_list: List[str], is_flush=False):
+    if check_request_rate_limit():
+        return error_reply(WAVES_CODE_108)
     user_id = ev.user_id
     uid = await WavesBind.get_uid_by_game(user_id, ev.bot_id)
     if not uid:

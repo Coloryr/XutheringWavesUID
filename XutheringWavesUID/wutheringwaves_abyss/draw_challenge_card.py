@@ -4,11 +4,12 @@ from typing import Union
 
 from PIL import Image, ImageDraw
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
 from ..utils.api.model import AccountBaseInfo, ChallengeArea, RoleList
-from ..utils.error_reply import WAVES_CODE_102
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
 from ..utils.fonts.waves_fonts import (
     waves_font_18,
     waves_font_20,
@@ -41,6 +42,8 @@ ERROR_NO_CHALLENGE = "您未通关任何全息战略"
 
 
 async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]:
+    if check_request_rate_limit():
+        return error_reply(WAVES_CODE_108)
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102)

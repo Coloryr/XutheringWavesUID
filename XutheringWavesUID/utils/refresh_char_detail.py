@@ -4,11 +4,12 @@ from typing import Dict, List, Optional, Union
 
 import aiofiles
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 
 from ..utils.api.model import AccountBaseInfo, RoleList
-from ..utils.error_reply import WAVES_CODE_101, WAVES_CODE_102
+from ..utils.error_reply import WAVES_CODE_101, WAVES_CODE_102, WAVES_CODE_108
 from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..utils.hint import error_reply
 from ..utils.queues.const import QUEUE_SCORE_RANK
@@ -86,6 +87,8 @@ async def send_card(
                 f"角色数量不一致，role_info.roleNum:{len(role_info.roleList)} != waves_char_rank:{len(save_data)}"
             )
             return
+        if check_request_rate_limit():
+            return error_reply(WAVES_CODE_108)
         account_info = await waves_api.get_base_info(uid, token=token)
         if not account_info.success:
             return account_info.throw_msg()
@@ -181,10 +184,14 @@ async def refresh_char(
 ) -> Union[str, List]:
     waves_datas = []
     if not ck:
+        if check_request_rate_limit():
+            return error_reply(WAVES_CODE_108)
         is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102)
     # 共鸣者信息
+    if check_request_rate_limit():
+        return error_reply(WAVES_CODE_108)
     role_info = await waves_api.get_role_info(uid, ck)
     if not role_info.success:
         return role_info.throw_msg()
@@ -200,6 +207,8 @@ async def refresh_char(
 
     async def limited_get_role_detail_info(role_id, uid, ck):
         async with semaphore:
+            if check_request_rate_limit():
+                return error_reply(WAVES_CODE_108)
             return await waves_api.get_role_detail_info(role_id, uid, ck)
 
     if is_self_ck:

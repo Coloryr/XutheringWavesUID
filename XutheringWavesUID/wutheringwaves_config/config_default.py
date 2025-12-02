@@ -183,5 +183,22 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "验证码提供方appkey",
         "验证码提供方appkey",
         "",
-    )
+    ),
+    "EnableLimit": GsBoolConfig(
+        "开启限制库洛服务器访问次数",
+        "开启限制库洛服务器访问次数",
+        False,
+    ),
+    "LimitMode": GsListStrConfig(
+        "限制库洛服务器访问方式",
+        "限制库洛服务器访问方式",
+        "每分钟",
+        options=["每分钟", "每小时", "每天"],
+    ),
+    "LimitCount": GsIntConfig(
+        "限制库洛服务器访问次数",
+        "限制库洛服务器访问次数",
+        10,
+        1000,
+    ),
 }

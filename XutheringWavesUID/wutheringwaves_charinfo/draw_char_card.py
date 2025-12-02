@@ -6,6 +6,7 @@ from typing import Dict, Optional
 import httpx
 from PIL import Image, ImageDraw, ImageEnhance
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
@@ -39,7 +40,7 @@ from ..utils.calculate import (
 )
 from ..utils.char_info_utils import get_all_roleid_detail_info
 from ..utils.damage.abstract import DamageDetailRegister
-from ..utils.error_reply import WAVES_CODE_102
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
 from ..utils.fonts.waves_fonts import (
     waves_font_16,
     waves_font_18,
@@ -645,6 +646,8 @@ async def draw_char_detail_img(
     is_online_user = False
     ck = ""
     if not is_limit_query:
+        if check_request_rate_limit():
+            return hint.error_reply(WAVES_CODE_108)
         _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
         if not ck:
             return hint.error_reply(WAVES_CODE_102)

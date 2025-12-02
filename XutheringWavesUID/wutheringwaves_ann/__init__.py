@@ -1,6 +1,7 @@
 import asyncio
 import random
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.aps import scheduler
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -92,6 +93,8 @@ async def check_waves_ann():
 
 
 async def check_waves_ann_state():
+    if check_request_rate_limit():
+        return
     logger.info("[鸣潮公告] 定时任务: 鸣潮公告查询..")
     datas = await gs_subscribe.get_subscribe(task_name_ann)
     if not datas:

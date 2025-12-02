@@ -3,6 +3,9 @@ from typing import Optional
 
 from PIL import Image, ImageDraw
 
+from XutheringWavesUID.utils import hint
+from XutheringWavesUID.utils.error_reply import WAVES_CODE_108
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -43,6 +46,9 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
     # if not succ:
     #     return game_info
     # game_info = KuroRoleInfo(**game_info)
+
+    if check_request_rate_limit():
+        return hint.error_reply(WAVES_CODE_108)
 
     # 共鸣者信息
     role_info = await waves_api.get_role_info(uid, ck)

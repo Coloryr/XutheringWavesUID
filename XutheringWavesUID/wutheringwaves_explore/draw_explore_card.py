@@ -4,6 +4,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw
 
+from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.utils import sget
@@ -16,7 +17,7 @@ from ..utils.api.model import (
     ExploreItem,
     ExploreList,
 )
-from ..utils.error_reply import WAVES_CODE_102
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
 from ..utils.fonts.waves_fonts import (
     waves_font_24,
     waves_font_25,
@@ -80,6 +81,8 @@ def get_progress_color(progress):
 
 
 async def draw_explore_img(ev: Event, uid: str, user_id: str):
+    if check_request_rate_limit():
+        return hint.error_reply(WAVES_CODE_108)
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return hint.error_reply(WAVES_CODE_102)
