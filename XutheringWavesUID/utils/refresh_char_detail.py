@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Union
 
 import aiofiles
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 
@@ -17,6 +16,7 @@ from ..utils.queues.queues import push_item
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
 from ..utils.util import get_version
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import WutheringWavesConfig
 from .resource.constant import SPECIAL_CHAR_INT_ALL
 

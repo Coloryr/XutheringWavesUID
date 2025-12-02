@@ -3,7 +3,6 @@ from typing import Union
 
 from PIL import Image, ImageDraw
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -34,6 +33,7 @@ from ..utils.queues.const import QUEUE_ABYSS_RECORD
 from ..utils.queues.queues import push_item
 from ..utils.util import get_version
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import PREFIX
 
 TEXT_PATH = Path(__file__).parent / "texture2d"

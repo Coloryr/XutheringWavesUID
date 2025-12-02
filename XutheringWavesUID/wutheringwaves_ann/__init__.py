@@ -1,7 +1,6 @@
 import asyncio
 import random
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.aps import scheduler
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -10,6 +9,7 @@ from gsuid_core.subscribe import gs_subscribe
 from gsuid_core.sv import SV
 
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import WutheringWavesConfig
 from .ann_card import ann_detail_card, ann_list_card
 

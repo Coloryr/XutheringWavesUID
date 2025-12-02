@@ -4,8 +4,6 @@ from typing import List, Union
 
 from PIL import Image, ImageDraw, ImageOps
 
-from XutheringWavesUID.utils.error_reply import WAVES_CODE_108
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.image_tools import (

@@ -1,4 +1,3 @@
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
@@ -9,6 +8,7 @@ from ..utils.database.models import WavesBind
 from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103, WAVES_CODE_108
 from ..utils.hint import error_reply
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from .draw_role_info import draw_role_img
 from XutheringWavesUID.utils import hint
 

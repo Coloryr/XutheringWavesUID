@@ -4,7 +4,6 @@ from typing import Dict, List
 
 from PIL import Image, ImageDraw
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -45,6 +44,7 @@ from ..utils.refresh_char_detail import refresh_char
 from ..utils.resource.constant import SPECIAL_CHAR
 from ..utils.resource.download_file import get_material_img
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 
 skillBreakList = ["2-1", "2-2", "2-3", "2-4", "2-5", "3-1", "3-2", "3-3", "3-4", "3-5"]
 

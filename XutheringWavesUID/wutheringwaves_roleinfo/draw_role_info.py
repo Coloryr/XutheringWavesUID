@@ -3,9 +3,6 @@ from typing import Optional
 
 from PIL import Image, ImageDraw
 
-from XutheringWavesUID.utils import hint
-from XutheringWavesUID.utils.error_reply import WAVES_CODE_108
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -37,6 +34,9 @@ from ..utils.image import (
 from ..utils.imagetool import draw_pic_with_ring
 from ..utils.resource.constant import NORMAL_LIST, SPECIAL_CHAR_INT
 from ..utils.waves_api import waves_api
+from ..utils import hint
+from ..utils.error_reply import WAVES_CODE_108
+from ..utils.limit_request import check_request_rate_limit
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 

@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw
 from pydantic import BaseModel
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -41,6 +40,7 @@ from ..utils.image import (
 from ..utils.imagetool import draw_pic_with_ring
 from ..utils.resource.download_file import get_phantom_img
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import PREFIX
 
 TEXT_PATH = Path(__file__).parent / "texture2d"

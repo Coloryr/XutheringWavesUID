@@ -5,7 +5,6 @@ from typing import Union
 import aiofiles
 from PIL import Image, ImageDraw
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
@@ -42,6 +41,7 @@ from ..utils.queues.const import QUEUE_SLASH_RECORD
 from ..utils.queues.queues import push_item
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, SLASH_PATH
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 

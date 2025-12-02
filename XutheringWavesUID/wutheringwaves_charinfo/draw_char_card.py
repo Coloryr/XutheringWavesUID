@@ -6,7 +6,6 @@ from typing import Dict, Optional
 import httpx
 from PIL import Image, ImageDraw, ImageEnhance
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
@@ -92,6 +91,7 @@ from ..utils.resource.download_file import (
     get_skill_img,
 )
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import PREFIX
 from ..wutheringwaves_config.wutheringwaves_config import (
     ShowConfig,

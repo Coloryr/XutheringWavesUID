@@ -4,7 +4,6 @@ from typing import Union
 
 from PIL import Image, ImageDraw
 
-from XutheringWavesUID.utils.limit_request import check_request_rate_limit
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -32,6 +31,7 @@ from ..utils.imagetool import draw_pic, draw_pic_with_ring
 from ..utils.name_convert import char_name_to_char_id
 from ..utils.resource.RESOURCE_PATH import CHALLENGE_PATH
 from ..utils.waves_api import waves_api
+from ..utils.limit_request import check_request_rate_limit
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
