@@ -182,16 +182,14 @@ async def refresh_char(
     is_self_ck: bool = False,
     refresh_type: Union[str, List[str]] = "all",
 ) -> Union[str, List]:
+    if check_request_rate_limit():
+        return error_reply(WAVES_CODE_108)
     waves_datas = []
     if not ck:
-        if check_request_rate_limit():
-            return error_reply(WAVES_CODE_108)
         is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102)
     # 共鸣者信息
-    if check_request_rate_limit():
-        return error_reply(WAVES_CODE_108)
     role_info = await waves_api.get_role_info(uid, ck)
     if not role_info.success:
         return role_info.throw_msg()
@@ -207,8 +205,6 @@ async def refresh_char(
 
     async def limited_get_role_detail_info(role_id, uid, ck):
         async with semaphore:
-            if check_request_rate_limit():
-                return error_reply(WAVES_CODE_108)
             return await waves_api.get_role_detail_info(role_id, uid, ck)
 
     if is_self_ck:
