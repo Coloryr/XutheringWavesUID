@@ -5,10 +5,10 @@ LAST_TIME = datetime.now()
 LAST_COUNT = 0
 
 def check_request_rate_limit() -> bool:
+    global LAST_TIME
+    
     if WutheringWavesConfig.get_config("EnableLimit").data is False:
         return False
-    
-    global LAST_TIME
     
     mode = WutheringWavesConfig.get_config("LimitMode").data
     count = WutheringWavesConfig.get_config("LimitCount").data
