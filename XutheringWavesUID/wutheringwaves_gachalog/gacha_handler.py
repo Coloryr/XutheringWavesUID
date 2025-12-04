@@ -236,7 +236,7 @@ def merge_gacha_data(original_data: dict, latest_data: dict) -> dict:
                     items_before_x.append(item)
                 
                 count_existing = len(items_before_x)
-                target_count = cp_x['draw_total']
+                target_count = cp_x['draw_total'] - 1
                 
                 diff = target_count - count_existing
                 
