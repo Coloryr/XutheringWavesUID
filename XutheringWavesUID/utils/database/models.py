@@ -1,18 +1,18 @@
-from typing import Any, Dict, List, Optional, Type, TypeVar
+from typing import Any, Dict, List, Type, TypeVar, Optional
 
-from sqlalchemy import delete, null, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql import and_, or_
 from sqlmodel import Field, col, select
+from sqlalchemy import null, delete, update
+from sqlalchemy.sql import or_, and_
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from gsuid_core.webconsole.mount_app import PageSchema, GsAdminModel, site
+from gsuid_core.utils.database.startup import exec_list
 from gsuid_core.utils.database.base_models import (
     Bind,
     Push,
     User,
     with_session,
 )
-from gsuid_core.utils.database.startup import exec_list
-from gsuid_core.webconsole.mount_app import GsAdminModel, PageSchema, site
 
 exec_list.extend(
     [
@@ -21,6 +21,8 @@ exec_list.extend(
         'ALTER TABLE WavesUser ADD COLUMN bbs_sign_switch TEXT DEFAULT "off"',
         'ALTER TABLE WavesUser ADD COLUMN bat TEXT DEFAULT ""',
         'ALTER TABLE WavesUser ADD COLUMN did TEXT DEFAULT ""',
+        'ALTER TABLE WavesUser ADD COLUMN pgr_uid TEXT DEFAULT ""',
+        'ALTER TABLE WavesBind ADD COLUMN pgr_uid TEXT DEFAULT ""',
     ]
 )
 
@@ -31,16 +33,13 @@ T_WavesUser = TypeVar("T_WavesUser", bound="WavesUser")
 class WavesBind(Bind, table=True):
     __table_args__: Dict[str, Any] = {"extend_existing": True}
     uid: Optional[str] = Field(default=None, title="鸣潮UID")
+    pgr_uid: Optional[str] = Field(default=None, title="战双UID")
 
     @classmethod
     @with_session
-    async def get_group_all_uid(
-        cls: Type[T_WavesBind], session: AsyncSession, group_id: Optional[str] = None
-    ):
+    async def get_group_all_uid(cls: Type[T_WavesBind], session: AsyncSession, group_id: Optional[str] = None):
         """根据传入`group_id`获取该群号下所有绑定`uid`列表"""
-        result = await session.scalars(
-            select(cls).where(col(cls.group_id).contains(group_id))
-        )
+        result = await session.scalars(select(cls).where(col(cls.group_id).contains(group_id)))
         return result.all()
 
     @classmethod
@@ -110,6 +109,7 @@ class WavesUser(User, table=True):
     __table_args__: Dict[str, Any] = {"extend_existing": True}
     cookie: str = Field(default="", title="Cookie")
     uid: str = Field(default=None, title="鸣潮UID")
+    pgr_uid: Optional[str] = Field(default=None, title="战双UID")
     record_id: Optional[str] = Field(default=None, title="鸣潮记录ID")
     platform: str = Field(default="", title="ck平台")
     stamina_bg_value: str = Field(default="", title="体力背景")
@@ -119,15 +119,8 @@ class WavesUser(User, table=True):
 
     @classmethod
     @with_session
-    async def mark_cookie_invalid(
-        cls: Type[T_WavesUser], session: AsyncSession, uid: str, cookie: str, mark: str
-    ):
-        sql = (
-            update(cls)
-            .where(col(cls.uid) == uid)
-            .where(col(cls.cookie) == cookie)
-            .values(status=mark)
-        )
+    async def mark_cookie_invalid(cls: Type[T_WavesUser], session: AsyncSession, uid: str, cookie: str, mark: str):
+        sql = update(cls).where(col(cls.uid) == uid).where(col(cls.cookie) == cookie).values(status=mark)
         await session.execute(sql)
         return True
 
@@ -224,9 +217,7 @@ class WavesUser(User, table=True):
 
     @classmethod
     @with_session
-    async def get_waves_all_user(
-        cls: Type[T_WavesUser], session: AsyncSession
-    ) -> List[T_WavesUser]:
+    async def get_waves_all_user(cls: Type[T_WavesUser], session: AsyncSession) -> List[T_WavesUser]:
         """获取所有有效用户"""
         sql = select(cls).where(
             and_(

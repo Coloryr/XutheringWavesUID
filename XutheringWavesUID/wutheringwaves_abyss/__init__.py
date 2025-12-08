@@ -1,17 +1,17 @@
 from typing import Any, List
 
+from gsuid_core.sv import SV
 from gsuid_core.bot import Bot
 from gsuid_core.models import Event
-from gsuid_core.sv import SV
 
-from ..utils.at_help import ruser_id
-from ..utils.button import WavesButton
-from ..utils.database.models import WavesBind
-from ..utils.error_reply import WAVES_CODE_103
 from ..utils.hint import error_reply
-from ..wutheringwaves_abyss.draw_abyss_card import draw_abyss_img
-from .draw_challenge_card import draw_challenge_img
+from ..utils.button import WavesButton
+from ..utils.at_help import ruser_id
 from .draw_slash_card import draw_slash_img
+from ..utils.error_reply import WAVES_CODE_103
+from .draw_challenge_card import draw_challenge_img
+from ..utils.database.models import WavesBind
+from ..wutheringwaves_abyss.draw_abyss_card import draw_abyss_img
 
 sv_waves_abyss = SV("waves查询深渊")
 sv_waves_challenge = SV("waves查询全息")
@@ -147,6 +147,8 @@ async def send_waves_rank_slash_info(bot: Bot, ev: Event):
     block=True,
 )
 async def send_waves_rank_slash_list_info(bot: Bot, ev: Event):
+    if not ev.group_id:
+        return await bot.send("请在群聊中使用")
     from ..wutheringwaves_rank.slash_rank import draw_slash_rank_list
 
     im = await draw_slash_rank_list(bot, ev)

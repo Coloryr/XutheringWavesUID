@@ -48,7 +48,10 @@ git clone https://github.com/Loping151/XutheringWavesUID.git
 
 ## 丨其他
 
-+ 本项目仅供学习使用，请勿用于商业用途，禁止将**仅具有本插件功能**的服务进行收费
++ 本项目仅供学习使用，请勿用于商业用途，禁止将**仅具有本插件功能**的服务进行收费。涉及本插件的一切收费行为与开发者无关，开发者不参与任何收费分成。
+
+写给用户：但仍请考虑到即使仅具有本插件功能，部署也需要少量的 服务器或电费。部署并非零成本的，但绝非高成本的。
+
 + [GPL-3.0 License](https://github.com/Loping151/XutheringWavesUID/blob/main/LICENSE)
 
 ## 支持设备列表：

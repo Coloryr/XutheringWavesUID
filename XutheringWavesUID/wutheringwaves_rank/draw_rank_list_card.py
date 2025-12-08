@@ -1,8 +1,10 @@
-import asyncio
+import json
 import time
+import asyncio
+from typing import Dict, List, Union, Optional
 from pathlib import Path
-from typing import List, Optional, Union
 
+import aiofiles
 from PIL import Image, ImageDraw
 from pydantic import BaseModel
 
@@ -10,17 +12,34 @@ from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
-from gsuid_core.utils.image.image_tools import crop_center_img
 
-from ..utils.api.model import RoleDetailData
-from ..utils.cache import TimedCache
+from .slash_rank import get_avatar
 from ..utils.calc import WuWaCalc
+from ..utils.cache import TimedCache
+from ..utils.image import (
+    RED,
+    GREY,
+    AMBER,
+    WAVES_VOID,
+    SPECIAL_GOLD,
+    WAVES_MOLTEN,
+    WAVES_SIERRA,
+    WAVES_MOONLIT,
+    WAVES_FREEZING,
+    WAVES_LINGERING,
+    get_ICON,
+    add_footer,
+    get_square_avatar,
+    get_custom_waves_bg,
+)
+from ..utils.api.model import RoleDetailData
 from ..utils.calculate import (
-    calc_phantom_score,
     get_calc_map,
+    calc_phantom_score,
 )
 from ..utils.char_info_utils import get_all_role_detail_info_list
 from ..utils.database.models import WavesBind
+from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
     waves_font_12,
     waves_font_16,
@@ -31,25 +50,96 @@ from ..utils.fonts.waves_fonts import (
     waves_font_34,
     waves_font_58,
 )
-from ..utils.image import (
-    AMBER,
-    GREY,
-    RED,
-    SPECIAL_GOLD,
-    WAVES_FREEZING,
-    WAVES_LINGERING,
-    WAVES_MOLTEN,
-    WAVES_MOONLIT,
-    WAVES_SIERRA,
-    WAVES_VOID,
-    add_footer,
-    get_ICON,
-    get_qq_avatar,
-    get_square_avatar,
-    get_waves_bg,
-)
-from ..wutheringwaves_config import PREFIX
-from .slash_rank import get_avatar
+from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
+
+
+async def get_practice_rank_token_condition(ev):
+    """检查练度排行的权限配置"""
+    # 群组 不限制token
+    WavesRankNoLimitGroup = WutheringWavesConfig.get_config("WavesRankNoLimitGroup").data
+    if WavesRankNoLimitGroup and ev.group_id in WavesRankNoLimitGroup:
+        return True
+
+    # 群组 自定义的
+    WavesRankUseTokenGroup = WutheringWavesConfig.get_config("WavesRankUseTokenGroup").data
+    # 全局 主人定义的
+    RankUseToken = WutheringWavesConfig.get_config("RankUseToken").data
+    if (WavesRankUseTokenGroup and ev.group_id in WavesRankUseTokenGroup) or RankUseToken:
+        return True
+
+    return False
+
+
+def calculate_role_phantom_score(role_detail: RoleDetailData) -> float:
+    """计算单个角色的声骸总分
+
+    Args:
+        role_detail: 角色详情
+
+    Returns:
+        角色的声骸总分
+    """
+    if not role_detail.phantomData or not role_detail.phantomData.equipPhantomList:
+        return 0.0
+
+    calc: WuWaCalc = WuWaCalc(role_detail)
+    calc.phantom_pre = calc.prepare_phantom()
+    calc.phantom_card = calc.enhance_summation_phantom_value(calc.phantom_pre)
+    calc.calc_temp = get_calc_map(
+        calc.phantom_card,
+        role_detail.role.roleName,
+        role_detail.role.roleId,
+    )
+
+    phantom_score = 0.0
+    for _phantom in role_detail.phantomData.equipPhantomList:
+        if _phantom and _phantom.phantomProp:
+            props = _phantom.get_props()
+            _score, _ = calc_phantom_score(role_detail.role.roleId, props, _phantom.cost, calc.calc_temp)
+            phantom_score += _score
+
+    return phantom_score
+
+
+async def save_char_list_data(uid: str, char_list_data: Dict):
+    """保存角色评分数据到charListData.json
+
+    Args:
+        uid: 用户uid
+        char_list_data: 角色评分字典，格式为 {roleId: score}
+    """
+    try:
+        _dir = PLAYER_PATH / uid
+        _dir.mkdir(parents=True, exist_ok=True)
+        path = _dir / "charListData.json"
+
+        async with aiofiles.open(path, "w", encoding="utf-8") as file:
+            await file.write(json.dumps(char_list_data, ensure_ascii=False))
+    except Exception as e:
+        logger.debug(f"保存charListData.json失败 uid={uid}: {e}")
+
+
+async def load_char_list_data(uid: str) -> Optional[Dict]:
+    """从charListData.json读取角色评分数据
+
+    Args:
+        uid: 用户uid
+
+    Returns:
+        角色评分字典，格式为 {roleId: score}，如果文件不存在返回None
+    """
+    try:
+        path = PLAYER_PATH / uid / "charListData.json"
+        if not path.exists():
+            return None
+
+        async with aiofiles.open(path, mode="r", encoding="utf-8") as f:
+            char_list_data = json.loads(await f.read())
+            return char_list_data
+    except Exception as e:
+        logger.debug(f"读取charListData.json失败 uid={uid}: {e}")
+        return None
+
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 avatar_mask = Image.open(TEXT_PATH / "avatar_mask.png")
@@ -76,7 +166,7 @@ class PracticeRankInfo(BaseModel):
     role_details: List[RoleDetailData]  # 角色详情列表
 
 
-async def get_all_practice_rank_info(
+async def get_all_rank_list_info(
     users: List[WavesBind],
     threshold: int = 175,
 ) -> List[PracticeRankInfo]:
@@ -92,67 +182,91 @@ async def get_all_practice_rank_info(
         if not user.uid:
             continue
 
-        # 获取该用户的所有角色信息
-        role_details_list = await get_all_role_detail_info_list(user.uid)
-        if role_details_list is None:
-            continue
+        # 处理多个uid（用下划线连接）
+        for uid in user.uid.split("_"):
+            # 首先尝试从charListData.json读取缓存的角色评分
+            char_list_data = await load_char_list_data(uid)
 
-        role_details = list(role_details_list)
-        if not role_details:
-            continue
+            if char_list_data:
+                # 使用缓存的角色评分数据
+                total_score = 0.0
+                valid_role_ids = []
 
-        # 计算总声骸分数
-        total_score = 0.0
-        valid_role_details = []
+                for role_id_str, score in char_list_data.items():
+                    if score >= threshold:
+                        total_score += score
+                        valid_role_ids.append(role_id_str)
 
-        for role_detail in role_details:
-            # 检查是否有声骸装备
-            if not role_detail.phantomData or not role_detail.phantomData.equipPhantomList:
-                continue
+                if total_score == 0:
+                    continue
 
-            # 计算该角色的声骸总分
-            calc: WuWaCalc = WuWaCalc(role_detail)
-            calc.phantom_pre = calc.prepare_phantom()
-            calc.phantom_card = calc.enhance_summation_phantom_value(calc.phantom_pre)
-            calc.calc_temp = get_calc_map(
-                calc.phantom_card,
-                role_detail.role.roleName,
-                role_detail.role.roleId,
-            )
+                total_score = round(total_score, 2)
 
-            phantom_score = 0.0
-            for _phantom in role_detail.phantomData.equipPhantomList:
-                if _phantom and _phantom.phantomProp:
-                    props = _phantom.get_props()
-                    _score, _bg = calc_phantom_score(
-                        role_detail.role.roleId, props, _phantom.cost, calc.calc_temp
-                    )
-                    phantom_score += _score
+                # 获取角色详情用于排行展示
+                role_details_list = await get_all_role_detail_info_list(uid)
+                if role_details_list is None:
+                    continue
 
-            # 只计算分数>=阈值的角色
-            if phantom_score >= threshold:
-                total_score += phantom_score
-                valid_role_details.append(role_detail)
+                role_details = [r for r in role_details_list if str(r.role.roleId) in valid_role_ids]
 
-        if total_score == 0:
-            continue
+                rankInfo = PracticeRankInfo(
+                    qid=user.user_id,
+                    uid=uid,
+                    kuro_name=uid,
+                    total_score=total_score,
+                    role_details=role_details,
+                )
+                rankInfoList.append(rankInfo)
+            else:
+                # charListData.json不存在，从rawData计算并保存
+                role_details_list = await get_all_role_detail_info_list(uid)
+                if role_details_list is None:
+                    continue
 
-        total_score = round(total_score, 2)
-        rankInfo = PracticeRankInfo(
-            qid=user.user_id,
-            uid=user.uid,
-            kuro_name=user.uid,  # 使用uid作为名字，因为本地数据没有玩家昵称
-            total_score=total_score,
-            role_details=valid_role_details,
-        )
-        rankInfoList.append(rankInfo)
+                role_details = list(role_details_list)
+                if not role_details:
+                    continue
+
+                # 计算总声骸分数并保存到charListData
+                total_score = 0.0
+                valid_role_details = []
+                char_list_data = {}
+
+                for role_detail in role_details:
+                    phantom_score = calculate_role_phantom_score(role_detail)
+                    char_list_data[str(role_detail.role.roleId)] = phantom_score
+
+                    # 只计算分数>=阈值的角色
+                    if phantom_score >= threshold:
+                        total_score += phantom_score
+                        valid_role_details.append(role_detail)
+
+                # 保存计算结果到charListData.json
+                if char_list_data:
+                    await save_char_list_data(uid, char_list_data)
+
+                if total_score == 0:
+                    continue
+
+                total_score = round(total_score, 2)
+                rankInfo = PracticeRankInfo(
+                    qid=user.user_id,
+                    uid=uid,
+                    kuro_name=uid,
+                    total_score=total_score,
+                    role_details=valid_role_details,
+                )
+                rankInfoList.append(rankInfo)
 
     return rankInfoList
 
 
-async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 175) -> Union[str, bytes]:
+async def draw_rank_list(bot: Bot, ev: Event, threshold: int = 175) -> Union[str, bytes]:
     start_time = time.time()
     logger.info(f"[draw_practice_rank_list] start: {start_time}")
+
+    # 检查权限配置
+    tokenLimitFlag = await get_practice_rank_token_condition(ev)
 
     # 解析参数以获取阈值
     text = ev.text.strip() if ev.text else ""
@@ -171,14 +285,18 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
         msg = []
         msg.append(f"[鸣潮] 群【{ev.group_id}】暂无练度排行数据")
         msg.append(f"请使用【{PREFIX}刷新面板】后再使用此功能！")
+        if tokenLimitFlag:
+            msg.append(f"当前排行开启了登录验证，请使用命令【{PREFIX}登录】登录后此功能！")
         msg.append("")
         return "\n".join(msg)
 
-    rankInfoList = await get_all_practice_rank_info(list(users), threshold)
+    rankInfoList = await get_all_rank_list_info(list(users), threshold)
     if len(rankInfoList) == 0:
         msg = []
         msg.append(f"[鸣潮] 群【{ev.group_id}】暂无练度排行数据")
         msg.append(f"请使用【{PREFIX}刷新面板】后再使用此功能！")
+        if tokenLimitFlag:
+            msg.append(f"当前排行开启了登录验证，请使用命令【{PREFIX}登录】登录后此功能！")
         msg.append("")
         return "\n".join(msg)
 
@@ -226,20 +344,16 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
     char_list_len = len(rankInfoList_display)
 
     # 计算所需的总高度
-    total_height = (
-        header_height + text_bar_height + item_spacing * char_list_len + footer_height
-    )
+    total_height = header_height + text_bar_height + item_spacing * char_list_len + footer_height
 
     # 创建带背景的画布
-    card_img = get_waves_bg(width, total_height, "bg9")
+    card_img = get_custom_waves_bg(width, total_height, "bg9")
 
     text_bar_img = Image.new("RGBA", (width, 140), color=(0, 0, 0, 0))
     text_bar_draw = ImageDraw.Draw(text_bar_img)
     # 绘制深灰色背景
     bar_bg_color = (36, 36, 41, 230)
-    text_bar_draw.rounded_rectangle(
-        [20, 20, width - 40, 120], radius=8, fill=bar_bg_color
-    )
+    text_bar_draw.rounded_rectangle([20, 20, width - 40, 120], radius=8, fill=bar_bg_color)
 
     # 绘制顶部的金色高亮线
     accent_color = (203, 161, 95)
@@ -254,9 +368,7 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
         waves_font_20,
         "lm",
     )
-    text_bar_draw.text(
-        (185, 85), "2. 显示声骸分数最高的前8个角色", SPECIAL_GOLD, waves_font_20, "lm"
-    )
+    text_bar_draw.text((185, 85), "2. 显示声骸分数最高的前8个角色", SPECIAL_GOLD, waves_font_20, "lm")
 
     # 备注 - 排行标准，根据阈值动态生成文案
     temp_notes = f"排行标准：以所有角色声骸分数总和（角色分数>={threshold}（{threshold_label}级））为排序的综合排名"
@@ -295,9 +407,7 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
         # 排名背景
         info_rank = Image.new("RGBA", (50, 50), color=(255, 255, 255, 0))
         rank_draw = ImageDraw.Draw(info_rank)
-        rank_draw.rounded_rectangle(
-            [0, 0, 50, 50], radius=8, fill=rank_color + (int(0.9 * 255),)
-        )
+        rank_draw.rounded_rectangle([0, 0, 50, 50], radius=8, fill=rank_color + (int(0.9 * 255),))
         rank_draw.text((25, 25), f"{rank_id}", "white", waves_font_34, "mm")
         bar_bg.alpha_composite(info_rank, (40, 35))
 
@@ -305,13 +415,11 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
         uid_color = "white"
         if rankInfo.uid == self_uid:
             uid_color = RED
-        bar_draw.text(
-            (210, 40), f"{rankInfo.uid}", uid_color, waves_font_20, "lm"
-        )
+        bar_draw.text((210, 40), f"{rankInfo.uid}", uid_color, waves_font_20, "lm")
 
         # 绘制角色数量（根据等级显示）
         char_count = len(rankInfo.role_details)
-        bar_draw.text((210, 75), f"{threshold_label}级: {char_count}", "white", waves_font_18, "lm")
+        bar_draw.text((210, 75), f"{threshold_label}角色数: {char_count}", "white", waves_font_18, "lm")
 
         # 绘制角色信息
         if rankInfo.role_details:
@@ -332,15 +440,11 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
                 for _phantom in role.phantomData.equipPhantomList:
                     if _phantom and _phantom.phantomProp:
                         props = _phantom.get_props()
-                        _score, _ = calc_phantom_score(
-                            role.role.roleId, props, _phantom.cost, calc.calc_temp
-                        )
+                        _score, _ = calc_phantom_score(role.role.roleId, props, _phantom.cost, calc.calc_temp)
                         phantom_score += _score
                 role_scores.append((role, phantom_score))
 
-            sorted_roles = sorted(
-                role_scores, key=lambda x: x[1], reverse=True
-            )[:8]
+            sorted_roles = sorted(role_scores, key=lambda x: x[1], reverse=True)[:8]
 
             # 在条目底部绘制前5名角色的头像（放在UID右边）
             char_size = 40
@@ -362,9 +466,7 @@ async def draw_rank_list(bot: Bot, ev: Event, pages: int = 1, threshold: int = 1
                 char_avatar_masked.paste(char_avatar, (0, 0), char_mask_resized)
 
                 # 粘贴头像
-                bar_bg.paste(
-                    char_avatar_masked, (char_x, char_start_y), char_avatar_masked
-                )
+                bar_bg.paste(char_avatar_masked, (char_x, char_start_y), char_avatar_masked)
 
                 # 绘制分数
                 score_text = f"{int(score)}"

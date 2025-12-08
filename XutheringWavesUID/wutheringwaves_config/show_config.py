@@ -3,10 +3,10 @@ from typing import Dict
 from gsuid_core.data_store import get_res_path
 from gsuid_core.utils.plugins_config.models import (
     GSC,
-    GsBoolConfig,
-    GsImageConfig,
     GsIntConfig,
     GsStrConfig,
+    GsBoolConfig,
+    GsImageConfig,
 )
 
 bg_path = get_res_path(["XutheringWavesUID", "bg"])
@@ -36,8 +36,8 @@ SHOW_CONIFG: Dict[str, GSC] = {
         False,
     ),
     "CardBgPath": GsImageConfig(
-        "自定义面板背景",
-        "自定义面板背景图片",
+        "自定义背景",
+        "自定义背景图片，亦用于排行等背景",
         str(bg_path / "card.jpg"),
         str(bg_path),
         "card",

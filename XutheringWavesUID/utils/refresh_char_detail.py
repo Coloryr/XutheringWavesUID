@@ -1,6 +1,6 @@
-import asyncio
 import json
-from typing import Dict, List, Optional, Union
+import asyncio
+from typing import Dict, List, Union, Optional
 
 import aiofiles
 
@@ -11,14 +11,14 @@ from ..utils.api.model import AccountBaseInfo, RoleList
 from ..utils.error_reply import WAVES_CODE_101, WAVES_CODE_102, WAVES_CODE_108
 from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..utils.hint import error_reply
-from ..utils.queues.const import QUEUE_SCORE_RANK
-from ..utils.queues.queues import push_item
-from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
 from ..utils.util import get_version
 from ..utils.waves_api import waves_api
+from .resource.constant import SPECIAL_CHAR_INT_ALL
+from ..utils.queues.const import QUEUE_SCORE_RANK
+from ..utils.queues.queues import push_item
 from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import WutheringWavesConfig
-from .resource.constant import SPECIAL_CHAR_INT_ALL
+from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
 
 
 def is_use_global_semaphore() -> bool:
@@ -72,15 +72,7 @@ async def send_card(
     if WavesToken:
         waves_char_rank = await get_waves_char_rank(uid, save_data, True)
 
-    if (
-        is_self_ck
-        and token
-        and waves_char_rank
-        and WavesToken
-        and role_info
-        and waves_data
-        and user_id
-    ):
+    if is_self_ck and token and waves_char_rank and WavesToken and role_info and waves_data and user_id:
         # 单角色上传排行
         if len(waves_data) != 1 and len(role_info.roleList) != len(save_data):
             logger.warning(
@@ -102,7 +94,9 @@ async def send_card(
             "user_id": user_id,
             "waves_id": f"{account_info.id}",
             "kuro_name": account_info.name,
-            "version": get_version(dynamic=True, user_id=user_id, waves_id=f"{account_info.id}", char_info=str(len(waves_char_rank))),
+            "version": get_version(
+                dynamic=True, user_id=user_id, waves_id=f"{account_info.id}", char_info=str(len(waves_char_rank))
+            ),
             "char_info": [r.to_rank_dict() for r in waves_char_rank],
             "role_num": account_info.roleNum,
             "single_refresh": 1 if len(waves_data) == 1 else 0,
@@ -168,9 +162,47 @@ async def save_card_info(
     except Exception as e:
         logger.exception(f"save_card_info save failed {path}:", e)
 
+    # 保存charListData.json（角色评分缓存）
+    waves_char_rank = await get_waves_char_rank(uid, save_data, True)
+    await save_char_list_cache(uid, waves_char_rank)
+
     if waves_map:
         waves_map["refresh_update"] = refresh_update
         waves_map["refresh_unchanged"] = refresh_unchanged
+
+
+async def save_char_list_cache(uid: str, waves_char_rank: Optional[List[WavesCharRank]]):
+    """保存角色评分数据到charListData.json供练度排行使用
+
+    只更新改动的角色，而不是重写整个文件。
+
+    Args:
+        uid: 用户uid
+        waves_char_rank: WavesCharRank列表（只包含改动的角色）
+    """
+    if not waves_char_rank:
+        return
+
+    try:
+        from ..wutheringwaves_rank.draw_rank_list_card import (
+            load_char_list_data,
+            save_char_list_data,
+        )
+
+        # 加载现有的角色评分数据
+        existing_char_list_data = await load_char_list_data(uid)
+        if not existing_char_list_data:
+            existing_char_list_data = {}
+
+        # 只更新改动的角色
+        for char_rank in waves_char_rank:
+            existing_char_list_data[str(char_rank.roleId)] = char_rank.score
+
+        # 保存更新后的数据
+        if existing_char_list_data:
+            await save_char_list_data(uid, existing_char_list_data)
+    except Exception as e:
+        logger.debug(f"保存charListData.json失败 uid={uid}: {e}")
 
 
 async def refresh_char(
@@ -211,30 +243,25 @@ async def refresh_char(
         tasks = [
             limited_get_role_detail_info(f"{r.roleId}", uid, ck)
             for r in role_info.roleList
-            if refresh_type == "all"
-            or (isinstance(refresh_type, list) and f"{r.roleId}" in refresh_type)
+            if refresh_type == "all" or (isinstance(refresh_type, list) and f"{r.roleId}" in refresh_type)
         ]
     else:
         if role_info.showRoleIdList:
             tasks = [
                 limited_get_role_detail_info(f"{r}", uid, ck)
                 for r in role_info.showRoleIdList
-                if refresh_type == "all"
-                or (isinstance(refresh_type, list) and f"{r}" in refresh_type)
+                if refresh_type == "all" or (isinstance(refresh_type, list) and f"{r}" in refresh_type)
             ]
         else:
             tasks = [
                 limited_get_role_detail_info(f"{r.roleId}", uid, ck)
                 for r in role_info.roleList
-                if refresh_type == "all"
-                or (isinstance(refresh_type, list) and f"{r.roleId}" in refresh_type)
+                if refresh_type == "all" or (isinstance(refresh_type, list) and f"{r.roleId}" in refresh_type)
             ]
     results = await asyncio.gather(*tasks)
 
     charId2chainNum: Dict[int, int] = {
-        r.roleId: r.chainUnlockNum
-        for r in role_info.roleList
-        if isinstance(r.chainUnlockNum, int)
+        r.roleId: r.chainUnlockNum for r in role_info.roleList if isinstance(r.chainUnlockNum, int)
     }
     # 处理返回的数据
     for role_detail_info in results:
@@ -271,10 +298,7 @@ async def refresh_char(
 
         # 修正合鸣效果
         try:
-            if (
-                role_detail_info["phantomData"]
-                and role_detail_info["phantomData"]["equipPhantomList"]
-            ):
+            if role_detail_info["phantomData"] and role_detail_info["phantomData"]["equipPhantomList"]:
                 for i in role_detail_info["phantomData"]["equipPhantomList"]:
                     if not isinstance(i, dict):
                         continue

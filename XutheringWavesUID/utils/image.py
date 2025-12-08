@@ -1,33 +1,34 @@
 import os
 import random
 from io import BytesIO
+from typing import Tuple, Union, Literal, Optional
 from pathlib import Path
-from typing import Literal, Optional, Tuple, Union
 
 from PIL import (
     Image,
-    ImageDraw,
-    ImageEnhance,
-    ImageFilter,
-    ImageFont,
     ImageOps,
+    ImageDraw,
+    ImageFont,
+    ImageFilter,
+    ImageEnhance,
 )
 
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
-from gsuid_core.utils.image.image_tools import crop_center_img
 from gsuid_core.utils.image.utils import sget
+from gsuid_core.utils.image.image_tools import crop_center_img
 
 from ..utils.resource.RESOURCE_PATH import (
     AVATAR_PATH,
-    CUSTOM_CARD_PATH,
-    CUSTOM_MR_CARD_PATH,
-    CUSTOM_MR_BG_PATH,
-    ROLE_PILE_PATH,
+    WEAPON_PATH,
     ROLE_BG_PATH,
     SHARE_BG_PATH,
-    WEAPON_PATH,
+    ROLE_PILE_PATH,
+    CUSTOM_CARD_PATH,
+    CUSTOM_MR_BG_PATH,
+    CUSTOM_MR_CARD_PATH,
 )
+from ..wutheringwaves_config.wutheringwaves_config import ShowConfig
 
 ICON = Path(__file__).parent.parent.parent / "ICON.png"
 TEXT_PATH = Path(__file__).parent / "texture2d"
@@ -135,6 +136,7 @@ async def get_random_waves_role_pile(char_id: Optional[str] = None, force_not_us
     path = random.choice(os.listdir(f"{ROLE_PILE_PATH}"))
     return Image.open(f"{ROLE_PILE_PATH}/{path}").convert("RGBA")
 
+
 async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custom: bool = False):
     if char_id:
         custom_dir = f"{CUSTOM_MR_BG_PATH}/{char_id}"
@@ -147,11 +149,9 @@ async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custo
             path = ROLE_BG_PATH / name
             if os.path.exists(path):
                 return Image.open(path).convert("RGBA"), True
-        
+
     else:
-        bg_list = [
-            f for f in os.listdir(f"{CUSTOM_MR_BG_PATH}") if os.path.isdir(f"{CUSTOM_MR_BG_PATH}/{f}")
-        ]
+        bg_list = [f for f in os.listdir(f"{CUSTOM_MR_BG_PATH}") if os.path.isdir(f"{CUSTOM_MR_BG_PATH}/{f}")]
         if not force_not_use_custom and bg_list:
             char_id = random.choice(bg_list)
             custom_dir = f"{CUSTOM_MR_BG_PATH}/{char_id}"
@@ -159,18 +159,17 @@ async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custo
                 path = _random_image_from_dir(custom_dir)
                 if path:
                     return Image.open(f"{custom_dir}/{path}").convert("RGBA"), True
-                
+
         else:
             name = random.choice(os.listdir(f"{ROLE_BG_PATH}"))
             path = ROLE_BG_PATH / name
             if os.path.exists(path):
                 return Image.open(path).convert("RGBA"), True
-            
+
     return await get_random_waves_role_pile(char_id, force_not_use_custom), False
 
-async def get_role_pile(
-    resource_id: Union[int, str], custom: bool = False
-) -> tuple[bool, Image.Image]:
+
+async def get_role_pile(resource_id: Union[int, str], custom: bool = False) -> tuple[bool, Image.Image]:
     if custom:
         custom_dir = f"{CUSTOM_CARD_PATH}/{resource_id}"
         if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
@@ -182,9 +181,8 @@ async def get_role_pile(
     path = ROLE_PILE_PATH / name
     return False, Image.open(path).convert("RGBA")
 
-async def get_role_pile_default(
-    resource_id: Union[int, str], custom: bool = False
-) -> Image.Image:
+
+async def get_role_pile_default(resource_id: Union[int, str], custom: bool = False) -> Image.Image:
     if custom:
         custom_dir = f"{CUSTOM_MR_CARD_PATH}/{resource_id}"
         if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
@@ -247,22 +245,45 @@ async def get_attribute(name: str = "", is_simple: bool = False) -> Image.Image:
 
 
 async def get_attribute_prop(name: str = "") -> Image.Image:
-    return Image.open(TEXT_PATH / f"attribute_prop/attr_prop_{name}.png").convert(
-        "RGBA"
-    )
+    if (TEXT_PATH / "attribute_prop" / f"attr_prop_{name}.png").exists():
+        return Image.open(TEXT_PATH / "attribute_prop" / f"attr_prop_{name}.png").convert("RGBA")
+    else:
+        return Image.open(TEXT_PATH / "attribute_prop" / "attr_prop_攻击.png").convert("RGBA")
 
 
 async def get_attribute_effect(name: str = "") -> Image.Image:
-    return Image.open(TEXT_PATH / f"attribute_effect/attr_{name}.png").convert("RGBA")
+    if (TEXT_PATH / "attribute_effect" / f"attr_{name}.png").exists():
+        return Image.open(TEXT_PATH / "attribute_effect" / f"attr_{name}.png").convert("RGBA")
+    else:
+        return Image.open(TEXT_PATH / "attribute_effect" / "attr_不绝余音.png").convert("RGBA")
 
 
-async def get_weapon_type(name: str = "") -> Image.Image:
+async def get_weapon_type(name: str = "") -> Image.Image:  # 出新武器改这里
     return Image.open(TEXT_PATH / f"weapon_type/weapon_type_{name}.png").convert("RGBA")
 
 
 def get_waves_bg(w: int, h: int, bg: str = "bg") -> Image.Image:
     img = Image.open(TEXT_PATH / f"{bg}.jpg").convert("RGBA")
     return crop_center_img(img, w, h)
+
+
+def get_custom_waves_bg(  # 不是所有地方都适合替换为custom，函数分开
+    w: int,
+    h: int,
+    bg: str = "bg",
+):
+    img: Optional[Image.Image] = None
+    if ShowConfig.get_config("CardBg").data:
+        bg_path = Path(ShowConfig.get_config("CardBgPath").data)
+        if bg_path.exists():
+            img = Image.open(bg_path).convert("RGBA")
+            img = crop_center_img(img, w, h)
+
+    if not img:
+        img = get_waves_bg(w, h, bg)
+
+    img = _get_custom_gaussian_blur(img)
+    return img
 
 
 def get_crop_waves_bg(w: int, h: int, bg: str = "bg") -> Image.Image:
@@ -285,7 +306,7 @@ async def get_qq_avatar(
     if qid:
         avatar_url = f"http://q1.qlogo.cn/g?b=qq&nk={qid}&s={size}"
     elif avatar_url is None:
-        return None # 并非 QQ 来源
+        return None  # 并非 QQ 来源
     char_pic = Image.open(BytesIO((await sget(avatar_url)).content)).convert("RGBA")
     return char_pic
 
@@ -412,17 +433,13 @@ def draw_text_with_shadow(
     """描边"""
     for i in range(-offset[0], offset[0] + 1):
         for j in range(-offset[1], offset[1] + 1):
-            image.text(
-                (_x + i, _y + j), text, font=font, fill=shadow_color, anchor=anchor
-            )
+            image.text((_x + i, _y + j), text, font=font, fill=shadow_color, anchor=anchor)
 
     image.text((_x, _y), text, font=font, fill=fill_color, anchor=anchor)
     image.text((_x, _y), text, font=font, fill=fill_color, anchor=anchor)
 
 
-def compress_to_webp(
-    image_path: Path, quality: int = 80, delete_original: bool = False
-) -> tuple[bool, Path]:
+def compress_to_webp(image_path: Path, quality: int = 80, delete_original: bool = False) -> tuple[bool, Path]:
     try:
         from PIL import Image
 
@@ -451,9 +468,7 @@ def compress_to_webp(
         # 计算压缩率
         webp_size = webp_path.stat().st_size
         compression_ratio = (1 - webp_size / orig_size) * 100 if orig_size > 0 else 0
-        logger.info(
-            f"图片 {image_path.name} 压缩为webp格式, 压缩率: {compression_ratio:.2f}%"
-        )
+        logger.info(f"图片 {image_path.name} 压缩为webp格式, 压缩率: {compression_ratio:.2f}%")
 
         # 删除原图片（如果需要）
         if delete_original:
@@ -510,6 +525,10 @@ async def pic_download_from_url(
 
 
 async def get_custom_gaussian_blur(img: Image.Image) -> Image.Image:
+    return _get_custom_gaussian_blur(img)
+
+
+def _get_custom_gaussian_blur(img: Image.Image) -> Image.Image:
     from ..wutheringwaves_config.wutheringwaves_config import ShowConfig
 
     radius = ShowConfig.get_config("BlurRadius").data

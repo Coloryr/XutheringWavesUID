@@ -1,13 +1,14 @@
-import asyncio
+import re
 import copy
 import json
-import re
 import time
-from pathlib import Path
+import asyncio
 from typing import List, Optional
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
-import aiofiles
 import httpx
+import aiofiles
 from PIL import Image, ImageDraw
 
 from gsuid_core.bot import Bot
@@ -16,46 +17,68 @@ from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.image_tools import crop_center_img
 
+from ..utils.util import get_version
+from ..utils.cache import TimedCache
+from ..utils.image import (
+    RED,
+    GREY,
+    AMBER,
+    WAVES_VOID,
+    WAVES_MOLTEN,
+    WAVES_SIERRA,
+    WAVES_MOONLIT,
+    WAVES_FREEZING,
+    WAVES_LINGERING,
+    get_ICON,
+    add_footer,
+    get_waves_bg,
+    get_qq_avatar,
+    get_square_avatar,
+    pic_download_from_url,
+)
 from ..utils.api.model import SlashDetail
 from ..utils.api.wwapi import (
     GET_SLASH_RANK_URL,
     SlashRank,
-    SlashRankItem,
     SlashRankRes,
+    SlashRankItem,
 )
 from ..utils.ascension.char import get_char_model
-from ..utils.cache import TimedCache
 from ..utils.database.models import WavesBind
+from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
     waves_font_12,
-    waves_font_16,
     waves_font_18,
     waves_font_20,
     waves_font_34,
     waves_font_44,
     waves_font_58,
 )
-from ..utils.image import (
-    AMBER,
-    RED,
-    WAVES_FREEZING,
-    WAVES_LINGERING,
-    WAVES_MOLTEN,
-    WAVES_MOONLIT,
-    WAVES_SIERRA,
-    WAVES_VOID,
-    add_footer,
-    get_ICON,
-    get_qq_avatar,
-    get_square_avatar,
-    get_waves_bg,
-    pic_download_from_url,
+from ..wutheringwaves_abyss.period import (
+    SLASH_BASE_TIMESTAMP,
+    get_slash_period_number,
+    is_slash_record_expired,
 )
 from ..utils.resource.RESOURCE_PATH import SLASH_PATH
-from ..utils.util import get_version
-from ..utils.waves_api import waves_api
 from ..wutheringwaves_abyss.draw_slash_card import COLOR_QUALITY
-from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
+
+
+async def get_endless_rank_token_condition(ev):
+    """检查无尽排行的权限配置"""
+    # 群组 不限制token
+    WavesRankNoLimitGroup = WutheringWavesConfig.get_config("WavesRankNoLimitGroup").data
+    if WavesRankNoLimitGroup and ev.group_id in WavesRankNoLimitGroup:
+        return True
+
+    # 群组 自定义的
+    WavesRankUseTokenGroup = WutheringWavesConfig.get_config("WavesRankUseTokenGroup").data
+    # 全局 主人定义的
+    RankUseToken = WutheringWavesConfig.get_config("RankUseToken").data
+    if (WavesRankUseTokenGroup and ev.group_id in WavesRankUseTokenGroup) or RankUseToken:
+        return True
+
+    return False
+
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 avatar_mask = Image.open(TEXT_PATH / "avatar_mask.png")
@@ -71,6 +94,30 @@ BOT_COLOR = [
     WAVES_LINGERING,
     WAVES_MOONLIT,
 ]
+
+CHINA_TZ = timezone(timedelta(hours=8))
+
+
+def parse_rank_date(date_str: str) -> Optional[datetime]:
+    if not date_str:
+        return None
+
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y-%m-%d %H:%M:%S"):
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            return dt.replace(tzinfo=CHINA_TZ)
+        except ValueError:
+            continue
+
+    try:
+        dt = datetime.fromisoformat(date_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=CHINA_TZ)
+        else:
+            dt = dt.astimezone(CHINA_TZ)
+        return dt
+    except ValueError:
+        return None
 
 
 def get_score_color(score: int):
@@ -166,6 +213,19 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
     title_text = "#无尽总排行"
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
+    period_label = None
+    if rankInfoList.data and rankInfoList.data.start_date:
+        rank_dt = parse_rank_date(rankInfoList.data.start_date)
+        if rank_dt:
+            period_label = f"第{get_slash_period_number(rank_dt)}期"
+    if period_label:
+        title_bg_draw.text(
+            (225, 360),
+            period_label,
+            GREY,
+            waves_font_20,
+            "lm",
+        )
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")
@@ -208,9 +268,7 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
         def draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30)):
             info_rank = Image.new("RGBA", size, color=(255, 255, 255, 0))
             rank_draw = ImageDraw.Draw(info_rank)
-            rank_draw.rounded_rectangle(
-                [0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),)
-            )
+            rank_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),))
             rank_draw.text(draw, f"{rank_id}", "white", waves_font_34, "mm")
             role_bg.alpha_composite(info_rank, dest)
 
@@ -223,17 +281,13 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
             draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30))
 
         # 名字
-        role_bg_draw.text(
-            (210, 75), f"{rank_temp.kuro_name}", "white", waves_font_20, "lm"
-        )
+        role_bg_draw.text((210, 75), f"{rank_temp.kuro_name}", "white", waves_font_20, "lm")
 
         # uid
         uid_color = "white"
         if rank_temp.waves_id == item.waves_id:
             uid_color = RED
-        role_bg_draw.text(
-            (350, 40), f"特征码: {rank_temp.waves_id}", uid_color, waves_font_20, "lm"
-        )
+        role_bg_draw.text((350, 40), f"特征码: {rank_temp.waves_id}", uid_color, waves_font_20, "lm")
 
         # bot主人名字
         botName = rank_temp.alias_name if rank_temp.alias_name else ""
@@ -247,12 +301,8 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
 
             info_block = Image.new("RGBA", (200, 30), color=(255, 255, 255, 0))
             info_block_draw = ImageDraw.Draw(info_block)
-            info_block_draw.rounded_rectangle(
-                [0, 0, 200, 30], radius=6, fill=color + (int(0.6 * 255),)
-            )
-            info_block_draw.text(
-                (100, 15), f"bot: {botName}", "white", waves_font_18, "mm"
-            )
+            info_block_draw.rounded_rectangle([0, 0, 200, 30], radius=6, fill=color + (int(0.6 * 255),))
+            info_block_draw.text((100, 15), f"bot: {botName}", "white", waves_font_18, "mm")
             role_bg.alpha_composite(info_block, (350, 66))
 
         # 总分数
@@ -265,10 +315,9 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
         )
 
         for half_index, slash_half in enumerate(rank_temp.half_list):
-
             for role_index, char_detail in enumerate(slash_half.char_detail):
                 char_id = char_detail.char_id
-                char_level = char_detail.level
+                # char_level = char_detail.level
                 char_chain = char_detail.chain
 
                 char_model = get_char_model(char_id)
@@ -280,9 +329,7 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
                 if char_chain != -1:
                     info_block = Image.new("RGBA", (20, 20), color=(255, 255, 255, 0))
                     info_block_draw = ImageDraw.Draw(info_block)
-                    info_block_draw.rectangle(
-                        [0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255))
-                    )
+                    info_block_draw.rectangle([0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255)))
                     info_block_draw.text(
                         (8, 8),
                         f"{char_chain}",
@@ -292,9 +339,7 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
                     )
                     char_avatar.paste(info_block, (30, 30), info_block)
 
-                role_bg.alpha_composite(
-                    char_avatar, (570 + half_index * 250 + role_index * 50, 20)
-                )
+                role_bg.alpha_composite(char_avatar, (570 + half_index * 250 + role_index * 50, 20))
 
             # buff
             buff_bg = Image.new("RGBA", (50, 50), (255, 255, 255, 0))
@@ -371,9 +416,7 @@ async def get_avatar(
 class SlashRankListInfo:
     """无尽排行信息"""
 
-    def __init__(
-        self, user_id: str, uid: str, slash_data: Optional[SlashDetail] = None
-    ):
+    def __init__(self, user_id: str, uid: str, slash_data: Optional[SlashDetail] = None):
         self.user_id = user_id
         self.uid = uid
         self.slash_data = slash_data
@@ -381,9 +424,7 @@ class SlashRankListInfo:
 
         if slash_data and slash_data.difficultyList:
             # 获取难度12的分数
-            difficulty_12 = next(
-                (k for k in slash_data.difficultyList if k.difficulty == 2), None
-            )
+            difficulty_12 = next((k for k in slash_data.difficultyList if k.difficulty == 2), None)
             if difficulty_12 and difficulty_12.challengeList:
                 challenge = difficulty_12.challengeList[0]
                 if challenge.halfList:
@@ -403,26 +444,41 @@ async def get_all_slash_rank_info(
         if not user.uid:
             continue
 
-        # 从本地读取该用户的无尽数据
-        try:
-            slash_data_path = Path(PLAYER_PATH / user.uid / "slashData.json")
-            if not slash_data_path.exists():
+        # 处理多个uid（用下划线连接）
+        for uid in user.uid.split("_"):
+            # 从本地读取该用户的无尽数据
+            try:
+                slash_data_path = Path(PLAYER_PATH / uid / "slashData.json")
+                if not slash_data_path.exists():
+                    continue
+
+                async with aiofiles.open(slash_data_path, mode="r", encoding="utf-8") as f:
+                    slash_raw = json.loads(await f.read())
+
+                record_time = None
+                slash_data = slash_raw
+                if isinstance(slash_raw, dict) and "slash_data" in slash_raw:
+                    record_time = slash_raw.get("record_time", SLASH_BASE_TIMESTAMP)
+                    slash_data = slash_raw.get("slash_data")
+
+                if not isinstance(slash_data, dict) or not slash_data:
+                    continue
+
+                if is_slash_record_expired(record_time):
+                    logger.debug(f"用户{uid}无尽数据已过期，跳过")
+                    continue
+
+                if not slash_data.get("isUnlock", False):
+                    continue
+
+                slash_data = SlashDetail.model_validate(slash_data)
+
+                rankInfo = SlashRankListInfo(user.user_id, uid, slash_data)
+                if rankInfo.score > 0:
+                    rankInfoList.append(rankInfo)
+            except Exception as e:
+                logger.debug(f"获取用户{uid}本地无尽数据失败: {e}")
                 continue
-
-            async with aiofiles.open(slash_data_path, mode="r", encoding="utf-8") as f:
-                slash_data = json.loads(await f.read())
-
-            if not slash_data or not slash_data.get("isUnlock", False):
-                continue
-
-            slash_data = SlashDetail.model_validate(slash_data)
-
-            rankInfo = SlashRankListInfo(user.user_id, user.uid, slash_data)
-            if rankInfo.score > 0:
-                rankInfoList.append(rankInfo)
-        except Exception as e:
-            logger.debug(f"获取用户{user.uid}本地无尽数据失败: {e}")
-            continue
 
     return rankInfoList
 
@@ -488,12 +544,17 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
     start_time = time.time()
     logger.info(f"[draw_slash_rank_list] start: {start_time}")
 
+    # 检查权限配置
+    tokenLimitFlag = await get_endless_rank_token_condition(ev)
+
     # 获取群里的所有用户
     users = await WavesBind.get_group_all_uid(ev.group_id)
     if not users:
         msg = []
         msg.append(f"[鸣潮] 群【{ev.group_id}】暂无无尽排行数据")
         msg.append(f"请使用【{PREFIX}无尽】后再使用此功能！")
+        if tokenLimitFlag:
+            msg.append(f"当前排行开启了登录验证，请使用命令【{PREFIX}登录】登录后此功能！")
         msg.append("")
         return "\n".join(msg)
 
@@ -502,6 +563,8 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         msg = []
         msg.append(f"[鸣潮] 群【{ev.group_id}】暂无无尽排行数据")
         msg.append(f"请使用【{PREFIX}无尽】后再使用此功能！")
+        if tokenLimitFlag:
+            msg.append(f"当前排行开启了登录验证，请使用命令【{PREFIX}登录】登录后此功能！")
         msg.append("")
         return "\n".join(msg)
 
@@ -556,6 +619,13 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
     title_text = "#无尽群排行"
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
+    title_bg_draw.text(
+        (225, 360),
+        f"第{get_slash_period_number()}期",
+        GREY,
+        waves_font_20,
+        "lm",
+    )
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")
@@ -594,9 +664,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         def draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30)):
             info_rank = Image.new("RGBA", size, color=(255, 255, 255, 0))
             rank_draw = ImageDraw.Draw(info_rank)
-            rank_draw.rounded_rectangle(
-                [0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),)
-            )
+            rank_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),))
             rank_draw.text(draw, f"{rank_id}", "white", waves_font_34, "mm")
             role_bg.alpha_composite(info_rank, dest)
 
@@ -610,9 +678,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         # 计算出场角色的金数
         char_gold_total = 0
         if rankInfo.slash_data and rankInfo.slash_data.difficultyList:
-            difficulty_12 = next(
-                (k for k in rankInfo.slash_data.difficultyList if k.difficulty == 2), None
-            )
+            difficulty_12 = next((k for k in rankInfo.slash_data.difficultyList if k.difficulty == 2), None)
             if difficulty_12 and difficulty_12.challengeList:
                 challenge = difficulty_12.challengeList[0]
                 if challenge.halfList:
@@ -620,18 +686,14 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
                         for slash_role in slash_half.roleList:
                             chain_count = await get_role_chain_count(rankInfo.uid, slash_role.roleId)
                             char_gold_total += (chain_count + 1) if chain_count >= 0 else 0
-       
-        role_bg_draw.text(
-            (210, 40), f"角色金数: {char_gold_total}", "white", waves_font_18, "lm"
-        )
+
+        role_bg_draw.text((210, 40), f"角色金数: {char_gold_total}", "white", waves_font_18, "lm")
 
         # 特征码（白色UID）
         uid_color = "white"
         if rankInfo.uid == self_uid:
             uid_color = RED
-        role_bg_draw.text(
-            (210, 70), f"{rankInfo.uid}", uid_color, waves_font_20, "lm"
-        )
+        role_bg_draw.text((210, 70), f"{rankInfo.uid}", uid_color, waves_font_20, "lm")
 
         # 总分数
         role_bg_draw.text(
@@ -645,9 +707,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         # 绘制角色和信物信息
         if rankInfo.slash_data and rankInfo.slash_data.difficultyList:
             # 获取难度12的数据
-            difficulty_12 = next(
-                (k for k in rankInfo.slash_data.difficultyList if k.difficulty == 2), None
-            )
+            difficulty_12 = next((k for k in rankInfo.slash_data.difficultyList if k.difficulty == 2), None)
             if difficulty_12 and difficulty_12.challengeList:
                 challenge = difficulty_12.challengeList[0]
                 if challenge.halfList:
@@ -663,9 +723,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
                                 if chain_count != -1:
                                     info_block = Image.new("RGBA", (20, 20), color=(255, 255, 255, 0))
                                     info_block_draw = ImageDraw.Draw(info_block)
-                                    info_block_draw.rectangle(
-                                        [0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255))
-                                    )
+                                    info_block_draw.rectangle([0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255)))
                                     info_block_draw.text(
                                         (8, 8),
                                         f"{chain_count}",
