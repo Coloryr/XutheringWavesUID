@@ -108,6 +108,9 @@ async def download_all_resource():
         "小维资源"
     )
     
+    if "win" in PLATFORM:
+        logger.warning("如下载失败原因为 Permission Denied, 请尝试core关闭以后手动重新启动core")
+    
     from ..calculate import reload_calculate_module
     from ..safety import reload_safety_module
     from ..map.damage.damage import reload_damage_module
