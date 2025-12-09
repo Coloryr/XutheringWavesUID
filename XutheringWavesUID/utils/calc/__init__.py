@@ -75,14 +75,21 @@ class WuWaCalc(object):
     def sum_phantom_value(self, result: Dict[str, str], prop_list: List[Props]) -> Dict:
         name_per = ["攻击", "生命", "防御"]
 
+        logger.warning(f"声骸属性列表: {prop_list}")
+
         for prop in prop_list:
             per = "%" in prop.attributeValue
             name = prop.attributeName
             if per and name in name_per:
                 name = f"{name}%"
+            elif not per and "%" and name not in name_per:
+                per = True
+                prop.attributeValue = prop.attributeValue + "%"
             if name not in result:
                 result[name] = prop.attributeValue
                 continue
+
+            logger.warning(f"声骸属性: {name} - {result[name]} - {prop.attributeValue}")
 
             if per:
                 old = float(result[name].replace("%", ""))
