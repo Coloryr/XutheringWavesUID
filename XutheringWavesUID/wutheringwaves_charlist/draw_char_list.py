@@ -29,6 +29,7 @@ from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.ascension.weapon import get_breach
+from ..utils.ascension.char import char_id_data, ensure_data_loaded
 from ..utils.fonts.waves_fonts import (
     waves_font_16,
     waves_font_18,
@@ -42,7 +43,7 @@ from ..utils.fonts.waves_fonts import (
     waves_font_40,
     waves_font_42,
 )
-from ..utils.resource.constant import NORMAL_LIST
+from ..utils.resource.constant import NORMAL_LIST, NORMAL_LIST_IDS, SPECIAL_CHAR_NAME
 from ..utils.refresh_char_detail import refresh_char
 from ..utils.resource.download_file import get_skill_img
 
@@ -147,6 +148,17 @@ async def draw_char_list_img(
         title_bar_draw.text((810, 125), "世界等级", GREY, waves_font_26, "mm")
         title_bar_draw.text((810, 78), f"Lv.{account_info.worldLevel}", "white", waves_font_42, "mm")
         card_img.paste(title_bar, (-20, 70), title_bar)
+
+    # 计算游戏中所有UP五星角色的总数
+    ensure_data_loaded()
+    all_up_num = 0
+    for char_id, char_data in char_id_data.items():
+        if (
+            char_data.get("starLevel") == 5
+            and int(char_id) not in NORMAL_LIST_IDS
+            and str(char_id) not in SPECIAL_CHAR_NAME
+        ):
+            all_up_num += 1
 
     # up角色
     up_num = 0
@@ -295,7 +307,7 @@ async def draw_char_list_img(
     # 简单描述
     info_bg = Image.open(TEXT_PATH / "info_bg.png")
     info_bg_draw = ImageDraw.Draw(info_bg)
-    info_bg_draw.text((240, 120), f"{up_num}/{all_num}", "white", waves_font_40, "mm")
+    info_bg_draw.text((240, 120), f"{up_num}/{all_up_num}", "white", waves_font_40, "mm")
     info_bg_draw.text((240, 160), "up角色", "white", waves_font_20, "mm")
 
     info_bg_draw.text((410, 120), f"{level_num}/{all_num}", "white", waves_font_40, "mm")

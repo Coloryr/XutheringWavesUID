@@ -56,29 +56,22 @@ ID_MAPPING = {
 
 def _dynamic_load_and_register(attr_name, register_cls, force_reload=False):
     current_globals = globals()
-
     for char_id, module_suffix in ID_MAPPING.items():
         module_path = f"..waves_build.damage_{module_suffix}"
-
         try:
             module = importlib.import_module(module_path, package=__package__)
-
             if force_reload:
                 importlib.reload(module)
-
             if not hasattr(module, attr_name):
                 continue
 
             target_obj = getattr(module, attr_name)
-
             register_cls.register_class(char_id, target_obj)
-
             global_var_name = f"{attr_name.split('_')[0]}_{char_id}"
-
             current_globals[global_var_name] = target_obj
 
-        except ImportError:
-            pass
+        except ImportError as e:
+            logger.warning(f"[Warning] 模块 {module_path} 未找到，跳过加载 {char_id} 的数据: {e}")
         except Exception as e:
             logger.warning(f"[Warning] Failed to load {module_path} for {char_id}: {e}")
 
@@ -91,13 +84,20 @@ def register_rank(reload=False):
     _dynamic_load_and_register(attr_name="rank", register_cls=DamageRankRegister, force_reload=reload)
 
 
-try:
-    register_damage(reload=False)
-    register_rank(reload=False)
-except Exception:
-    logger.warning("无法导入 计算模块，将尝试下载")
-
-
 def reload_all_register():
+    # 注册
+    from ...queues import init_queues
+    from ...damage.register_char import register_char
+    from ...damage.register_echo import register_echo
+    from ...damage.register_weapon import register_weapon
+    
+    register_weapon()
+    register_echo()
+    
     register_damage(reload=True)
     register_rank(reload=True)
+    
+    register_char()
+
+    # 初始化任务队列
+    init_queues()

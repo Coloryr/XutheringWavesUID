@@ -120,10 +120,15 @@ def get_char_detail2(role) -> WavesCharResult:
     return get_char_detail(role_id, role_level, role_breach)
 
 
-def get_char_id(char_name):
+def get_char_id(char_name, loose: bool = False) -> Optional[str]:
     ensure_data_loaded()
-    return next((_id for _id, value in char_id_data.items() if value["name"] == char_name), None)
-
+    if not loose:
+        return next((_id for _id, value in char_id_data.items() if value["name"] == char_name), None)
+    else:
+        for _id, value in char_id_data.items():
+            if char_name in value["name"] or value["name"] in char_name:
+                return _id
+        return None
 
 def get_char_model(char_id: Union[str, int]) -> Optional[CharacterModel]:
     ensure_data_loaded()

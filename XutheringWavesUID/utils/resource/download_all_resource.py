@@ -7,7 +7,7 @@ from gsuid_core.utils.download_resource.download_core import download_all_file
 
 from .RESOURCE_PATH import (
     MAP_PATH,
-    BUILD_PATH,
+    BUILD_TEMP,
     AVATAR_PATH,
     WEAPON_PATH,
     PHANTOM_PATH,
@@ -16,7 +16,7 @@ from .RESOURCE_PATH import (
     MATERIAL_PATH,
     SHARE_BG_PATH,
     MAP_ALIAS_PATH,
-    MAP_BUILD_PATH,
+    MAP_BUILD_TEMP,
     ROLE_PILE_PATH,
     XFM_GUIDE_PATH,
     XMU_GUIDE_PATH,
@@ -83,10 +83,10 @@ async def download_all_resource(force: bool = False):
     if force:
         import shutil
 
-        shutil.rmtree(BUILD_PATH, ignore_errors=True)
-        shutil.rmtree(MAP_BUILD_PATH, ignore_errors=True)
-        BUILD_PATH.mkdir(parents=True, exist_ok=True)
-        MAP_BUILD_PATH.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(BUILD_TEMP, ignore_errors=True)
+        shutil.rmtree(MAP_BUILD_TEMP, ignore_errors=True)
+        BUILD_TEMP.mkdir(parents=True, exist_ok=True)
+        MAP_BUILD_TEMP.mkdir(parents=True, exist_ok=True)
 
     await download_all_file(
         "XutheringWavesUID",
@@ -107,8 +107,8 @@ async def download_all_resource(force: bool = False):
             "resource/guide/XiaoYang": XIAOYANG_GUIDE_PATH,
             "resource/guide/WuHen": WUHEN_GUIDE_PATH,
             "resource/guide/XFM": XFM_GUIDE_PATH,
-            f"resource/build/{PLATFORM}/waves_build": BUILD_PATH,
-            f"resource/build/{PLATFORM}/map/waves_build": MAP_BUILD_PATH,
+            f"resource/build/{PLATFORM}/waves_build": BUILD_TEMP,
+            f"resource/build/{PLATFORM}/map/waves_build": MAP_BUILD_TEMP,
             "resource/map": MAP_PATH,
             "resource/map/character": MAP_CHAR_PATH,
             "resource/map/detail_json": MAP_DETAIL_PATH,
@@ -119,13 +119,7 @@ async def download_all_resource(force: bool = False):
         "小维资源",
     )
 
-    if "win" in PLATFORM:
-        logger.warning(
-            "如下载失败原因为 Permission Denied, 请手动删除 ./XutheringWavesUID/utils/waves_build 和 ./XutheringWavesUID/utils/map/waves_build 文件夹后重试，或尝试 强制下载全部资源"
-        )
-
-    from ..safety import reload_safety_module
-    from ..calculate import reload_calculate_module
+def reload_all_modules():
 
     # 强制加载所有 map 数据
     from ..name_convert import ensure_data_loaded as ensure_name_convert_loaded
@@ -133,14 +127,7 @@ async def download_all_resource(force: bool = False):
     from ..ascension.echo import ensure_data_loaded as ensure_echo_loaded
     from ..ascension.sonata import ensure_data_loaded as ensure_sonata_loaded
     from ..ascension.weapon import ensure_data_loaded as ensure_weapon_loaded
-    from ..map.damage.damage import reload_damage_module
     from ..map.damage.register import reload_all_register
-
-    # no async
-    reload_calculate_module()
-    reload_safety_module()
-    reload_damage_module()
-    reload_all_register()
 
     # 在下载完成后强制加载所有数据
     ensure_name_convert_loaded(force=True)
@@ -148,3 +135,5 @@ async def download_all_resource(force: bool = False):
     ensure_weapon_loaded(force=True)
     ensure_echo_loaded(force=True)
     ensure_sonata_loaded(force=True)
+
+    reload_all_register()

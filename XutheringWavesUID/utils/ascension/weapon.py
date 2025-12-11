@@ -127,12 +127,22 @@ def get_weapon_detail(
     return result
 
 
-def get_weapon_id(weapon_name):
+def get_weapon_id(weapon_name, loose: bool = False) -> Optional[str]:
     ensure_data_loaded()
-    return next(
-        (_id for _id, value in weapon_id_data.items() if value["name"] == weapon_name),
-        None,
-    )
+    if not loose:
+        return next(
+            (_id for _id, value in weapon_id_data.items() if value["name"] == weapon_name),
+            None,
+        )
+    else:
+        for _id, value in weapon_id_data.items():
+            if value["name"] == weapon_name:
+                return _id
+        for _id, value in weapon_id_data.items():
+            for alias in value.get("alias", []):
+                if alias == weapon_name:
+                    return _id
+    return None
 
 
 def get_weapon_star(weapon_name) -> int:

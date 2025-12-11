@@ -297,7 +297,7 @@ async def draw_calendar_gacha(side_module, gacha_type):
                 return None
 
             if gacha_type == "角色":
-                id = get_char_id(name)
+                id = get_char_id(name, loose=True)
                 if id is None:
                     return None
                 pic = await get_square_avatar(id)

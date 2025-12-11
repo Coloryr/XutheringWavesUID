@@ -12,6 +12,7 @@ from ..utils.resource.RESOURCE_PATH import (
     CUSTOM_ECHO_ALIAS_PATH,
     CUSTOM_SONATA_ALIAS_PATH,
     CUSTOM_WEAPON_ALIAS_PATH,
+    CUSTOM_ID2NAME_PATH,
 )
 
 # 别名数据已移动到 resource/map/alias
@@ -38,17 +39,21 @@ def add_dictionaries(dict1, dict2):
 
 def load_alias_data():
     global char_alias_data, weapon_alias_data, sonata_alias_data, echo_alias_data
-    with open(CHAR_ALIAS, "r", encoding="UTF-8") as f:
-        char_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
+    if CHAR_ALIAS.exists():
+        with open(CHAR_ALIAS, "r", encoding="UTF-8") as f:
+            char_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
 
-    with open(WEAPON_ALIAS, "r", encoding="UTF-8") as f:
-        weapon_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
+    if WEAPON_ALIAS.exists():
+        with open(WEAPON_ALIAS, "r", encoding="UTF-8") as f:
+            weapon_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
 
-    with open(SONATA_ALIAS, "r", encoding="UTF-8") as f:
-        sonata_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
+    if SONATA_ALIAS.exists():
+        with open(SONATA_ALIAS, "r", encoding="UTF-8") as f:
+            sonata_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
 
-    with open(ECHO_ALIAS, "r", encoding="UTF-8") as f:
-        echo_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
+    if ECHO_ALIAS.exists():
+        with open(ECHO_ALIAS, "r", encoding="UTF-8") as f:
+            echo_alias_data = msgjson.decode(f.read(), type=Dict[str, List[str]])
 
     if CUSTOM_CHAR_ALIAS_PATH.exists():
         try:
@@ -135,6 +140,22 @@ def ensure_data_loaded(force: bool = False):
     except Exception as e:
         logger.exception(f"Failed to load id2name.json: {e}")
         id2name = {}
+
+    # 加载自定义 id2name.json
+    if CUSTOM_ID2NAME_PATH.exists():
+        try:
+            with open(CUSTOM_ID2NAME_PATH, "r", encoding="UTF-8") as f:
+                custom_id2name = msgjson.decode(f.read(), type=Dict[str, str])
+        except Exception as e:
+            logger.exception(f"读取自定义id2name失败 {CUSTOM_ID2NAME_PATH} - {e}")
+            custom_id2name = {}
+
+        # 合并自定义数据（自定义数据会覆盖默认数据）
+        id2name.update(custom_id2name)
+
+    # 将合并后的数据写回到自定义文件中
+    with open(CUSTOM_ID2NAME_PATH, "w", encoding="UTF-8") as f:
+        f.write(json.dumps(id2name, indent=2, ensure_ascii=False))
 
     _data_loaded = True
 

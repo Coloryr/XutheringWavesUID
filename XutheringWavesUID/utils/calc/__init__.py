@@ -80,6 +80,9 @@ class WuWaCalc(object):
             name = prop.attributeName
             if per and name in name_per:
                 name = f"{name}%"
+            elif not per and "%" and name not in name_per:
+                per = True
+                prop.attributeValue = prop.attributeValue + "%"
             if name not in result:
                 result[name] = prop.attributeValue
                 continue

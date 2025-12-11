@@ -8,23 +8,8 @@ from ..wutheringwaves_resource import startup
 async def all_start():
     logger.info("[鸣潮] 启动中...")
     try:
-        from ..utils.queues import init_queues
-        from ..utils.map.damage.register import register_rank, register_damage
-        from ..utils.damage.register_char import register_char
-        from ..utils.damage.register_echo import register_echo
-        from ..utils.damage.register_weapon import register_weapon
-
-        # 注册
-        register_weapon()
-        register_echo()
-        register_damage()
-        register_rank()
-        register_char()
-
-        # 初始化任务队列
-        init_queues()
-
         await startup()
+
     except Exception as e:
         logger.exception(e)
 

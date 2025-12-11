@@ -1,8 +1,5 @@
 from typing import Any, Dict, Tuple
 
-from gsuid_core.logger import logger
-
-
 def calc_phantom_entry(*args, **kwargs) -> Tuple[float, float]:
     from .waves_build.calculate import calc_phantom_entry as _func
 
@@ -37,29 +34,3 @@ def get_valid_color(*args, **kwargs) -> Tuple[str, str]:
     from .waves_build.calculate import get_valid_color as _func
 
     return _func(*args, **kwargs)
-
-
-import importlib
-
-
-def reload_calculate_module():
-    try:
-        module = importlib.import_module(".waves_build.calculate", package=__package__)
-        importlib.reload(module)
-
-    except ImportError as e:
-        logger.warning(f"无法导入 calculate 模块: {e}")
-        return
-
-    current_globals = globals()
-
-    if hasattr(module, "__all__"):
-        attributes = module.__all__
-    else:
-        attributes = [name for name in dir(module) if not name.startswith("_")]
-
-    for attr in attributes:
-        val = getattr(module, attr)
-        current_globals[attr] = val
-
-    logger.info("calculate 模块已重新加载")

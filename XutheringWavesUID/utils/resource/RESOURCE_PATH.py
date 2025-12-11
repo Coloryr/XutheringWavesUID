@@ -51,11 +51,13 @@ XFM_GUIDE_PATH = GUIDE_PATH / "XFM"
 # 构建 和 详情文件
 BUILD_ROOT = Path(__file__).parent.parent
 BUILD_PATH = BUILD_ROOT / "waves_build"
+BUILD_TEMP = MAIN_PATH / "build" / "waves_build"
 MAP_PATH = RESOURCE_PATH / "map"
 MAP_CHAR_PATH = RESOURCE_PATH / "map" / "character"
 MAP_DETAIL_PATH = RESOURCE_PATH / "map" / "detail_json"
 MAP_CHALLENGE_PATH = RESOURCE_PATH / "map" / "detail_json" / "challenge"
 MAP_BUILD_PATH = BUILD_ROOT / "map" / "waves_build"
+MAP_BUILD_TEMP =  MAIN_PATH / "build" / "map" / "waves_build"
 MAP_ALIAS_PATH = MAP_PATH / "alias"
 
 # 自定义背景图
@@ -77,6 +79,7 @@ CUSTOM_CHAR_ALIAS_PATH = ALIAS_PATH / "char_alias.json"
 CUSTOM_SONATA_ALIAS_PATH = ALIAS_PATH / "sonata_alias.json"
 CUSTOM_WEAPON_ALIAS_PATH = ALIAS_PATH / "weapon_alias.json"
 CUSTOM_ECHO_ALIAS_PATH = ALIAS_PATH / "echo_alias.json"
+CUSTOM_ID2NAME_PATH = ALIAS_PATH / "id2name.json"
 
 
 def init_dir():
@@ -105,7 +108,10 @@ def init_dir():
         OTHER_PATH,
         CALENDAR_PATH,
         ANN_CARD_PATH,
+        BUILD_PATH,
+        BUILD_TEMP,
         MAP_BUILD_PATH,
+        MAP_BUILD_TEMP,
         MAP_PATH,
         MAP_CHAR_PATH,
         MAP_DETAIL_PATH,
