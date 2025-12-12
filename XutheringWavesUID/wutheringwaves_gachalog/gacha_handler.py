@@ -130,7 +130,6 @@ def merge_gacha_data(original_data: dict, latest_data: dict) -> dict:
                 "export_app_version": "v2.0",
                 "export_timestamp": int(now.timestamp()),
                 "version": "v2.0",
-                "merged_with_sanyueqi": True,
                 "uid": str(uid),
             }
             logger.debug(f"[GachaHandler] 本地记录为空，已重建 info 信息 (UID: {uid})")
@@ -205,7 +204,7 @@ def merge_gacha_data(original_data: dict, latest_data: dict) -> dict:
             newest_local_time = _time_to_timestamp(O_5s[-1]["time"])
             L_5s_filtered = [x for x in L_5s if _time_to_timestamp(x["time"]) < newest_local_time]
             logger.debug(
-                f"[GachaHandler] Pool {pool_id}: 本地最新五星时间 {O_5s[-1]['time']}, "
+                f"[GachaHandler] Pool {pool_id}: 本地最新五星时间 {O_5s[min(1, len(O_5s))]['time']}, "
                 f"过滤后保留 {len(L_5s_filtered)}/{len(L_5s)} 条工坊记录"
             )
             L_5s = L_5s_filtered

@@ -98,10 +98,7 @@ async def get_gacha_log_by_link(bot: Bot, ev: Event):
             # 合并数据
             if not original_data["info"].get("uid") == latest_data["data"].get("uid"):
                 return await bot.send("导入数据UID与当前UID不匹配，无法合并！")
-            if original_data["info"].get("merged_with_sanyueqi"):
-                return await bot.send("当前抽卡记录已与工坊数据合并，请直接使用链接导入，或联系主人删除记录后再次合并！")
             merged_data = await asyncio.to_thread(merge_gacha_data, original_data, latest_data)
-            merged_data["info"]["merged_with_sanyueqi"] = True
 
             # 导入合并后的数据
             merged_json_str = json.dumps(merged_data, ensure_ascii=False)
