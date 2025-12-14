@@ -24,6 +24,11 @@ async def login_success_msg(bot: Bot, ev: Event, waves_user: WavesUser):
     msg = await draw_refresh_char_detail_img(bot, ev, waves_user.user_id, waves_user.uid, buttons)
     if isinstance(msg, bytes):
         return await bot.send_option(msg, buttons)
+
+    at_sender = True if ev.group_id else False
+    uid = str(waves_user.uid or "")
+    if uid.isdigit() and len(uid) == 9:
+        text = login_fail.format(uid)
     else:
-        at_sender = True if ev.group_id else False
-        return await bot.send(login_fail.format(waves_user.uid), at_sender=at_sender)
+        text = "[鸣潮] 登录失败，请稍后重试\n"
+    return await bot.send(text, at_sender=at_sender)

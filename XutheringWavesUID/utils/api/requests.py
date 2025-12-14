@@ -11,6 +11,7 @@ from aiohttp import ClientTimeout, ContentTypeError
 from gsuid_core.logger import logger
 
 from .api import (
+    BBS_LIST,
     LOGIN_URL,
     SERVER_ID,
     REFRESH_URL,
@@ -132,12 +133,15 @@ class WavesApi:
                 # "user_id": waves_user.user_id,
                 # "bot_id": waves_user.bot_id,
                 "uid": waves_user.uid,
+                "game_id": waves_user.game_id,
             },
             update_data={"bat": access_token},
         )
         return waves_user
 
-    async def get_used_headers(self, cookie: str, uid: str, needToken=False) -> Dict[str, Any]:
+    async def get_used_headers(
+        self, cookie: str, uid: str, needToken=False, game_id: Optional[int] = WAVES_GAME_ID
+    ) -> Dict[str, Any]:
         headers = {
             # "token": cookie,
             "did": "",
@@ -148,6 +152,7 @@ class WavesApi:
         waves_user: Optional[WavesUser] = await WavesUser.select_data_by_cookie_and_uid(
             cookie=cookie,
             uid=uid,
+            game_id=game_id,
         ) or await WavesUser.select_data_by_cookie(
             cookie=cookie,
         )
@@ -172,7 +177,7 @@ class WavesApi:
 
     async def get_self_waves_ck(self, uid: str, user_id: str, bot_id: str) -> Optional[str]:
         # 返回空串 表示绑定已失效
-        waves_user = await WavesUser.select_waves_user(uid, user_id, bot_id)
+        waves_user = await WavesUser.select_waves_user(uid, user_id, bot_id, game_id=WAVES_GAME_ID)
         if not waves_user or not waves_user.cookie:
             return ""
 
@@ -805,7 +810,35 @@ class WavesApi:
                 value = [{**x, "id": int(x["id"])} for x in raw_data["data"]["list"]]
                 self.ann_list_data.extend(value)
 
+        bbs_sub = WutheringWavesConfig.get_config("WavesAnnBBSSub").data
+        for bbs_id in bbs_sub:
+            res = await self.get_bbs_list(bbs_id, pageIndex=1, pageSize=5)
+            if not res.success:
+                continue
+            raw_data = res.model_dump()
+            value = [{**x, "id": int(x["postId"])} for x in raw_data["data"]["postList"]]
+            self.ann_list_data.extend(value)
+
         return self.ann_list_data
+
+    async def get_bbs_list(
+        self,
+        otherUserId: Union[int, str],
+        pageIndex: int = 1,
+        pageSize: int = 10,
+    ):
+        """获取BBS列表"""
+        headers = await get_community_header()
+        headers.update({"token": "", "devCode": ""})
+        data = {
+            "searchType": 1,
+            "type": 2,
+            "otherUserId": otherUserId,
+            "pageIndex": pageIndex,
+            "pageSize": pageSize,
+        }
+        res = await self._waves_request(BBS_LIST, "POST", headers, data=data)
+        return res
 
     async def get_wiki_home(self):
         """获取wiki首页"""

@@ -2,6 +2,7 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event
 
 from ..utils.database.models import WavesUser
+from ..utils.constants import WAVES_GAME_ID
 
 WAVES_USER_MAP = {"体力背景": "stamina_bg"}
 
@@ -14,7 +15,12 @@ async def set_waves_user_value(ev: Event, func: str, uid: str, value: str):
     logger.info("[设置{}] uid:{} value: {}".format(func, uid, value))
     if (
         await WavesUser.update_data_by_data(
-            select_data={"user_id": ev.user_id, "bot_id": ev.bot_id, "uid": uid},
+            select_data={
+                "user_id": ev.user_id,
+                "bot_id": ev.bot_id,
+                "uid": uid,
+                "game_id": WAVES_GAME_ID,
+            },
             update_data={f"{status}_value": value},
         )
         == 0

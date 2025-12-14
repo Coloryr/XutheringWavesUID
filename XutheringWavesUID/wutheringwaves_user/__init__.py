@@ -10,6 +10,7 @@ from gsuid_core.models import Event
 
 from .deal import add_cookie, get_cookie, refresh_bind, delete_cookie
 from ..utils.button import WavesButton
+from ..utils.api.api import WAVES_GAME_ID
 from ..utils.database.models import WavesBind, WavesUser
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..wutheringwaves_user.login_succ import login_success_msg
@@ -67,7 +68,9 @@ async def send_waves_add_ck_msg(bot: Bot, ev: Event):
 
     msg = await add_cookie(ev, ck, did)
     if "成功" in msg:
-        user = await WavesUser.get_user_by_attr(ev.user_id, ev.bot_id, "cookie", ck)
+        user = await WavesUser.get_user_by_attr(
+            ev.user_id, ev.bot_id, "cookie", ck, game_id=WAVES_GAME_ID
+        )
         if user:
             return await login_success_msg(bot, ev, user)
 

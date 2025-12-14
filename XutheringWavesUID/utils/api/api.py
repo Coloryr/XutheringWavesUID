@@ -1,7 +1,6 @@
 # waves
+from ..constants import PGR_GAME_ID, WAVES_GAME_ID
 
-PGR_GAME_ID = 2
-WAVES_GAME_ID = 3
 SERVER_ID = "76402e5b20be2c39f095a152090afddc"
 SERVER_ID_NET = "919752ae5ea09c1ced910dd668a63ffb"
 
