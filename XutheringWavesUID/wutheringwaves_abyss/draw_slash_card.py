@@ -238,7 +238,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
             # 挑战名称
             temp_bar_draw.text(
                 (140, 45),
-                f"{challenge.challengeName}",
+                f"{challenge.challengeName}" + (f" 第{get_slash_period_number()}期" if challenge.challengeId == 12 else ""),
                 "white",
                 waves_font_40,
             )
@@ -253,16 +253,6 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                 SPECIAL_GOLD,
                 waves_font_25,
             )
-
-            # 无尽挑战添加期数显示
-            if challenge.challengeId == 12:
-                period_text = f"第{get_slash_period_number()}期"
-                temp_bar_draw.text(
-                    (700, 85),
-                    period_text,
-                    (180, 180, 180),
-                    waves_font_18,
-                )
 
             role_bg = Image.open(TEXT_PATH / "role_hang_bg.png")
             # 获取角色信息

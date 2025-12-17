@@ -35,6 +35,7 @@ ABYSS_TYPE_MAP_REVERSE = {
 
 class RankDetail(BaseModel):
     rank: int
+    inter_rank: str
     user_id: str
     username: str
     alias_name: str
@@ -119,6 +120,8 @@ class TotalRankResponse(BaseModel):
 class OneRankRequest(BaseModel):
     char_id: int = Field(..., description="角色ID")
     waves_id: Optional[str] = Field(default="", description="鸣潮ID")
+    phantom_score: Optional[float] = Field(default=None, description="声骸评分")
+    expected_damage: Optional[float] = Field(default=None, description="期望伤害")
 
 
 class OneRankResponse(BaseModel):
