@@ -51,7 +51,7 @@ gachalogs_history_meta = {
 ERROR_MSG_INVALID_LINK = "当前抽卡链接已经失效，请重新导入抽卡链接"
 
 
-# 找到两个数组中最长公共子串的下标
+# 找到两个数组中最长公共子串的下标（忽略resourceType字段差异）
 def find_longest_common_subarray_indices(
     a: List[GachaLog], b: List[GachaLog]
 ) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
@@ -62,7 +62,8 @@ def find_longest_common_subarray_indices(
 
     for i in range(n - 1, -1, -1):
         for j in range(m - 1, -1, -1):
-            if a[i] == b[j]:
+            # 使用 match_key() 比较，忽略 resourceType 差异
+            if a[i].match_key() == b[j].match_key():
                 dp[i][j] = dp[i + 1][j + 1] + 1
                 if dp[i][j] > length:
                     length = dp[i][j]

@@ -136,5 +136,15 @@ waves_templates = Environment(
     )
 )
 
+# 自定义模板路径
+CUSTOM_TEMP_PATH = get_res_path(["XutheringWavesUID", "show"])
+custom_waves_template = Environment(
+    loader=FileSystemLoader(
+        [
+            str(CUSTOM_TEMP_PATH),
+        ]
+    )
+)
+
 # 设置captcha目录
 CAPTCHA_PATH = Path(__file__).parents[1].parent / "utils/api/captcha"

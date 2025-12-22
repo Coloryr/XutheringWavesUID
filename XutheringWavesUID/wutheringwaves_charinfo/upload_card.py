@@ -34,7 +34,7 @@ def get_hash_id(name):
 
 def get_char_id_and_name(char: str) -> tuple[Optional[str], str, str]:
     char_id = None
-    msg = f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
+    msg = f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！"
     sex = ""
     if "男" in char:
         char = char.replace("男", "")
@@ -53,7 +53,7 @@ def get_char_id_and_name(char: str) -> tuple[Optional[str], str, str]:
 
     if char_id in SPECIAL_CHAR:
         if not sex:
-            msg1 = f"[鸣潮] 主角【{char}】需要指定性别！\n"
+            msg1 = f"[鸣潮] 主角【{char}】需要指定性别！"
             return char_id, char, msg1
         char_id = SPECIAL_CHAR_ID[f"{char}·{sex}"]
 
@@ -84,14 +84,15 @@ async def upload_custom_card(bot: Bot, ev: Event, char: str, target_type: str = 
 
     upload_images = await get_image(ev)
     if not upload_images:
+        msg = f"[鸣潮] 上传角色{target_type}图失败\n请同时发送图片及其命令\n支持上传的图片类型：面板图/体力图/背景图"
         return await bot.send(
-            f"[鸣潮] 上传角色{target_type}图失败\n请同时发送图片及其命令\n支持上传的图片类型：面板图/体力图/背景图",
+            (" " if at_sender else "") + msg,
             at_sender,
         )
 
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
-        return await bot.send(msg, at_sender)
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     temp_dir.mkdir(parents=True, exist_ok=True)
@@ -120,20 +121,23 @@ async def upload_custom_card(bot: Bot, ev: Event, char: str, target_type: str = 
                 break
 
     if success:
-        return await bot.send(f"[鸣潮]【{char}】上传{target_type}图成功！\n", at_sender)
+        msg = f"[鸣潮]【{char}】上传{target_type}图成功！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
     else:
-        return await bot.send(f"[鸣潮]【{char}】上传{target_type}图失败！\n", at_sender)
+        msg = f"[鸣潮]【{char}】上传{target_type}图失败！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
 
 async def get_custom_card_list(bot: Bot, ev: Event, char: str, target_type: str = "card"):
     at_sender = True if ev.group_id else False
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
-        return await bot.send(msg, at_sender)
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        return await bot.send(f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！\n", at_sender)
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     # 获取角色文件夹图片数量, 只要图片
     files = [f for f in temp_dir.iterdir() if f.is_file() and f.suffix in [".jpg", ".png", ".jpeg", ".webp"]]
@@ -158,11 +162,12 @@ async def delete_custom_card(bot: Bot, ev: Event, char: str, hash_id: str, targe
     at_sender = True if ev.group_id else False
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
-        return await bot.send(msg, at_sender)
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        return await bot.send(f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！\n", at_sender)
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     files_map = {
         get_hash_id(f.name): f
@@ -171,12 +176,14 @@ async def delete_custom_card(bot: Bot, ev: Event, char: str, hash_id: str, targe
     }
 
     if hash_id not in files_map:
-        return await bot.send(f"[鸣潮] 角色【{char}】未找到id为【{hash_id}】的{target_type}图！\n", at_sender)
+        msg = f"[鸣潮] 角色【{char}】未找到id为【{hash_id}】的{target_type}图！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     # 删除文件
     try:
         files_map[hash_id].unlink()
-        return await bot.send(f"[鸣潮] 删除角色【{char}】的id为【{hash_id}】的{target_type}图成功！\n", at_sender)
+        msg = f"[鸣潮] 删除角色【{char}】的id为【{hash_id}】的{target_type}图成功！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
     except Exception:
         return
 
@@ -185,11 +192,12 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     at_sender = True if ev.group_id else False
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
-        return await bot.send(msg, at_sender)
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        return await bot.send(f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！\n", at_sender)
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     files_map = {
         get_hash_id(f.name): f
@@ -198,7 +206,8 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     }
 
     if len(files_map) == 0:
-        return await bot.send(f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！\n", at_sender)
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     # 删除文件夹包括里面的内容
     try:
@@ -207,7 +216,8 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     except Exception:
         pass
 
-    return await bot.send(f"[鸣潮] 删除角色【{char}】的所有{target_type}图成功！\n", at_sender)
+    msg = f"[鸣潮] 删除角色【{char}】的所有{target_type}图成功！"
+    return await bot.send((" " if at_sender else "") + msg, at_sender)
 
 
 async def compress_all_custom_card(bot: Bot, ev: Event):
@@ -240,6 +250,6 @@ async def compress_all_custom_card(bot: Bot, ev: Event):
                 logger.error(f"Error processing {file_info[0]}: {exc}")
 
     if count > 0:
-        return await bot.send(f"[鸣潮] 压缩【{count}】张图成功！\n")
+        return await bot.send(f"[鸣潮] 压缩【{count}】张图成功！")
     else:
-        return await bot.send("[鸣潮] 暂未找到需要压缩的资源！\n")
+        return await bot.send("[鸣潮] 暂未找到需要压缩的资源！")

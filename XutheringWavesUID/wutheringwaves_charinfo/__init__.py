@@ -128,7 +128,7 @@ async def send_one_char_detail_msg(bot: Bot, ev: Event):
         return
     char_id = char_name_to_char_id(char)
     if not char_id or len(char_id) != 4:
-        return await bot.send(f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n")
+        return await bot.send(f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！")
     refresh_type = [char_id]
     if char_id in SPECIAL_CHAR:
         refresh_type = SPECIAL_CHAR.copy()[char_id]
@@ -203,7 +203,8 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
     if is_pk:
         if not waves_id and not is_valid_at(ev):
-            return await bot.send(f"[鸣潮] [角色面板] 角色【{char}】PK需要指定目标玩家!\n", at_sender)
+            msg = f"[鸣潮] [角色面板] 角色【{char}】PK需要指定目标玩家!"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
 
         uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
         if not uid:

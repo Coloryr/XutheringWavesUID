@@ -295,6 +295,11 @@ class GachaLog(BaseModel):
     def __hash__(self):
         return hash((self.resourceId, self.time))
 
+    def match_key(self):
+        """用于匹配的key，忽略resourceType字段（不同数据源可能标记不同）"""
+        return (self.cardPoolType, self.resourceId, self.qualityLevel,
+                self.name, self.count, self.time)
+
 
 # 定义角色模型
 class AbyssRole(BaseModel):
