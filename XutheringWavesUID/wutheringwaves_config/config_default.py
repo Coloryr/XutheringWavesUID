@@ -53,6 +53,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
             "Moealkyne",
             "小沐XMu",
             "吃我无痕",
+            "巡游天国FM",
         ],
     ),
     "WavesLoginUrl": GsStrConfig(

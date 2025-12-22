@@ -9,9 +9,35 @@ from gsuid_core.utils.plugins_config.models import (
     GsImageConfig,
 )
 
-bg_path = get_res_path(["XutheringWavesUID", "bg"])
+show_path = get_res_path(["XutheringWavesUID", "show"])
 
 SHOW_CONIFG: Dict[str, GSC] = {
+    "LoginIndexHtmlPath": GsStrConfig(
+        "登录页面HTML路径",
+        "自定义登录页面HTML文件路径，请自行确保模板格式正确，尤其注意在移动端显示良好",
+        str(show_path / "index.html"),
+    ),
+    "Login404HtmlPath": GsStrConfig(
+        "404页面HTML路径",
+        "自定义404页面HTML文件路径，请自行确保模板格式正确，尤其注意在移动端显示良好",
+        str(show_path / "404.html"),
+    ),
+    "LoginIndexHtmlUpload": GsImageConfig(
+        "上传登录页面模板（上传格式html）",
+        "",
+        str(show_path / "index.html"),
+        str(show_path),
+        "index",
+        "html",
+    ),
+    "Login404HtmlUpload": GsImageConfig(
+        "上传404页面模板（上传格式html）",
+        "",
+        str(show_path / "404.html"),
+        str(show_path),
+        "404",
+        "html",
+    ),
     "BlurRadius": GsIntConfig(
         "毛玻璃半径越大，毛玻璃效果越明显，0为不开启",
         "毛玻璃半径越大，毛玻璃效果越明显",
@@ -32,14 +58,14 @@ SHOW_CONIFG: Dict[str, GSC] = {
     ),
     "CardBg": GsBoolConfig(
         "是否开启自定义面板背景",
-        "开启路径位于XutheringWavesUID/bg",
+        "开启路径位于XutheringWavesUID/show",
         False,
     ),
     "CardBgPath": GsImageConfig(
         "自定义背景",
         "自定义背景图片，亦用于排行等背景",
-        str(bg_path / "card.jpg"),
-        str(bg_path),
+        str(show_path / "card.jpg"),
+        str(show_path),
         "card",
         "jpg",
     ),

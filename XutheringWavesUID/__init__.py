@@ -11,10 +11,28 @@ from gsuid_core.data_store import get_res_path
 Plugins(name="XutheringWavesUID", force_prefix=["ww"], allow_empty_prefix=False)
 
 
-DATA_PATH = get_res_path()
-PLAYERS_PATH = DATA_PATH / "XutheringWavesUID" / "players"
-BACKUP_PATH = DATA_PATH / "backup"
+MAIN_PATH = get_res_path()
+PLAYERS_PATH = MAIN_PATH / "XutheringWavesUID" / "players"
+cfg_path = MAIN_PATH / "config.json"
+show_cfg_path = MAIN_PATH / "XutheringWavesUID" / "show_config.json"
+BACKUP_PATH = MAIN_PATH / "backup"
 
+# 此次迁移是直接把显示配置改为上传内容配置
+BG_PATH = MAIN_PATH / "XutheringWavesUID" / "bg"
+if BG_PATH.exists():
+    shutil.move(str(BG_PATH), str(BG_PATH.parent / "show"))
+    logger.info("[XutheringWavesUID] 已将bg重命名为show以适应新配置")
+
+if show_cfg_path.exists():
+    with open(show_cfg_path, "r", encoding="utf-8") as f:
+        show_cfg_text = f.read()
+    if "bg" in show_cfg_text:
+        logger.info("正在更新显示配置文件中的背景路径...")
+        shutil.copyfile(show_cfg_path, MAIN_PATH / "show_config_back.json")
+        show_cfg_text = show_cfg_text.replace("/bg", "/show")
+        with open(show_cfg_path, "w", encoding="utf-8") as f:
+            f.write(show_cfg_text)
+        Path(MAIN_PATH / "show_config_back.json").unlink()
 
 # 此次迁移是因为支持工坊抽卡记录，以防出现bug，先备份所有抽卡记录
 # if PLAYERS_PATH.exists():
@@ -40,7 +58,6 @@ BACKUP_PATH = DATA_PATH / "backup"
 #     if backup_count > 0:
 #         logger.info(f"[XutheringWavesUID] 抽卡记录备份完成，共 {backup_count} 个玩家")
 
-
 # 此次迁移是因为初次实现抽卡排行时，uid字段拿错导致的下划线连接多uid
 if PLAYERS_PATH.exists():
     BACKUP_PATH.mkdir(parents=True, exist_ok=True)
@@ -61,7 +78,6 @@ if PLAYERS_PATH.exists():
 if "WutheringWavesUID" in str(Path(__file__)):
     logger.error("请修改插件文件夹名称为 XutheringWavesUID 以支持后续指令更新")
 
-MAIN_PATH = get_res_path()
 if not Path(MAIN_PATH / "XutheringWavesUID").exists() and Path(MAIN_PATH / "WutheringWavesUID").exists():
     logger.info("存在旧版插件资源，正在进行重命名...")
     shutil.copytree(MAIN_PATH / "WutheringWavesUID", MAIN_PATH / "XutheringWavesUID")
@@ -69,7 +85,6 @@ if not Path(MAIN_PATH / "XutheringWavesUID").exists() and Path(MAIN_PATH / "Wuth
 if Path(MAIN_PATH / "WutheringWavesUID").exists():
     logger.warning("检测到旧版资源 WutheringWavesUID，建议删除以节省空间")
 
-cfg_path = MAIN_PATH / "config.json"
 with open(cfg_path, "r", encoding="utf-8") as f:
     cfg_text = f.read()
 if "WutheringWavesUID" in cfg_text and "XutheringWavesUID" not in cfg_text:
@@ -84,7 +99,6 @@ elif "WutheringWavesUID" in cfg_text and "XutheringWavesUID" in cfg_text:
         "同时存在 WutheringWavesUID 和 XutheringWavesUID 配置，可保留老的配置文件后重启，请自己编辑 gsuid_core/data/config.json 删除冗余配置（将 XutheringWavesUID 条目删除后将 WutheringWavesUID 改名为 XutheringWavesUID）"
     )
 
-show_cfg_path = MAIN_PATH / "XutheringWavesUID" / "show_config.json"
 if Path(show_cfg_path).exists():
     with open(show_cfg_path, "r", encoding="utf-8") as f:
         show_cfg_text = f.read()

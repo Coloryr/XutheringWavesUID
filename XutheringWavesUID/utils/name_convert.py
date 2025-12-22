@@ -237,9 +237,17 @@ def alias_to_sonata_name(sonata_name: str | None) -> str | None:
     ensure_data_loaded()
     if sonata_name is None:
         return None
+    # Remove "套" character to make it optional
+    normalized_sonata_name = sonata_name.rstrip('套')
     for i in sonata_alias_data:
-        if (sonata_name in i) or (sonata_name in sonata_alias_data[i]):
+        # Check if normalized input matches the key (with "套" stripped)
+        normalized_key = i.rstrip('套')
+        if normalized_sonata_name in normalized_key:
             return i
+        # Check if normalized input matches any alias (with "套" stripped)
+        for alias in sonata_alias_data[i]:
+            if normalized_sonata_name in alias.rstrip('套'):
+                return i
     return None
 
 

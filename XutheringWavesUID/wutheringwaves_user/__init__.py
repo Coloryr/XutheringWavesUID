@@ -10,7 +10,7 @@ from gsuid_core.models import Event
 
 from .deal import add_cookie, get_cookie, refresh_bind, delete_cookie
 from ..utils.button import WavesButton
-from ..utils.api.api import WAVES_GAME_ID
+from ..utils.constants import WAVES_GAME_ID
 from ..utils.database.models import WavesBind, WavesUser
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..wutheringwaves_user.login_succ import login_success_msg
@@ -61,18 +61,20 @@ async def send_waves_add_ck_msg(bot: Bot, ev: Event):
         did = ""
 
     if not ck or not did:
+        msg = "\n".join(msg_notify)
         return await bot.send(
-            "\n".join(msg_notify),
+            (" " if at_sender else "") + msg,
             at_sender,
         )
 
-    msg = await add_cookie(ev, ck, did)
-    if "成功" in msg:
+    ck_msg = await add_cookie(ev, ck, did)
+    if "成功" in ck_msg:
         user = await WavesUser.get_user_by_attr(ev.user_id, ev.bot_id, "cookie", ck, game_id=WAVES_GAME_ID)
         if user:
             return await login_success_msg(bot, ev, user)
 
-    await bot.send(msg, at_sender)
+    ck_msg = ck_msg.rstrip("\n") if isinstance(ck_msg, str) else ck_msg
+    await bot.send((" " if at_sender and isinstance(ck_msg, str) else "") + ck_msg if isinstance(ck_msg, str) else ck_msg, at_sender)
 
 
 @waves_del_ck.on_command(("删除ck", "删除CK", "删除Token", "删除token", "删除TOKEN"), block=True)
@@ -80,11 +82,14 @@ async def send_waves_del_ck_msg(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
     uid = ev.text.strip()
     if not uid or len(uid) != 9:
+        msg = f"[鸣潮] 该命令末尾需要跟正确的特征码!\n例如【{PREFIX}删除token123456】"
         return await bot.send(
-            f"[鸣潮] 该命令末尾需要跟正确的特征码! \n例如【{PREFIX}删除token123456】\n",
+            (" " if at_sender else "") + msg,
             at_sender,
         )
-    await bot.send(await delete_cookie(ev, uid), at_sender)
+    del_msg = await delete_cookie(ev, uid)
+    del_msg = del_msg.rstrip("\n") if isinstance(del_msg, str) else del_msg
+    await bot.send((" " if at_sender and isinstance(del_msg, str) else "") + del_msg if isinstance(del_msg, str) else del_msg, at_sender)
 
 
 @waves_get_ck.on_fullmatch(("获取ck", "获取CK", "获取Token", "获取token", "获取TOKEN"), block=True)
@@ -96,14 +101,16 @@ async def send_waves_get_ck_msg(bot: Bot, ev: Event):
 async def send_waves_refresh_bind_msg(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
     msg = await refresh_bind(ev)
-    await bot.send(msg, at_sender)
+    msg = msg.rstrip("\n") if isinstance(msg, str) else msg
+    await bot.send((" " if at_sender and isinstance(msg, str) else "") + msg if isinstance(msg, str) else msg, at_sender)
 
 
 @waves_del_all_invalid_ck.on_fullmatch(("删除无效token"), block=True)
 async def delete_all_invalid_cookie(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
     del_len = await WavesUser.delete_all_invalid_cookie()
-    await bot.send(f"[鸣潮] 已删除无效token【{del_len}】个\n", at_sender)
+    msg = f"[鸣潮] 已删除无效token【{del_len}】个"
+    await bot.send((" " if at_sender else "") + msg, at_sender)
 
 
 @scheduler.scheduled_job("cron", hour=23, minute=30)
@@ -151,14 +158,16 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
 
     if "绑定" in ev.command:
         if not uid:
-            return await bot.send(f"该命令需要带上正确的uid!\n{PREFIX}绑定uid\n", at_sender)
+            msg = f"该命令需要带上正确的uid!\n{PREFIX}绑定uid"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
         uid_list = await WavesBind.get_uid_list_by_game(qid, ev.bot_id)
         cookie_uid_list = await WavesUser.select_user_cookie_uids(qid)
         if uid_list and cookie_uid_list:
             difference_uid_list = set(uid_list).difference(set(cookie_uid_list))
             max_bind_num: int = WutheringWavesConfig.get_config("MaxBindNum").data
             if len(difference_uid_list) >= max_bind_num:
-                return await bot.send("[鸣潮] 绑定特征码达到上限\n", at_sender)
+                msg = "[鸣潮] 绑定特征码达到上限"
+                return await bot.send((" " if at_sender else "") + msg, at_sender)
 
         code = await WavesBind.insert_waves_uid(qid, ev.bot_id, uid, ev.group_id, lenth_limit=9)
         if code == 0 or code == -2:
@@ -167,10 +176,10 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
             bot,
             code,
             {
-                0: f"[鸣潮] 特征码[{uid}]绑定成功！\n\n当前仅支持查询部分信息，完整功能请使用【{PREFIX}登录】\n使用【{PREFIX}查看】查看已绑定的特征码\n使用【{PREFIX}刷新面板】更新角色面板\n更新角色面板后可以使用【{PREFIX}暗主排行】查询暗主排行\n",
-                -1: f"[鸣潮] 特征码[{uid}]的位数不正确！\n",
-                -2: f"[鸣潮] 特征码[{uid}]已经绑定过了！\n",
-                -3: "[鸣潮] 你输入了错误的格式!\n",
+                0: f"[鸣潮] 特征码[{uid}]绑定成功！\n\n当前仅支持查询部分信息，完整功能请使用【{PREFIX}登录】\n使用【{PREFIX}查看】查看已绑定的特征码\n使用【{PREFIX}刷新面板】更新角色面板\n更新角色面板后可以使用【{PREFIX}暗主排行】查询暗主排行",
+                -1: f"[鸣潮] 特征码[{uid}]的位数不正确！",
+                -2: f"[鸣潮] 特征码[{uid}]已经绑定过了！",
+                -3: "[鸣潮] 你输入了错误的格式!",
             },
             at_sender=at_sender,
         )
@@ -182,11 +191,13 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
                 _buttons: List[Any] = []
                 for uid in uid_list:
                     _buttons.append(WavesButton(f"{uid}", f"切换{uid}"))
-                return await bot.send_option(f"[鸣潮] 切换特征码[{uid_list[0]}]成功！\n", _buttons)
+                return await bot.send_option(f" [鸣潮] 切换特征码[{uid_list[0]}]成功！", _buttons)
             else:
-                return await bot.send("[鸣潮] 尚未绑定任何特征码\n", at_sender)
+                msg = "[鸣潮] 尚未绑定任何特征码"
+                return await bot.send((" " if at_sender else "") + msg, at_sender)
         else:
-            return await bot.send(f"[鸣潮] 尚未绑定该特征码[{uid}]\n", at_sender)
+            msg = f"[鸣潮] 尚未绑定该特征码[{uid}]"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
     elif "查看" in ev.command:
         uid_list = await WavesBind.get_uid_list_by_game(qid, ev.bot_id)
         if uid_list:
@@ -194,9 +205,10 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
             buttons: List[Any] = []
             for uid in uid_list:
                 buttons.append(WavesButton(f"{uid}", f"切换{uid}"))
-            return await bot.send_option(f"[鸣潮] 绑定的特征码列表为：\n{uids}\n", buttons)
+            return await bot.send_option(f" [鸣潮] 绑定的特征码列表为：\n{uids}", buttons)
         else:
-            return await bot.send("[鸣潮] 尚未绑定任何特征码\n", at_sender)
+            msg = "[鸣潮] 尚未绑定任何特征码"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
     elif "删除全部" in ev.command:
         retcode = await WavesBind.update_data(
             user_id=qid,
@@ -204,13 +216,16 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
             **{WavesBind.get_gameid_name(None): None},
         )
         if retcode == 0:
-            return await bot.send("[鸣潮] 删除全部特征码成功！\n", at_sender)
+            msg = "[鸣潮] 删除全部特征码成功！"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
         else:
-            return await bot.send("[鸣潮] 尚未绑定任何特征码\n", at_sender)
+            msg = "[鸣潮] 尚未绑定任何特征码"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
     else:
         if not uid:
+            msg = f"[鸣潮] 该命令末尾需要跟正确的特征码!\n例如【{PREFIX}删除123456】"
             return await bot.send(
-                f"[鸣潮] 该命令末尾需要跟正确的特征码!\n例如【{PREFIX}删除123456】\n",
+                (" " if at_sender else "") + msg,
                 at_sender,
             )
         data = await WavesBind.delete_uid(qid, ev.bot_id, uid)
@@ -218,8 +233,8 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
             bot,
             data,
             {
-                0: f"[鸣潮] 删除特征码[{uid}]成功！\n",
-                -1: f"[鸣潮] 该特征码[{uid}]不在已绑定列表中！\n",
+                0: f"[鸣潮] 删除特征码[{uid}]成功！",
+                -1: f"[鸣潮] 该特征码[{uid}]不在已绑定列表中！",
             },
             at_sender=at_sender,
         )
@@ -228,4 +243,7 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
 async def send_diff_msg(bot: Bot, code: Any, data: Dict, at_sender=False):
     for retcode in data:
         if code == retcode:
-            return await bot.send(data[retcode], at_sender)
+            msg = data[retcode] if isinstance(data[retcode], str) else data[retcode]
+            if at_sender and isinstance(msg, str):
+                msg = " " + msg
+            return await bot.send(msg, at_sender)

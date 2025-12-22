@@ -31,7 +31,8 @@ async def get_login_msg(bot: Bot, ev: Event):
         return
 
     at_sender = True if ev.group_id else False
+    msg = f"{game_title} 账号登录失败\n请重新输入命令【{PREFIX}登录】进行登录"
     return await bot.send(
-        f"{game_title} 账号登录失败\n请重新输入命令【{PREFIX}登录】进行登录\n",
+        (" " if at_sender else "") + msg,
         at_sender=at_sender,
     )

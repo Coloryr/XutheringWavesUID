@@ -2,6 +2,7 @@
 
 import re
 import json
+import math
 from typing import Any, Dict, Union, Optional
 from pathlib import Path
 
@@ -71,7 +72,7 @@ def _clean_text(text: str) -> str:
     """清理文本中的HTML标签"""
     text = re.sub(r"<color[^>]*>", "", text)
     text = re.sub(r"</color>", "", text)
-    return text
+    return text.replace("\n", " ")
 
 
 async def draw_tower_challenge_img(ev: Event, period: Optional[int] = None) -> Union[bytes, str]:
@@ -198,7 +199,7 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
         # 预计算内容高度
         title = endless_data.get("Title", "无尽湍渊")
         desc = endless_data.get("Desc", "")
-        desc = _clean_text(desc)
+        desc = _clean_text(desc).rstrip("。.")
 
         # 获取所有Floor的数据
         floors = endless_data.get("Floor", {})
@@ -210,7 +211,7 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
         # 描述区域高度
         desc_start_y = header_height + 10
         desc_lines = []
-        max_char_per_line = 42  # 900宽，左右padding，字体18
+        max_char_per_line = 45  # 900宽，左右padding，字体18
         if desc:
             for line in desc.split("\n"):
                 if not line.strip():
@@ -226,8 +227,9 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
             buff_height += 40
             for b_name, b_desc in buff_data.items():
                 buff_height += 30
+                b_desc = _clean_text(b_desc).rstrip("。.")
                 b_desc_len = len(b_desc)
-                b_lines = (b_desc_len // 45) + 1
+                b_lines = math.ceil(b_desc_len / 45)
                 buff_height += b_lines * 22 + 15
 
         # 计算每个Floor的高度
@@ -236,9 +238,9 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
             h = 40
 
             # Floor Desc/Buff
-            f_desc = _clean_text(floor_data.get("Desc", ""))
+            f_desc = _clean_text(floor_data.get("Desc", "")).rstrip("。.")
             if f_desc:
-                f_desc_lines = (len(f_desc) // 45) + 1
+                f_desc_lines = math.ceil(len(f_desc) / 45)
                 h += f_desc_lines * 22 + 10
 
             # Monsters
@@ -279,15 +281,18 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
             current_y += 35
 
             for b_name, b_desc in buff_data.items():
+                b_desc = _clean_text(b_desc).rstrip("。.")
                 # Buff Name
                 draw.text((65, current_y), f"◆ {b_name}", (255, 200, 100), waves_font_18, "lm")
                 current_y += 25
 
-                # Buff Desc
-                max_char = 45
+                max_char = 48
                 lines = [b_desc[j : j + max_char] for j in range(0, len(b_desc), max_char)]
-                for line in lines:
-                    draw.text((85, current_y), line, (220, 220, 220), waves_font_16, "lm")
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        draw.text((85, current_y), line, (220, 220, 220), waves_font_16, "lm")
+                    else:
+                        draw.text((85, current_y), line, (220, 220, 220), waves_font_16, "lm")
                     current_y += 22
                 current_y += 10
 
@@ -299,12 +304,15 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
             current_y += 30
 
             # Floor Desc
-            f_desc = _clean_text(floor_data.get("Desc", ""))
+            f_desc = _clean_text(floor_data.get("Desc", "")).rstrip("。.")
             if f_desc:
-                max_char = 45
+                max_char = 48
                 lines = [f_desc[j : j + max_char] for j in range(0, len(f_desc), max_char)]
-                for line in lines:
-                    draw.text((65, current_y), f"· {line}", (200, 200, 200), waves_font_16, "lm")
+                for i, line in enumerate(lines):
+                    if i == 0:
+                        draw.text((65, current_y), f"· {line}", (200, 200, 200), waves_font_16, "lm")
+                    else:
+                        draw.text((65 + 12, current_y), line, (200, 200, 200), waves_font_16, "lm")
                     current_y += 22
                 current_y += 10
 
@@ -373,17 +381,14 @@ def _calculate_section_height(area_name: str, floor_data: Dict[str, Any], width:
     monsters = floor_data.get("Monsters", {})
 
     buff_lines = 0
-    # 宽度调整：width - padding(30+?) -> 估算字符数 (width-60)/8 ~= chars
-    # font 16, approx 9px width? let's be safe.
-    # 900 width -> ~800 content width -> ~50 chars per line for font 16
     max_char_buff = 48
 
-    for buff_info in list(buffs.values())[:2]:
-        buff_desc = _clean_text(buff_info.get("Desc", ""))
-        buff_lines += (len(buff_desc) // max_char_buff) + 1
+    for buff_info in list(buffs.values()):
+        buff_desc = _clean_text(buff_info.get("Desc", "")).rstrip("。.")
+        buff_lines += math.ceil(len(buff_desc) / max_char_buff)
 
-    # Monsters: 2 per row now for narrower width
     monster_rows = (min(len(monsters), 6) + 1) // 2
+
 
     section_height = 80 + buff_lines * 25 + monster_rows * 45 + 10
     if buffs:
@@ -429,14 +434,17 @@ def _draw_floor_section(
         draw.text((x + 20, current_y), "【环境Buff】", (100, 200, 255), waves_font_18, "lm")
         current_y += 25
 
-        for buff_info in list(buffs.values())[:2]:
-            buff_desc = _clean_text(buff_info.get("Desc", ""))
+        for buff_info in list(buffs.values()):
+            buff_desc = _clean_text(buff_info.get("Desc", "")).rstrip("。.")
 
             # 分行显示
             max_char = 48
             lines = [buff_desc[i : i + max_char] for i in range(0, len(buff_desc), max_char)]
-            for line in lines:
-                draw.text((x + 30, current_y), f"· {line}", (220, 220, 220), waves_font_16, "lm")
+            for i, line in enumerate(lines):
+                if i == 0:
+                    draw.text((x + 30, current_y), f"· {line}", (220, 220, 220), waves_font_16, "lm")
+                else:
+                    draw.text((x + 30 + 12, current_y), line, (220, 220, 220), waves_font_16, "lm")
                 current_y += 22
             current_y += 5
 
@@ -450,9 +458,6 @@ def _draw_floor_section(
         x_start = x + 30
         curr_x = x_start
 
-        # 调整卡片宽度以适应每行2个
-        # total width available ~ width - 60
-        # per card ~ (width - 60 - 20) / 2
         card_w = (width - 60 - 20) // 2
 
         for monster_info in list(monsters.values())[:6]:
@@ -477,9 +482,10 @@ def _draw_floor_section(
             draw.text((curr_x + card_w - w_elem - 10, current_y), element_name, color, waves_font_14, "lm")
 
             col += 1
-            if col >= 2:  # 一行2个 (因为变窄了)
+            if col >= 2:
                 col = 0
                 current_y += 45
                 curr_x = x_start
             else:
                 curr_x += card_w + 20
+
