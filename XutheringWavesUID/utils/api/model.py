@@ -229,7 +229,7 @@ class RoleDetailData(BaseModel):
 
     def get_skill_level(
         self,
-        skill_type: Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路"],
+        skill_type: Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路", "谐度破坏"],
     ):
         skill_level = 1
         _skill = next((skill for skill in self.skillList if skill.skill.type == skill_type), None)
@@ -238,7 +238,7 @@ class RoleDetailData(BaseModel):
         return skill_level
 
     def get_skill_list(self):
-        sort = ["常态攻击", "共鸣技能", "共鸣回路", "共鸣解放", "变奏技能", "延奏技能"]
+        sort = ["常态攻击", "共鸣技能", "共鸣回路", "共鸣解放", "变奏技能", "延奏技能", "谐度破坏"]
         return sorted(self.skillList, key=lambda x: sort.index(x.skill.type))
 
 
@@ -527,7 +527,7 @@ class RoleCultivateSkillLevel(BaseModel):
     level: int
 
 
-class RoleCultivateStatus(BaseModel):
+class RoleCultivateStatus(BaseModel): # 这里暂时没有谐度破坏
     """角色培养状态
     {
         "roleId": 1107,

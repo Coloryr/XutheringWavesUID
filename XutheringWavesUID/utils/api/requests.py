@@ -27,7 +27,7 @@ from .api import (
     WIKI_HOME_URL,
     WIKI_TREE_URL,
     MONTH_LIST_URL,
-    MR_REFRESH_URL,
+    GAME_DATA_URL,
     ANN_CONTENT_URL,
     BATCH_ROLE_COST,
     PERIOD_LIST_URL,
@@ -252,14 +252,14 @@ class WavesApi:
         used_headers = await self.get_used_headers(cookie=token, uid=roleId, needToken=True)
         header.update(used_headers)
         data = {
-            "type": "1",
-            "sizeType": "2",
+            "type": "2",
+            "sizeType": "1",
             "gameId": gameId,
             "serverId": self.get_server_id(roleId),
             "roleId": roleId,
         }
         return await self._waves_request(
-            MR_REFRESH_URL,
+            GAME_DATA_URL,
             "POST",
             header,
             data=data,
@@ -922,7 +922,7 @@ class WavesApi:
                     except Exception:
                         pass
 
-                # logger.debug(f"url:[{url}] params:[{params}] headers:[{header}] data:[{req_data}] raw_data:{raw_data}")
+                logger.debug(f"url:[{url}] params:[{params}] headers:[{header}] data:[{req_data}] raw_data:{raw_data}")
                 # 统一解析为 KuroApiResp
                 return KuroApiResp[Any].model_validate(raw_data)
 
