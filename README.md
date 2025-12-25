@@ -35,7 +35,7 @@ git clone https://github.com/Loping151/XutheringWavesUID.git
 git clone https://github.com/Loping151/XutheringWavesUID.git
 ``` 
 
-总排行申请、反馈（仅限主人）：群号 653696746。如实在不希望被打扰的，可发邮件 wkl@loping151.com 申请计算服务token，要求附带core信息截图和使用情况和规模说明，支持较少的请求量和用户量，但完全足以小范围使用，一般都欢迎入群。
+总排行申请、反馈（仅限主人）：群号 653696746。如不使用QQ平台，可发邮件 wkl@loping151.com 申请计算服务token，要求附带具体使用平台、core信息截图和使用情况和规模说明，支持较少的请求量和用户量，但完全足以小范围使用，一般都欢迎入群。
 
 ## 丨安装提醒
 
