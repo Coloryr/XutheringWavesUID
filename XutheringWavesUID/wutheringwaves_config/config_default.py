@@ -189,7 +189,17 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "CacheEverything": GsBoolConfig(
         "启用数据缓存",
-        "启用后，所有API数据（基础信息、角色信息、深渊等）都会被缓存到本地用于网络故障时兜底，每1000用户大约额外占用1GB空间。禁用则每次都从API获取最新数据",
+        "启用后，所有API数据（基础信息、角色信息、深渊等）都会被缓存到本地用于网络故障时兜底，每1000用户大约额外占用1GB空间。禁用则每次都从API获取最新数据，但如掉登录等由于实际请求成功，不会生效",
         False,
+    ),
+    "RefreshSingleCharBehavior": GsStrConfig(
+        "刷新单角色面板逻辑",
+        "控制刷新单个角色面板后的行为：refresh_only(仅刷新)、refresh_and_send(刷新并合并发送)、refresh_and_send_separately(刷新并分别发送)",
+        "refresh_and_send",
+        options=[
+            "refresh_only",
+            "refresh_and_send",
+            "refresh_and_send_separately",
+        ],
     ),
 }

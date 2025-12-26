@@ -158,16 +158,16 @@ async def draw_refresh_char_detail_img(
 ):
     time_stamp = can_refresh_card(user_id, uid)
     if time_stamp > 0:
-        return get_refresh_interval_notify(time_stamp)
+        return get_refresh_interval_notify(time_stamp), False
     self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
-        return error_reply(WAVES_CODE_102)
+        return error_reply(WAVES_CODE_102), False
     # 账户数据
     account_info = await waves_api.get_base_info(uid, ck)
     if not account_info.success:
-        return account_info.throw_msg()
+        return account_info.throw_msg(), False
     if not account_info.data:
-        return "用户未展示数据"
+        return "用户未展示数据", False
     account_info = AccountBaseInfo.model_validate(account_info.data)
     # 更新group id
     await WavesBind.insert_waves_uid(user_id, ev.bot_id, uid, ev.group_id, lenth_limit=9)
@@ -176,7 +176,7 @@ async def draw_refresh_char_detail_img(
     if ev.command == "面板":
         all_waves_datas = await get_all_role_detail_info_list(uid)
         if not all_waves_datas:
-            return "暂无面板数据"
+            return "暂无面板数据", False
         waves_map = {
             "refresh_update": {},
             "refresh_unchanged": {i.role.roleId: i.model_dump() for i in all_waves_datas},
@@ -192,7 +192,7 @@ async def draw_refresh_char_detail_img(
             refresh_type=refresh_type,
         )
         if isinstance(waves_datas, str):
-            return waves_datas
+            return waves_datas, False
 
     role_detail_list = [
         RoleDetailData(**r) for key in ["refresh_update", "refresh_unchanged"] for r in waves_map[key].values()
@@ -326,7 +326,7 @@ async def draw_refresh_char_detail_img(
     img = add_footer(img, 600, 20)
     img = await convert_img(img)
     set_cache_refresh_card(user_id, uid)
-    return img
+    return img, role_update > 0
 
 
 async def draw_pic(char_rank: WavesCharRank, isUpdate=False):

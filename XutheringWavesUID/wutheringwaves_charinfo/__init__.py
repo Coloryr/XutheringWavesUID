@@ -164,7 +164,7 @@ async def send_card_info(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
+    msg, _ = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
     if isinstance(msg, str) or isinstance(msg, bytes):
         return await bot.send_option(msg, buttons)
 
@@ -194,9 +194,30 @@ async def send_one_char_detail_msg(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
-    if isinstance(msg, str) or isinstance(msg, bytes):
-        return await bot.send_option(msg, buttons)
+    msg, is_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
+    if is_updated: # 必定有图片
+        from ..wutheringwaves_config import WutheringWavesConfig
+        refresh_behavior = WutheringWavesConfig.get_config("RefreshSingleCharBehavior").data
+
+        if refresh_behavior == "refresh_only":
+            # 仅刷新，不发送
+            await bot.send_option(msg, buttons)
+        elif refresh_behavior == "refresh_and_send_separately":
+            # 刷新并分别发送
+            await bot.send(msg)
+            if not uid:
+                return await bot.send(error_reply(WAVES_CODE_103))
+            im = await draw_char_detail_img(ev, uid, char, user_id, None)
+            await bot.send(im)
+        else:  # refresh_and_send 或默认行为
+            # 刷新并合并发送
+            if not uid:
+                return await bot.send(error_reply(WAVES_CODE_103))
+            im = await draw_char_detail_img(ev, uid, char, user_id, None)
+            await bot.send([msg, im])
+
+    elif isinstance(msg, str) or isinstance(msg, bytes):
+        await bot.send_option(msg, buttons)
 
 
 @waves_char_detail.on_prefix(("角色面板", "查询"))
