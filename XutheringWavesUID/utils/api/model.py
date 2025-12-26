@@ -229,7 +229,7 @@ class RoleDetailData(BaseModel):
 
     def get_skill_level(
         self,
-        skill_type: Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路"],
+        skill_type: Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路", "谐度破坏"],
     ):
         skill_level = 1
         _skill = next((skill for skill in self.skillList if skill.skill.type == skill_type), None)
@@ -238,7 +238,7 @@ class RoleDetailData(BaseModel):
         return skill_level
 
     def get_skill_list(self):
-        sort = ["常态攻击", "共鸣技能", "共鸣回路", "共鸣解放", "变奏技能", "延奏技能"]
+        sort = ["常态攻击", "共鸣技能", "共鸣回路", "共鸣解放", "变奏技能", "延奏技能", "谐度破坏"]
         return sorted(self.skillList, key=lambda x: sort.index(x.skill.type))
 
 
@@ -517,9 +517,36 @@ class OnlinePhantomList(RootModel[List[OnlinePhantom]]):
         return iter(self.root)
 
 
-class OwnedRoleList(RootModel[List[int]]):
-    def __iter__(self):
-        return iter(self.root)
+class OwnedRoleInfo(BaseModel):
+    """已拥有角色信息
+    {
+        "roleId": 1402,
+        "level": 90
+    }
+    """
+
+    roleId: int
+    level: int
+
+
+class OwnedRoleInfoResponse(BaseModel):
+    """已拥有角色信息响应"""
+
+    roleInfoList: List[OwnedRoleInfo]
+
+
+class EquipWeapon(BaseModel):
+    """装备的武器
+    {
+        "id": 21010056,
+        "breach": 6,
+        "level": 90
+    }
+    """
+
+    id: int
+    breach: int
+    level: int
 
 
 class RoleCultivateSkillLevel(BaseModel):
@@ -527,13 +554,18 @@ class RoleCultivateSkillLevel(BaseModel):
     level: int
 
 
-class RoleCultivateStatus(BaseModel):
+class RoleCultivateStatus(BaseModel): # 这里暂时没有谐度破坏
     """角色培养状态
     {
         "roleId": 1107,
         "roleName": "珂莱塔",
         "roleLevel": 90,
         "roleBreakLevel": 6,
+        "equipWeapon": {
+            "id": 21010056,
+            "breach": 6,
+            "level": 90
+        },
         "skillLevelList": [{
                 "type": "常态攻击",
                 "level": 1
@@ -561,6 +593,7 @@ class RoleCultivateStatus(BaseModel):
     roleName: str
     roleLevel: int
     roleBreakLevel: int  # 突破等级
+    equipWeapon: Optional[EquipWeapon] = None  # 装备的武器
     skillLevelList: List[RoleCultivateSkillLevel]
     skillBreakList: List[str]  # 突破技能
 
@@ -688,13 +721,29 @@ class PeriodNode(BaseModel):
     num: int
 
 
+class PeriodDetailNode(BaseModel):
+    type: str
+    num: int
+    sort: int
+
+
+class PeriodDetailItem(BaseModel):
+    type: int
+    total: int
+    inc: Optional[int] = None
+    detail: List[PeriodDetailNode] = Field(default_factory=list)
+    copyWriting: Optional[str] = None
+
+
 class PeriodDetail(BaseModel):
     """资源简报详情"""
 
-    totalCoin: int
-    totalStar: int
+    totalCoin: Optional[int] = 0
+    totalStar: Optional[int] = 0
     coinList: List[PeriodNode] = Field(default_factory=list)
     starList: List[PeriodNode] = Field(default_factory=list)
+    itemList: List[PeriodDetailItem] = Field(default_factory=list)
+    copyWriting: Optional[str] = None
 
 
 class PermanentRouge(BaseModel):

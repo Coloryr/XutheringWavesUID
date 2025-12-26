@@ -26,19 +26,17 @@ waves_refresh_bind = SV("waves刷新绑定", priority=5)
 def get_ck_and_devcode(text: str, split_str: str = ",") -> tuple[str, str]:
     ck, devcode = "", ""
     try:
-        ck, devcode = text.split(split_str)
-        devcode = devcode.strip()
-        ck = ck.strip()
+        parts = text.split(split_str, maxsplit=1)
+        ck = parts[0].strip()
+        devcode = parts[1].strip() if len(parts) > 1 else ""
     except ValueError:
         pass
     return ck, devcode
 
 
 msg_notify = [
-    "[鸣潮] 该命令末尾需要跟正确的token和did!",
-    f"例如【{PREFIX}添加token token,did】",
-    "",
-    "先找名字为did，没有再找devcode（不是distinct_id）",
+    "[鸣潮] 该命令末尾需要跟正确的token，did",
+    f"例如【{PREFIX}添加token token】或【{PREFIX}添加token token,did】",
     "",
     "当前did位数不正确（32位、36位、40位），请检查后重新添加",
 ]
@@ -51,16 +49,20 @@ async def send_waves_add_ck_msg(bot: Bot, ev: Event):
 
     ck, did = "", ""
     for i in ["，", ","]:
-        ck, did = get_ck_and_devcode(text, split_str=i)
-        if ck and did:
+        if i in text:
+            ck, did = get_ck_and_devcode(text, split_str=i)
             break
+    if not ck:
+        ck = text.strip()
 
-    if len(did) == 32 or len(did) == 36 or len(did) == 40:
-        pass
-    else:
-        did = ""
+    if did and len(did) not in (32, 36, 40):
+        msg = "\n".join(msg_notify)
+        return await bot.send(
+            (" " if at_sender else "") + msg,
+            at_sender,
+        )
 
-    if not ck or not did:
+    if not ck:
         msg = "\n".join(msg_notify)
         return await bot.send(
             (" " if at_sender else "") + msg,

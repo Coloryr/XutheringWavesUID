@@ -38,7 +38,8 @@ from .RESOURCE_PATH import (
 async def check_speed(plugin_name):
     URL_LIB = {
         "小维1号": "https://ww1.loping151.top/",
-        "小维2号": "https://ww2.loping151.top/"
+        "小维2号": "https://ww2.loping151.top/",
+        "小维3号": "https://ww3.loping151.top/"
     }
 
     async def _measure_speed(client: httpx.AsyncClient, base_url: str) -> float:
@@ -97,6 +98,7 @@ async def check_speed(plugin_name):
 
     return url, tag
 
+
 def get_target_package():
     system = sys.platform
     machine = platform.machine().lower()
@@ -152,8 +154,10 @@ async def download_all_resource(force: bool = False):
 
             shutil.rmtree(BUILD_TEMP, ignore_errors=True)
             shutil.rmtree(MAP_BUILD_TEMP, ignore_errors=True)
+            shutil.rmtree(MAP_CHAR_PATH, ignore_errors=True)
             BUILD_TEMP.mkdir(parents=True, exist_ok=True)
             MAP_BUILD_TEMP.mkdir(parents=True, exist_ok=True)
+            MAP_CHAR_PATH.mkdir(parents=True, exist_ok=True)
             
         plugin_name = "XutheringWavesUID"
         url, tag = await check_speed(plugin_name)

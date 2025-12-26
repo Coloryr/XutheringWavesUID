@@ -547,6 +547,7 @@ async def parse_char_skill(data: Dict[str, Dict[str, Skill]]):
         ("共鸣解放", "3", ["11", "15"]),
         ("变奏技能", "6", ["9", "16"]),
         ("延奏技能", "8", []),
+        ("谐度破坏", "17", []),
     ]
 
     images = []

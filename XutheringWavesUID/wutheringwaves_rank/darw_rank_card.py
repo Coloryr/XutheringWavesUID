@@ -129,6 +129,20 @@ async def get_one_rank_info(user_id, uid, role_detail, rankDetail):
                 sonata_name = ph.get("ph_name", "")
                 break
 
+    expected_damage_int = 0
+    if expected_damage is not None:
+        if isinstance(expected_damage, (int, float)):
+            expected_damage_int = int(expected_damage)
+        elif isinstance(expected_damage, str):
+            temp = expected_damage.replace(",", "").strip()
+            if temp.isdigit():
+                expected_damage_int = int(temp)
+            else:
+                try:
+                    expected_damage_int = int(float(temp))
+                except ValueError:
+                    expected_damage_int = 0
+
     rankInfo = RankInfo(
         **{
             "roleDetail": role_detail,
@@ -140,7 +154,7 @@ async def get_one_rank_info(user_id, uid, role_detail, rankDetail):
             "score": round(int(phantom_score * 100) / 100, ndigits=2),
             "score_bg": phantom_bg,
             "expected_damage": expected_damage,
-            "expected_damage_int": int(expected_damage.replace(",", "")),
+            "expected_damage_int": expected_damage_int,
             "sonata_name": sonata_name,
         }
     )
