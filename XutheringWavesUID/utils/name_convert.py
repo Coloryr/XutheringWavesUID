@@ -162,6 +162,9 @@ def ensure_data_loaded(force: bool = False):
 
 def alias_to_char_name(char_name: str) -> str:
     ensure_data_loaded()
+    for key, aliases in char_alias_data.items():
+        if char_name == key or char_name in aliases:
+            return key
     for i in char_alias_data:
         if (char_name in i) or (char_name in char_alias_data[i]):
             return i
@@ -172,6 +175,9 @@ def alias_to_char_name_optional(char_name: Optional[str]) -> Optional[str]:
     ensure_data_loaded()
     if not char_name:
         return None
+    for key, aliases in char_alias_data.items():
+        if char_name == key or char_name in aliases:
+            return key
     for i in char_alias_data:
         if (char_name in i) or (char_name in char_alias_data[i]):
             return i
@@ -180,6 +186,9 @@ def alias_to_char_name_optional(char_name: Optional[str]) -> Optional[str]:
 
 def alias_to_char_name_list(char_name: str) -> List[str]:
     ensure_data_loaded()
+    for key, aliases in char_alias_data.items():
+        if char_name == key or char_name in aliases:
+            return aliases
     for i in char_alias_data:
         if (char_name in i) or (char_name in char_alias_data[i]):
             return char_alias_data[i]

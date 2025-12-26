@@ -97,7 +97,7 @@ async def send_login(bot: Bot, ev: Event, url):
         im = [
             f"{game_title} 您的id为【{ev.user_id}】",
             "完成后将刷新全部面板，无需立即刷新",
-            url,
+            f" {url}",
             "3分钟内有效",
         ]
 
@@ -334,6 +334,6 @@ async def waves_login(data: LoginModel):
     if temp is None:
         return {"success": False, "msg": "登录超时"}
 
-    temp.update(data.dict())
+    temp.update(data.model_dump())
     cache.set(data.auth, temp)
     return {"success": True}

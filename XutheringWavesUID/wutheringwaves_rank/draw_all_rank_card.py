@@ -99,7 +99,7 @@ async def get_rank(item: RankItem) -> Optional[RankInfoResponse]:
         try:
             res = await client.post(
                 GET_RANK_URL,
-                json=item.dict(),
+                json=item.model_dump(),
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {WavesToken}",
@@ -157,7 +157,7 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
     if not rankInfoList.data:
         return "获取排行失败"
 
-    totalNum = len(rankInfoList.data.details)
+    totalNum = len([rank for rank in rankInfoList.data.details if rank.rank > 0])
     title_h = 500
     bar_star_h = 110
     text_bar_h = 130
@@ -325,8 +325,10 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
             draw_rank_id("999+", size=(100, 50), draw=(50, 24), dest=(10, 30))
         elif rank_id > 99:
             draw_rank_id(rank_id, size=(75, 50), draw=(37, 24), dest=(25, 30))
-        else:
+        elif rank_id > 0:
             draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30))
+        else:
+            continue
 
         # 名字
         bar_star_draw.text((210, 75), f"{rank.kuro_name}", "white", waves_font_20, "lm")

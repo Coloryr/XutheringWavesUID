@@ -179,7 +179,7 @@ async def get_one_rank(item: OneRankRequest) -> Optional[OneRankResponse]:
         try:
             res = await client.post(
                 ONE_RANK_URL,
-                json=item.dict(),
+                json=item.model_dump(),
                 headers={
                     "Content-Type": "application/json",
                     "Authorization": f"Bearer {WavesToken}",
@@ -953,7 +953,7 @@ async def draw_char_detail_img(
 
     temp_i = 0
     for _, _skill in enumerate(role_detail.get_skill_list()):
-        if _skill.skill.type == "延奏技能":
+        if _skill.skill.type in ["延奏技能", "谐度破坏"]:
             continue
         skill_bg = skill_bg_1.copy()
         # logger.debug(f"{char_name}-{_skill.skill.name}")
@@ -1359,6 +1359,7 @@ async def generate_online_role_detail(char_id: str):
         "共鸣解放": "3",
         "变奏技能": "6",
         "延奏技能": "8",
+        "谐度破坏": "17"
     }
     for i in char_template_data["skillList"]:
         temp_skill = i["skill"]
