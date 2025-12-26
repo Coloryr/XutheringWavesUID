@@ -14,10 +14,8 @@ from ..utils.api.model import (
     OnlineRoleList,
     OnlineWeapon,
     OnlineWeaponList,
-    OwnedRoleList,
     RoleCostDetail,
-    RoleCultivateStatusList,
-    RoleDetailData,
+    RoleCultivateStatusList
 )
 from ..utils.char_info_utils import get_all_role_detail_info_list
 from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103, WAVES_CODE_108
