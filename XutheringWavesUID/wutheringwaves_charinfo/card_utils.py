@@ -47,10 +47,8 @@ ORB_THRESHOLD = 0.7
 ORB_BLOCK_THRESHOLD = 0.9
 ORB_FEATURES = 2000
 
-CROP_LEFT = 85
-CROP_TOP = 265
-CROP_RIGHT = 525
-CROP_BOTTOM = 1070
+CROP_PORTRAIT = (85, 265, 525, 1070)
+CROP_LANDSCAPE = (520, 0, 1100, 620)
 
 CUSTOM_PATH_MAP = {
     "card": CUSTOM_CARD_PATH,
@@ -194,11 +192,22 @@ async def match_hash_id_from_event(
         except Exception:
             continue
 
-        left = max(0, min(CROP_LEFT, image.width))
-        top = max(0, min(CROP_TOP, image.height))
-        right = max(left + 1, min(CROP_RIGHT, image.width))
-        bottom = max(top + 1, min(CROP_BOTTOM, image.height))
-        crop = image.crop((left, top, right, bottom))
+        if image.width > image.height:
+            left, top, right, bottom = CROP_LANDSCAPE
+        else:
+            left, top, right, bottom = CROP_PORTRAIT
+
+        if left >= image.width or top >= image.height:
+            crop = image
+        else:
+            left = max(0, left)
+            top = max(0, top)
+            right = min(right, image.width)
+            bottom = min(bottom, image.height)
+            if right <= left or bottom <= top:
+                crop = image
+            else:
+                crop = image.crop((left, top, right, bottom))
         crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
         feat_new = _compute_orb_features_from_image(crop)
         if feat_new is None:
