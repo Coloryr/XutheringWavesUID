@@ -94,6 +94,7 @@ async def send_waves_challenge_info(bot: Bot, ev: Event):
         "查询无尽",
         "查询海墟",
         "无尽",
+        "wj",
         "无尽深渊",
         "禁忌",
         "禁忌海域",
@@ -124,7 +125,10 @@ async def send_waves_slash_info(bot: Bot, ev: Event):
 @sv_waves_rank_slash.on_command(
     (
         "无尽总排行",
+        "wjzph",
+        "无尽总排行榜",
         "冥海总排行",
+        "冥海总排行榜",
     ),
     block=True,
 )
@@ -138,8 +142,11 @@ async def send_waves_rank_slash_info(bot: Bot, ev: Event):
 @sv_waves_rank_slash_list.on_command(
     (
         "无尽排行",
+        "wjph",
+        "无尽排行榜",
         "无尽排名",
         "无尽群排行",
+        "无尽群排行榜",
         "无尽群排名",
         "群无尽排行",
         "群无尽排名",

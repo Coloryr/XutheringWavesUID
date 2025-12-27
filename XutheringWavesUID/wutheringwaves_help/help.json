@@ -414,6 +414,14 @@
         "eg": "上传椿面板图",
         "need_ck": false,
         "need_sk": false,
+        "need_admin": true
+      },
+      {
+        "name": "查看角色面板图",
+        "desc": "查看角色面板图",
+        "eg": "查看椿面板图abcdefgh",
+        "need_ck": false,
+        "need_sk": false,
         "need_admin": false
       },
       {
@@ -422,7 +430,7 @@
         "eg": "椿面板图列表",
         "need_ck": false,
         "need_sk": false,
-        "need_admin": false
+        "need_admin": true
       },
       {
         "name": "删除面板图",
@@ -430,7 +438,7 @@
         "eg": "删除椿面板图123",
         "need_ck": false,
         "need_sk": false,
-        "need_admin": false
+        "need_admin": true
       },
       {
         "name": "删除全部面板图",
@@ -438,7 +446,7 @@
         "eg": "删除全部椿面板图",
         "need_ck": false,
         "need_sk": false,
-        "need_admin": false
+        "need_admin": true
       }
     ]
   },

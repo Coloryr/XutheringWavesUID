@@ -10,7 +10,7 @@ role_develop = SV("waves角色培养")
 
 
 @role_develop.on_regex(
-    rf"^(?P<develop_list>({PATTERN})(?:\s+{PATTERN})*?)\s*(?:养成|培养|培养成本)(?:\s*(?P<skill_levels>[\d,\s]+))?$",
+    rf"^(?P<develop_list>({PATTERN})(?:\s+{PATTERN})*?)\s*(?:养成|培养|培养成本|yc)(?:\s*(?P<skill_levels>[\d,\s]+))?$",
     block=True,
 )
 async def calc_develop(bot: Bot, ev: Event):

@@ -12,7 +12,7 @@ sv_waves_echo_list = SV("声骸展示")
 
 
 @sv_waves_echo_list.on_regex(
-    r"^(?P<command>声骸列表|我的声骸|声骸仓库|声骸|声骇)(?P<pages>\d+)?$",
+    r"^(?P<command>声骸列表|我的声骸|声骸仓库|声骸|声骇|sh)(?P<pages>\d+)?$",
     block=True,
 )
 async def send_echo_list_msg(bot: Bot, ev: Event):

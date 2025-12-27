@@ -14,12 +14,12 @@ sv_waves_char_list = SV("ww角色练度统计")
 
 
 @sv_waves_char_list.on_regex(
-    r"^(\d+)?(练度|练度统计|角色列表|刷新练度|刷新练度统计|刷新角色列表)$",
+    r"^(\d+)?(练度|ld|练度统计|角色列表|刷新练度|刷新练度统计|刷新角色列表|updld)$",
     block=True,
 )
 async def send_char_list_msg_new(bot: Bot, ev: Event):
     match = re.search(
-        r"(?P<waves_id>\d+)?(?P<query_type>练度|练度统计|角色列表|刷新练度|刷新练度统计|刷新角色列表)",
+        r"(?P<waves_id>\d+)?(?P<query_type>练度|ld|练度统计|角色列表|刷新练度|刷新练度统计|刷新角色列表)",
         ev.raw_text,
     )
     if not match:
@@ -28,7 +28,7 @@ async def send_char_list_msg_new(bot: Bot, ev: Event):
     query_type = match.group("query_type")
 
     is_refresh = False
-    if "刷新" in query_type:
+    if "刷新" in query_type or "upd" in query_type:
         is_refresh = True
 
     is_peek = False

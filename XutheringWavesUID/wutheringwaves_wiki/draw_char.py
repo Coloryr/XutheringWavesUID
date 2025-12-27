@@ -36,11 +36,11 @@ TEXT_PATH = Path(__file__).parent / "texture2d"
 
 
 async def draw_char_wiki(char_id: str, query_role_type: str):
-    if query_role_type == "天赋":
+    if query_role_type == "技能":
         return await draw_char_skill(char_id)
-    elif query_role_type == "命座":
+    elif query_role_type == "共鸣链":
         return await draw_char_chain(char_id)
-    elif query_role_type in ["回路", "操作", "机制"]:
+    elif query_role_type == "机制":
         return await draw_char_forte(char_id)
     return ""
 

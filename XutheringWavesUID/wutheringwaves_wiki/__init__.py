@@ -21,7 +21,7 @@ sv_waves_slash_info = SV("waves查询海墟信息", priority=4)
 
 
 @sv_waves_guide.on_regex(
-    rf"^(?P<wiki_name>{PATTERN})(?P<wiki_type>共鸣链|命座|天赋|技能|图鉴|wiki|介绍|回路|操作|机制)$",
+    rf"^(?P<wiki_name>{PATTERN})(?P<wiki_type>共鸣链|gml|命座|天赋|技能|jn|图鉴|wiki|介绍|回路|操作|机制|jz)$",
     block=True,
 )
 async def send_waves_wiki(bot: Bot, ev: Event):
@@ -29,17 +29,19 @@ async def send_waves_wiki(bot: Bot, ev: Event):
     wiki_type = ev.regex_dict.get("wiki_type", "")
 
     at_sender = True if ev.group_id else False
-    if wiki_type in ("共鸣链", "命座", "天赋", "技能", "回路", "操作", "机制"):
+    if wiki_type in ("共鸣链", "gml", "命座", "天赋", "技能", "jn", "回路", "操作", "机制", "jz"):
         char_name = wiki_name
         char_id = char_name_to_char_id(char_name)
         if not char_id:
             msg = f"[鸣潮] wiki【{char_name}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
             return await bot.send(msg, at_sender)
 
-        if wiki_type in ("技能", "天赋"):
-            query_role_type = "天赋"
-        elif wiki_type in ("共鸣链", "命座"):
-            query_role_type = "命座"
+        if wiki_type in ("技能", "天赋", "jn"):
+            query_role_type = "技能"
+        elif wiki_type in ("共鸣链", "命座", "gml"):
+            query_role_type = "共鸣链"
+        elif wiki_type in ("回路", "操作", "机制", "jz"):
+            query_role_type = "机制"
         else:
             query_role_type = wiki_type
 
@@ -62,7 +64,7 @@ async def send_waves_wiki(bot: Bot, ev: Event):
         await bot.send(img)
 
 
-@sv_waves_guide.on_regex(rf"^(?P<char>{PATTERN})攻略$", block=True)
+@sv_waves_guide.on_regex(rf"^(?P<char>{PATTERN})(?:攻略|gl)$", block=True)
 async def send_role_guide_pic(bot: Bot, ev: Event):
     char_name = ev.regex_dict.get("char", "")
 
@@ -75,7 +77,7 @@ async def send_role_guide_pic(bot: Bot, ev: Event):
     await get_guide(bot, ev, char_name)
 
 
-@sv_waves_guide.on_regex(rf"^(?P<type>{PATTERN})?武器(?:列表)?$", block=True)
+@sv_waves_guide.on_regex(rf"^(?P<type>{PATTERN})?(?:武器(?:列表)?|wq(?:lb)?)$", block=True)
 async def send_weapon_list(bot: Bot, ev: Event):
     weapon_type = ev.regex_dict.get("type", "")
     img = await draw_weapon_list(weapon_type)
@@ -88,7 +90,7 @@ async def send_sonata_list(bot: Bot, ev: Event):
 
 
 @sv_waves_tower.on_regex(
-    r"^深塔(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
+    r"^(?:深塔|st)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
     block=True,
 )
 async def send_tower_challenge_info(bot: Bot, ev: Event):
@@ -119,7 +121,7 @@ async def send_tower_challenge_info(bot: Bot, ev: Event):
         await bot.send(im)
 
 @sv_waves_slash_info.on_regex(
-    r"^(?:海墟|冥海|无尽)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
+    r"^(?:海墟|冥海|无尽|hx|wj)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
     block=True,
 )
 async def send_slash_challenge_info(bot: Bot, ev: Event):

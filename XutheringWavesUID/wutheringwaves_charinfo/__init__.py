@@ -1,3 +1,4 @@
+import asyncio
 from PIL import Image
 from gsuid_core.sv import SV
 from gsuid_core.bot import Bot
@@ -20,16 +21,21 @@ from .upload_card import (
     delete_all_custom_card,
     compress_all_custom_card,
 )
+from .card_utils import send_custom_card_single, send_repeated_custom_cards
 
 waves_upload_char = SV("waves上传面板图", priority=3, pm=1)
+waves_char_card_single = SV("waves查看面板图", priority=3)
 waves_char_card_list = SV("waves面板图列表", priority=3, pm=1)
 waves_delete_char_card = SV("waves删除面板图", priority=3, pm=1)
 waves_delete_all_card = SV("waves删除全部面板图", priority=5, pm=1)
 waves_compress_card = SV("waves面板图压缩", priority=5, pm=1)
+waves_repeated_card = SV("waves面板图查重", priority=3, pm=1)
 waves_new_get_char_info = SV("waves新获取面板", priority=3)
 waves_new_get_one_char_info = SV("waves新获取单个角色面板", priority=3)
 waves_new_char_detail = SV("waves新角色面板", priority=4)
 waves_char_detail = SV("waves角色面板", priority=5)
+
+_repeated_card_lock = asyncio.Lock()
 
 
 TYPE_MAP = {
@@ -44,15 +50,25 @@ TYPE_MAP = {
 }
 
 
-@waves_upload_char.on_regex(rf"^上传(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图$", block=True)
+@waves_upload_char.on_regex(
+    rf"^(?P<force>强制)?上传(?P<char>{PATTERN})(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图$",
+    block=True,
+)
 async def upload_char_img(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
     if not char:
         return
-    await upload_custom_card(bot, ev, char, target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"))
+    is_force = ev.regex_dict.get("force") is not None
+    await upload_custom_card(
+        bot,
+        ev,
+        char,
+        target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"),
+        is_force=is_force,
+    )
+    
 
-
-@waves_char_card_list.on_regex(rf"^(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图列表$", block=True)
+@waves_char_card_list.on_regex(rf"^(?P<char>{PATTERN})(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图列表$", block=True)
 async def get_char_card_list(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
     if not char:
@@ -61,7 +77,7 @@ async def get_char_card_list(bot: Bot, ev: Event):
 
 
 @waves_delete_char_card.on_regex(
-    rf"^删除(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|背景)图(?P<hash_id>[a-zA-Z0-9]+)$", block=True
+    rf"^删除(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9,，]+)$", block=True
 )
 async def delete_char_card(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
@@ -71,7 +87,7 @@ async def delete_char_card(bot: Bot, ev: Event):
     await delete_custom_card(bot, ev, char, hash_id, target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"))
 
 
-@waves_delete_all_card.on_regex(rf"^删除全部(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图$", block=True)
+@waves_delete_all_card.on_regex(rf"^删除全部(?P<char>{PATTERN})(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图$", block=True)
 async def delete_all_char_card(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
     if not char:
@@ -79,9 +95,43 @@ async def delete_all_char_card(bot: Bot, ev: Event):
     await delete_all_custom_card(bot, ev, char, target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"))
 
 
-@waves_compress_card.on_fullmatch(("压缩面板图", "压缩面包图", "压缩🍞图", "压缩背景图", "压缩体力图"), block=True)
+@waves_compress_card.on_fullmatch(("压缩面板图", "压缩面包图", "压缩🍞图", "压缩背景图", "压缩体力图", "压缩card图", "压缩bg图", "压缩mr图"), block=True)
 async def compress_char_card(bot: Bot, ev: Event):
     await compress_all_custom_card(bot, ev)
+    
+    
+@waves_repeated_card.on_fullmatch(("查看重复面板图", "查看重复🍞图", "查看重复背景图", "查看重复体力图", "查看重复card图", "查看重复bg图", "查看重复mr图"), block=True)
+async def repeated_char_card(bot: Bot, ev: Event):
+    if _repeated_card_lock.locked():
+        return
+    await _repeated_card_lock.acquire()
+    await bot.send("[鸣潮] 开始检查重复面板、背景、体力图，请稍后…")
+
+    async def _run() -> None:
+        try:
+            await send_repeated_custom_cards(bot, ev)
+        finally:
+            _repeated_card_lock.release()
+
+    asyncio.create_task(_run())
+
+
+@waves_char_card_single.on_regex(
+    rf"^查看(?P<char>{PATTERN})(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9]+)$",
+    block=True,
+)
+async def get_char_card_single(bot: Bot, ev: Event):
+    char = ev.regex_dict.get("char")
+    hash_id = ev.regex_dict.get("hash_id")
+    if not char or not hash_id:
+        return
+    await send_custom_card_single(
+        bot,
+        ev,
+        char,
+        hash_id,
+        target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"),
+    )
 
 
 @waves_new_get_char_info.on_fullmatch(
@@ -100,6 +150,8 @@ async def compress_char_card(bot: Bot, ev: Event):
         "面板",
         "面包",
         "🍞",
+        "upd🍞",
+        "updmb",
         "mb",
     ),
     block=True,
@@ -114,13 +166,13 @@ async def send_card_info(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
+    msg, _ = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
     if isinstance(msg, str) or isinstance(msg, bytes):
         return await bot.send_option(msg, buttons)
 
 
 @waves_new_get_one_char_info.on_regex(
-    rf"^(?P<is_refresh>刷新|更新)(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb)$",
+    rf"^(?P<is_refresh>刷新|更新|upd)(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb)$",
     block=True,
 )
 async def send_one_char_detail_msg(bot: Bot, ev: Event):
@@ -144,9 +196,30 @@ async def send_one_char_detail_msg(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
-    if isinstance(msg, str) or isinstance(msg, bytes):
-        return await bot.send_option(msg, buttons)
+    msg, is_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
+    if is_updated: # 必定有图片
+        from ..wutheringwaves_config import WutheringWavesConfig
+        refresh_behavior = WutheringWavesConfig.get_config("RefreshSingleCharBehavior").data
+
+        if refresh_behavior == "refresh_only":
+            # 仅刷新，不发送
+            await bot.send_option(msg, buttons)
+        elif refresh_behavior == "refresh_and_send_separately":
+            # 刷新并分别发送
+            await bot.send(msg)
+            if not uid:
+                return await bot.send(error_reply(WAVES_CODE_103))
+            im = await draw_char_detail_img(ev, uid, char, user_id, None)
+            await bot.send(im)
+        else:  # refresh_and_send 或默认行为
+            # 刷新并合并发送
+            if not uid:
+                return await bot.send(error_reply(WAVES_CODE_103))
+            im = await draw_char_detail_img(ev, uid, char, user_id, None)
+            await bot.send([msg, im])
+
+    elif isinstance(msg, str) or isinstance(msg, bytes):
+        await bot.send_option(msg, buttons)
 
 
 @waves_char_detail.on_prefix(("角色面板", "查询"))
@@ -167,7 +240,7 @@ async def send_char_detail_msg(bot: Bot, ev: Event):
 
 
 @waves_new_char_detail.on_regex(
-    rf"(?P<waves_id>\d+)?(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
+    rf"(?P<waves_id>\d+)?(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
     block=True,
 )
 async def send_char_detail_msg2(bot: Bot, ev: Event):

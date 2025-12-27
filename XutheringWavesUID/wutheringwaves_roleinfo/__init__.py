@@ -15,7 +15,7 @@ from .draw_role_info import draw_role_img
 waves_role_info = SV("waves查询信息")
 
 
-@waves_role_info.on_fullmatch(("查询", "卡片"), block=True)
+@waves_role_info.on_fullmatch(("查询", "卡片", "kp"), block=True)
 async def send_role_info(bot: Bot, ev: Event):
     if check_request_rate_limit():
         return hint.error_reply(WAVES_CODE_108)
