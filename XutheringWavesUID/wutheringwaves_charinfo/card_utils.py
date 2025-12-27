@@ -1,6 +1,5 @@
 import hashlib
 import os
-import re
 import ssl
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -22,22 +21,11 @@ def _import_cv2():
         return None
 
 
-def _import_easyocr():
-    try:
-        import easyocr  # type: ignore
-        return easyocr
-    except Exception:
-        logger.warning("[鸣潮] 未安装easyocr，请先安装后再使用OCR识别。")
-        return None
-
-
 cv2 = _import_cv2()
-easyocr = _import_easyocr()
 
 import httpx
 
 from gsuid_core.bot import Bot
-from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
@@ -59,13 +47,10 @@ ORB_THRESHOLD = 0.7
 ORB_BLOCK_THRESHOLD = 0.9
 ORB_FEATURES = 2000
 
-CROP_LEFT = 435
-CROP_TOP = 262
-CROP_RIGHT = 530
-CROP_BOTTOM = 282
-OCR_LANGS = ["en"]
-OCR_ALLOWLIST = "0123456789abcdef"
-_OCR_READER = None
+CROP_LEFT = 85
+CROP_TOP = 265
+CROP_RIGHT = 525
+CROP_BOTTOM = 1070
 
 CUSTOM_PATH_MAP = {
     "card": CUSTOM_CARD_PATH,
@@ -143,36 +128,6 @@ async def get_image(ev: Event) -> List[str]:
     return res
 
 
-def _get_ocr_reader():
-    global _OCR_READER
-    if _OCR_READER is None:
-        _OCR_READER = easyocr.Reader(OCR_LANGS, gpu=False, verbose=False)
-    return _OCR_READER
-
-
-def _otsu_binarize(gray: np.ndarray) -> np.ndarray:
-    hist, _ = np.histogram(gray.ravel(), bins=256, range=(0, 256))
-    total = gray.size
-    sum_total = np.dot(np.arange(256), hist)
-
-    sum_b, w_b, max_var, threshold = 0.0, 0.0, 0.0, 0
-    for i in range(256):
-        w_b += hist[i]
-        if w_b == 0:
-            continue
-        w_f = total - w_b
-        if w_f == 0:
-            break
-        sum_b += i * hist[i]
-        m_b = sum_b / w_b
-        m_f = (sum_total - sum_b) / w_f
-        var_between = w_b * w_f * (m_b - m_f) ** 2
-        if var_between > max_var:
-            max_var = var_between
-            threshold = i
-    return (gray > threshold).astype(np.uint8) * 255
-
-
 async def _fetch_image_bytes(url: str) -> Optional[bytes]:
     try:
         if httpx.__version__ >= "0.28.0":
@@ -190,25 +145,46 @@ async def _fetch_image_bytes(url: str) -> Optional[bytes]:
         return None
 
 
-def _extract_hash_id(text: str) -> Optional[str]:
-    if not text:
+def _compute_orb_features_from_image(image: Image.Image) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    if cv2 is None:
         return None
-    match = re.search(r"[a-fA-F0-9]{8}", text)
-    if match:
-        return match.group(0).lower()
-    return None
+    rgb = np.array(image.convert("RGB"))
+    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    orb = cv2.ORB_create(nfeatures=ORB_FEATURES)
+    keypoints, descriptors = orb.detectAndCompute(gray, None)
+    if descriptors is None or not keypoints:
+        return None
+    pts = np.float32([kp.pt for kp in keypoints])
+    return pts, descriptors
 
 
-async def ocr_hash_id_from_event(ev: Event) -> Optional[str]:
-    if easyocr is None:
-        logger.warning("[鸣潮] easyocr 未安装，无法使用OCR识别")
+async def match_hash_id_from_event(
+    ev: Event,
+    target_type: str,
+    char_id: Optional[str] = None,
+) -> Optional[Tuple[str, Path, float, str]]:
+    if cv2 is None:
+        logger.warning("[鸣潮] 未安装opencv-python，无法使用相似度识别。")
         return None
 
     urls = await get_image(ev)
     if not urls:
         return None
 
-    reader = _get_ocr_reader()
+    best_sim = 0.0
+    best_path: Optional[Path] = None
+    best_char_id: Optional[str] = None
+
+    if char_id:
+        char_dirs = [CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"]
+    else:
+        char_dirs = []
+        base = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH)
+        if base.exists():
+            for d in base.iterdir():
+                if d.is_dir():
+                    char_dirs.append(d)
+
     for url in urls:
         image_bytes = await _fetch_image_bytes(url)
         if not image_bytes:
@@ -217,16 +193,37 @@ async def ocr_hash_id_from_event(ev: Event) -> Optional[str]:
             image = Image.open(BytesIO(image_bytes)).convert("RGB")
         except Exception:
             continue
-        crop = image.crop((CROP_LEFT, CROP_TOP, CROP_RIGHT, CROP_BOTTOM))
-        crop = crop.resize((crop.width * 3, crop.height * 3), Image.Resampling.LANCZOS)
-        crop_rgb = np.array(crop)
-        result = reader.readtext(crop_rgb, detail=0, paragraph=True)
-        text = "".join(result).strip()
-        logger.info(f"[鸣潮] OCR识别结果: {text}")
-        hash_id = _extract_hash_id(text)
-        if hash_id:
-            return hash_id
-    return None
+
+        left = max(0, min(CROP_LEFT, image.width))
+        top = max(0, min(CROP_TOP, image.height))
+        right = max(left + 1, min(CROP_RIGHT, image.width))
+        bottom = max(top + 1, min(CROP_BOTTOM, image.height))
+        crop = image.crop((left, top, right, bottom))
+        crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
+        feat_new = _compute_orb_features_from_image(crop)
+        if feat_new is None:
+            continue
+
+        for dir_path in char_dirs:
+            if not dir_path.exists():
+                continue
+            for img_path in _iter_images(dir_path):
+                feat_old = get_orb_features(img_path)
+                if feat_old is None:
+                    continue
+                sim = _orb_similarity(feat_new, feat_old)
+                if sim is None:
+                    continue
+                if sim > best_sim:
+                    best_sim = sim
+                    best_path = img_path
+                    best_char_id = dir_path.name
+
+    if best_path is None or best_char_id is None:
+        return None
+    if best_sim < ORB_THRESHOLD:
+        return None
+    return get_hash_id(best_path.name), best_path, best_sim, best_char_id
 
 
 def _shorten_rel_path(path: Path) -> str:

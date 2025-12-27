@@ -62,6 +62,7 @@ from ..utils.calculate import (
     get_total_score_bg,
 )
 from ..utils.fonts.waves_fonts import (
+    waves_font_12,
     waves_font_16,
     waves_font_18,
     waves_font_20,
@@ -519,7 +520,7 @@ async def draw_fixed_img(img, avatar, account_info, role_detail):
     if is_custom and role_pile_path is not None:
         hash_id = hashlib.sha256(role_pile_path.name.encode()).hexdigest()[:8]
         draw = ImageDraw.Draw(img)
-        draw_text_with_shadow(draw, hash_id, 525, 270, waves_font_16, offset=(1, 1), shadow_color="gray", anchor="rm")
+        draw_text_with_shadow(draw, hash_id, 525, 270, waves_font_12, offset=(1, 1), shadow_color="gray", anchor="rm")
 
 
 def resize_and_center_image(image, output_size=(560, 1000), background_color=(255, 255, 255, 0), is_custom=False):

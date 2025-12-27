@@ -22,7 +22,8 @@ from .upload_card import (
     compress_all_custom_card,
 )
 from .card_utils import (
-    ocr_hash_id_from_event,
+    get_char_id_and_name,
+    match_hash_id_from_event,
     send_custom_card_single,
     send_custom_card_single_by_id,
     send_repeated_custom_cards,
@@ -146,10 +147,18 @@ async def get_char_card_single(bot: Bot, ev: Event):
     hash_id = ev.regex_dict.get("hash_id")
     if not hash_id:
         at_sender = True if ev.group_id else False
-        hash_id = await ocr_hash_id_from_event(ev)
-        if not hash_id:
-            msg = "[鸣潮] 未找到图像id，请提供id。"
+        target_type = TYPE_MAP.get(ev.regex_dict.get("type"), "card")
+        if char:
+            char_id, _, msg = get_char_id_and_name(char)
+            if msg:
+                return await bot.send((" " if at_sender else "") + msg, at_sender)
+            match = await match_hash_id_from_event(ev, target_type, char_id)
+        else:
+            match = await match_hash_id_from_event(ev, target_type, None)
+        if not match:
+            msg = "[鸣潮] 未找到相似图片，请提供id或附带图片。"
             return await bot.send((" " if at_sender else "") + msg, at_sender)
+        hash_id = match[0]
     if not char:
         return await send_custom_card_single_by_id(
             bot,
