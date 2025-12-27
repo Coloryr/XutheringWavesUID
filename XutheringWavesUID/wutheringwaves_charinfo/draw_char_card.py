@@ -100,6 +100,8 @@ from ..utils.image import (
     get_custom_gaussian_blur,
 )
 
+from ..utils.limit_request import check_request_rate_limit
+
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
 ph_sort_name = [
