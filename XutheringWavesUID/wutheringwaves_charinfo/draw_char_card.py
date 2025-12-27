@@ -15,7 +15,7 @@ from ..utils import hint
 from ..utils.calc import WuWaCalc
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import PREFIX
-from ..utils.error_reply import WAVES_CODE_102 WAVES_CODE_108
+from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
 from .role_info_change import change_role_detail
 from ..utils.ascension.char import get_char_model
 from ..utils.api.model_other import EnemyDetailData
