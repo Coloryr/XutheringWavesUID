@@ -299,9 +299,9 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
         damage = "1"
 
     is_limit_query = False
-    if isinstance(char, str) and "极限" in char:
+    if isinstance(char, str) and ("极限" in char or "limit" in char):
         is_limit_query = True
-        char = char.replace("极限", "")
+        char = char.replace("极限", "").replace("limit", "")
 
     if damage:
         char = f"{char}{damage}"

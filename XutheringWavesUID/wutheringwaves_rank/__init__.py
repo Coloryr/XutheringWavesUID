@@ -8,7 +8,7 @@ from .draw_rank_list_card import draw_rank_list
 from .draw_total_rank_card import draw_total_rank
 from ..utils.char_info_utils import PATTERN
 
-sv_waves_rank_list = SV("ww角色排行")
+sv_waves_rank_list = SV("ww角色排行", priority=3)
 sv_waves_rank_all_list = SV("ww角色总排行", priority=1)
 sv_waves_rank_total_list = SV("ww练度总排行", priority=0)
 sv_waves_rank_local_list = SV("ww练度排行", priority=0)
