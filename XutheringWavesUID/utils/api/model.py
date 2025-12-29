@@ -206,6 +206,13 @@ class SkillData(BaseModel):
     skill: Skill
     level: int
 
+class SkillBranch(BaseModel):
+    activePic: str
+    branchId: int
+    branchName: str
+    desc: str
+    pic: str
+    skillIcon: str
 
 class RoleDetailData(BaseModel):
     role: Role
@@ -214,6 +221,8 @@ class RoleDetailData(BaseModel):
     weaponData: WeaponData
     phantomData: Optional[EquipPhantomData] = None
     skillList: List[SkillData]
+    activeBranchId: int = 0
+    skillBranchList: Optional[List[SkillBranch]] = None
 
     def get_chain_num(self):
         """获取命座数量"""
@@ -240,6 +249,13 @@ class RoleDetailData(BaseModel):
     def get_skill_list(self):
         sort = ["常态攻击", "共鸣技能", "共鸣回路", "共鸣解放", "变奏技能", "延奏技能", "谐度破坏"]
         return sorted(self.skillList, key=lambda x: sort.index(x.skill.type))
+    
+    def get_skill_branch(self) -> str:
+        if self.activeBranchId and self.skillBranchList:
+            for branch in self.skillBranchList:
+                if branch.branchId == self.activeBranchId:
+                    return branch
+        return None
 
 
 class CalabashData(BaseModel):

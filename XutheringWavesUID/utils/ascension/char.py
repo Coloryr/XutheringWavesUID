@@ -46,6 +46,13 @@ class WavesCharResult:
         self.name = ""
         self.starLevel = 4
         self.stats = {"life": 0.0, "atk": 0.0, "def": 0.0}
+        self.statsWeakness = {
+            "weaknessBuildUp": 0,
+            "weaknessBuildUpMax": 10000,
+            "weaknessTotalBonus": 0,
+            "breakWeaknessRatio": 10000,
+            "weaknessMastery": 0
+        },
         self.skillTrees = {}
         self.fixed_skill = {}
 
@@ -89,6 +96,7 @@ def get_char_detail(char_id: Union[str, int], level: int, breach: Union[int, Non
     result.name = char_data["name"]
     result.starLevel = char_data["starLevel"]
     result.stats = copy.deepcopy(char_data["stats"][str(breach)][str(level)])
+    result.statsWeakness = copy.deepcopy(char_data["statsWeakness"])
     result.skillTrees = char_data["skillTree"]
 
     char_data["skillTree"].items()

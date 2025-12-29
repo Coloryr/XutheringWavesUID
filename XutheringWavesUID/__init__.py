@@ -17,6 +17,12 @@ cfg_path = MAIN_PATH / "config.json"
 show_cfg_path = MAIN_PATH / "XutheringWavesUID" / "show_config.json"
 BACKUP_PATH = MAIN_PATH / "backup"
 
+# 此次迁移是删除错误的背景id
+TO_DEL = MAIN_PATH / "XutheringWavesUID" / "resuorce" / "role_bg" / "1402.webp"
+if TO_DEL.exists():
+    TO_DEL.unlink()
+    logger.info("[XutheringWavesUID] 已删除错误的背景图片 1402.webp")
+
 # 此次迁移是直接把显示配置改为上传内容配置
 BG_PATH = MAIN_PATH / "XutheringWavesUID" / "bg"
 if BG_PATH.exists():

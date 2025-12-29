@@ -21,7 +21,13 @@ from .upload_card import (
     delete_all_custom_card,
     compress_all_custom_card,
 )
-from .card_utils import send_custom_card_single, send_repeated_custom_cards
+from .card_utils import (
+    get_char_id_and_name,
+    match_hash_id_from_event,
+    send_custom_card_single,
+    send_custom_card_single_by_id,
+    send_repeated_custom_cards,
+)
 
 waves_upload_char = SV("waves上传面板图", priority=3, pm=1)
 waves_char_card_single = SV("waves查看面板图", priority=3)
@@ -29,7 +35,7 @@ waves_char_card_list = SV("waves面板图列表", priority=3, pm=1)
 waves_delete_char_card = SV("waves删除面板图", priority=3, pm=1)
 waves_delete_all_card = SV("waves删除全部面板图", priority=5, pm=1)
 waves_compress_card = SV("waves面板图压缩", priority=5, pm=1)
-waves_repeated_card = SV("waves面板图查重", priority=3, pm=1)
+waves_repeated_card = SV("waves面板图查重", priority=2, pm=1)
 waves_new_get_char_info = SV("waves新获取面板", priority=3)
 waves_new_get_one_char_info = SV("waves新获取单个角色面板", priority=3)
 waves_new_char_detail = SV("waves新角色面板", priority=4)
@@ -100,8 +106,21 @@ async def compress_char_card(bot: Bot, ev: Event):
     await compress_all_custom_card(bot, ev)
     
     
-@waves_repeated_card.on_fullmatch(("查看重复面板图", "查看重复🍞图", "查看重复背景图", "查看重复体力图", "查看重复card图", "查看重复bg图", "查看重复mr图"), block=True)
+@waves_repeated_card.on_regex(
+    r"^查看重复(?P<type>面板|面包|🍞|背景|体力|card|bg|mr)图(?P<threshold>\s*\d+(?:\.\d+)?)?$",
+    block=True,
+)
 async def repeated_char_card(bot: Bot, ev: Event):
+    threshold = None
+    raw_threshold = ev.regex_dict.get("threshold")
+    if raw_threshold:
+        try:
+            threshold = float(raw_threshold.strip())
+        except ValueError:
+            threshold = None
+    if threshold is None or not (0.5 <= threshold <= 1.0):
+        threshold = None
+
     if _repeated_card_lock.locked():
         return
     await _repeated_card_lock.acquire()
@@ -109,7 +128,10 @@ async def repeated_char_card(bot: Bot, ev: Event):
 
     async def _run() -> None:
         try:
-            await send_repeated_custom_cards(bot, ev)
+            if threshold is not None:
+                await send_repeated_custom_cards(bot, ev, threshold=threshold)
+            else:
+                await send_repeated_custom_cards(bot, ev)
         finally:
             _repeated_card_lock.release()
 
@@ -117,15 +139,34 @@ async def repeated_char_card(bot: Bot, ev: Event):
 
 
 @waves_char_card_single.on_regex(
-    rf"^查看(?P<char>{PATTERN})(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9]+)$",
+    rf"^(查看|提取)(?P<char>{PATTERN})?(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9]+)?$",
     block=True,
 )
 async def get_char_card_single(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
     hash_id = ev.regex_dict.get("hash_id")
-    if not char or not hash_id:
-        return
-    await send_custom_card_single(
+    if not hash_id:
+        at_sender = True if ev.group_id else False
+        target_type = TYPE_MAP.get(ev.regex_dict.get("type"), "card")
+        if char:
+            char_id, _, msg = get_char_id_and_name(char)
+            if msg:
+                return await bot.send((" " if at_sender else "") + msg, at_sender)
+            match = await match_hash_id_from_event(ev, target_type, char_id)
+        else:
+            match = await match_hash_id_from_event(ev, target_type, None)
+        if not match:
+            msg = "[鸣潮] 未找到相似图片，请提供id或附带图片。"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
+        hash_id = match[0]
+    if not char:
+        return await send_custom_card_single_by_id(
+            bot,
+            ev,
+            hash_id,
+            target_type=TYPE_MAP.get(ev.regex_dict.get("type"), "card"),
+        )
+    return await send_custom_card_single(
         bot,
         ev,
         char,
@@ -258,9 +299,9 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
         damage = "1"
 
     is_limit_query = False
-    if isinstance(char, str) and "极限" in char:
+    if isinstance(char, str) and ("极限" in char or "limit" in char):
         is_limit_query = True
-        char = char.replace("极限", "")
+        char = char.replace("极限", "").replace("limit", "")
 
     if damage:
         char = f"{char}{damage}"

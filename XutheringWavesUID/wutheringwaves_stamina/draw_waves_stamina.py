@@ -156,6 +156,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     force_not_use_custom = False
 
     if user and user.stamina_bg_value:
+        logger.debug(f"[鸣潮][每日信息]使用自定义体力背景设置: {user.stamina_bg_value}")
         force_use_bg = "背景" in user.stamina_bg_value
         force_not_use_bg = "立绘" in user.stamina_bg_value
         force_not_use_custom = "官方" in user.stamina_bg_value
@@ -184,6 +185,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         else:
             pile_id = char_id
 
+    logger.debug(f"[鸣潮][每日信息]使用立绘ID: {pile_id}, 强制使用背景: {force_use_bg}, 强制不使用背景: {force_not_use_bg}")
     if force_use_bg:
         pile, has_bg = await get_random_waves_bg(pile_id, force_not_use_custom=force_not_use_custom)
     elif force_not_use_bg:

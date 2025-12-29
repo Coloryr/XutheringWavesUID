@@ -12,6 +12,7 @@ sv_period = SV("waves资源简报")
 @sv_period.on_command(
     (
         "星声",
+        "xs",
         "星声统计",
         "简报",
         "资源简报",

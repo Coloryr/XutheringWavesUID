@@ -12,7 +12,6 @@ from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.image_tools import get_qq_avatar, crop_center_img
 
 from ..utils import hint
-from ..utils.calc import WuWaCalc
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import PREFIX
 from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
@@ -94,6 +93,7 @@ from ..utils.image import (
     get_square_avatar,
     get_square_weapon,
     get_attribute_prop,
+    get_attribute_skill,
     get_attribute_effect,
     draw_text_with_shadow,
     get_role_pile_with_path,
@@ -139,7 +139,9 @@ card_sort_name = [
     ("生命", "0"),
     ("攻击", "0"),
     ("防御", "0"),
+    ("谐度破坏增幅", "0"),
     ("共鸣效率", "0%"),
+    ("偏谐值累积效率", "0%"),
     ("暴击", "0.0%"),
     ("暴击伤害", "0.0%"),
     ("属性伤害加成", "0.0%"),
@@ -211,6 +213,7 @@ async def ph_card_draw(
     change_command="",
     enemy_detail: Optional[EnemyDetailData] = None,
 ):
+    from ..utils.calc import WuWaCalc
     char_name = role_detail.role.roleName
 
     phantom_temp = Image.new("RGBA", (1200, 1280 + ph_sum_value))
@@ -522,7 +525,7 @@ async def draw_fixed_img(img, avatar, account_info, role_detail):
     if is_custom and role_pile_path is not None:
         hash_id = hashlib.sha256(role_pile_path.name.encode()).hexdigest()[:8]
         draw = ImageDraw.Draw(img)
-        draw_text_with_shadow(draw, hash_id, 520, 270, waves_font_12, offset=(1, 1), shadow_color="gray", anchor="rm")
+        draw_text_with_shadow(draw, hash_id, 525, 270, waves_font_12, offset=(1, 1), shadow_color="gray", anchor="rm")
 
 
 def resize_and_center_image(image, output_size=(560, 1000), background_color=(255, 255, 255, 0), is_custom=False):
@@ -773,8 +776,13 @@ async def draw_char_detail_img(
     banner2 = Image.open(TEXT_PATH / "banner2.png")
     right_image_temp.alpha_composite(banner2, dest=(0, 550))
 
-    # 右侧属性-武器
-    weapon_bg = Image.open(TEXT_PATH / "weapon_bg.png")
+    # 右侧属性-武器-激活技能
+    skill_branch = role_detail.get_skill_branch()
+    if skill_branch:
+        weapon_bg = Image.open(TEXT_PATH / "weapon_branch_bg.png")
+    else:
+        weapon_bg = Image.open(TEXT_PATH / "weapon_bg.png")
+        
     weapon_bg_temp = Image.new("RGBA", weapon_bg.size)
     weapon_bg_temp.alpha_composite(weapon_bg, dest=(0, 0))
 
@@ -812,13 +820,25 @@ async def draw_char_detail_img(
     stats_main = await get_attribute_prop(weapon_detail.stats[0]["name"])
     stats_main = stats_main.resize((40, 40))
     weapon_bg_temp.alpha_composite(stats_main, (65, 187))
-    weapon_bg_temp_draw.text((130, 207), f"{weapon_detail.stats[0]['name']}", "white", waves_font_30, "lm")
-    weapon_bg_temp_draw.text((500, 207), f"{weapon_detail.stats[0]['value']}", "white", waves_font_30, "rm")
     stats_sub = await get_attribute_prop(weapon_detail.stats[1]["name"])
     stats_sub = stats_sub.resize((40, 40))
     weapon_bg_temp.alpha_composite(stats_sub, (65, 237))
-    weapon_bg_temp_draw.text((130, 257), f"{weapon_detail.stats[1]['name']}", "white", waves_font_30, "lm")
-    weapon_bg_temp_draw.text((500, 257), f"{weapon_detail.stats[1]['value']}", "white", waves_font_30, "rm")
+    
+    if skill_branch:
+        weapon_bg_temp_draw.text((115, 207), f"{weapon_detail.stats[0]['name']}", "white", waves_font_30, "lm")
+        weapon_bg_temp_draw.text((115, 257), f"{weapon_detail.stats[1]['name']}", "white", waves_font_30, "lm")
+        weapon_bg_temp_draw.text((500 - 216, 207), f"{weapon_detail.stats[0]['value']}", "white", waves_font_30, "rm")
+        weapon_bg_temp_draw.text((500 - 216, 257), f"{weapon_detail.stats[1]['value']}", "white", waves_font_30, "rm")
+        weapon_bg_temp_draw.text((320, 207), f"{skill_branch.branchName.split('·')[0]}", "white", waves_font_30, "lm")
+        weapon_bg_temp_draw.text((320, 257), f"{skill_branch.branchName.split('·')[1]}", "white", waves_font_30, "lm")
+        active_skill = await get_attribute_skill(skill_branch.branchName)
+        active_skill = active_skill.resize((100, 100))
+        weapon_bg_temp.alpha_composite(active_skill, dest=(500-50, 232-50))
+    else:
+        weapon_bg_temp_draw.text((130, 207), f"{weapon_detail.stats[0]['name']}", "white", waves_font_30, "lm")
+        weapon_bg_temp_draw.text((130, 257), f"{weapon_detail.stats[1]['name']}", "white", waves_font_30, "lm")
+        weapon_bg_temp_draw.text((500, 207), f"{weapon_detail.stats[0]['value']}", "white", waves_font_30, "rm")
+        weapon_bg_temp_draw.text((500, 257), f"{weapon_detail.stats[1]['value']}", "white", waves_font_30, "rm")
 
     right_image_temp.alpha_composite(weapon_bg_temp, dest=(0, 650))
 
@@ -945,9 +965,16 @@ async def draw_char_detail_img(
             name_color, _ = get_valid_color(name, value, calc.calc_temp)
 
         prop_img = prop_img.resize((40, 40))
-        sh_bg.alpha_composite(prop_img, (60, 40 + index * 55))
-        sh_bg_draw.text((120, 58 + index * 55), f"{name[:6]}", name_color, waves_font_24, "lm")
-        sh_bg_draw.text((530, 58 + index * 55), f"{value}", name_color, waves_font_24, "rm")
+        
+        if index < 4:
+            name = name.replace("破坏", "") # 写不下喵
+            sh_bg.alpha_composite(prop_img, (60 + 261 * (index % 2), 40 + (index // 2) * 55))
+            sh_bg_draw.text((115 + 261 * (index % 2), 58 + (index // 2) * 55), f"{name[:6]}", name_color, waves_font_24, "lm")
+            sh_bg_draw.text((530 - 236 * ((index + 1) % 2), 58 + (index // 2) * 55), f"{value}", name_color, waves_font_24, "rm")
+        else:
+            sh_bg.alpha_composite(prop_img, (60, 40 + (index - 2) * 55))
+            sh_bg_draw.text((115, 58 + (index - 2) * 55), f"{name[:8]}", name_color, waves_font_24, "lm")
+            sh_bg_draw.text((530, 58 + (index - 2) * 55), f"{value}", name_color, waves_font_24, "rm")
 
     right_image_temp.alpha_composite(sh_bg, dest=(0, 80))
     img.paste(right_image_temp, (570, 200), right_image_temp)
@@ -986,6 +1013,7 @@ async def draw_char_detail_img(
 
 
 async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, waves_id: Optional[str] = None):
+    from ..utils.calc import WuWaCalc
     char, damageId = parse_text_and_number(char)
 
     char_id = char_name_to_char_id(char)

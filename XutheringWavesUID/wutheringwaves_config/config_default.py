@@ -219,4 +219,9 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
             "refresh_and_send_separately",
         ],
     ),
+    "HelpShowSign": GsBoolConfig(
+        "帮助是否显示签到帮助（重启生效）",
+        "需自行安装签到插件、使用相同前缀并关闭签到插件的帮助",
+        False,
+    ),
 }

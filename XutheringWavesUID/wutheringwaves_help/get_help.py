@@ -9,12 +9,25 @@ from gsuid_core.help.draw_new_plugin_help import get_new_help
 
 from ..version import XutheringWavesUID_version
 from ..utils.image import get_footer
-from ..wutheringwaves_config import PREFIX
+from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 
 ICON = Path(__file__).parent.parent.parent / "ICON.png"
 HELP_DATA = Path(__file__).parent / "help.json"
 ICON_PATH = Path(__file__).parent / "icon_path"
 TEXT_PATH = Path(__file__).parent / "texture2d"
+
+HELP_DATA_NO_SIGN = Path(__file__).parent / "help_no_sign.json"
+
+if not HELP_DATA_NO_SIGN.exists():
+    with open(HELP_DATA, "r", encoding="utf-8") as f:
+        help_content = json.load(f)
+        help_content["个人服务"]["data"] = help_content["个人服务"]["data"][2:]
+        help_content["bot主人功能"]["data"] = help_content["bot主人功能"]["data"][2:]
+    with open(HELP_DATA_NO_SIGN, "w", encoding="utf-8") as f:
+        json.dump(help_content, f, ensure_ascii=False, indent=4)
+
+if not WutheringWavesConfig.get_config("HelpShowSign").data:
+    HELP_DATA = HELP_DATA_NO_SIGN
 
 
 def get_help_data() -> Dict[str, PluginHelp]:

@@ -3,7 +3,7 @@ import ssl
 import time
 import shutil
 import asyncio
-from typing import List, Optional
+from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
@@ -16,36 +16,21 @@ from gsuid_core.utils.download_resource.download_file import download
 
 from ..utils.image import compress_to_webp
 from ..wutheringwaves_config import WutheringWavesConfig
+from ..utils.name_convert import easy_id_to_name
 from ..utils.resource.RESOURCE_PATH import CUSTOM_CARD_PATH
 from .card_utils import (
     CUSTOM_PATH_MAP,
+    CUSTOM_PATH_NAME_MAP,
     delete_orb_cache,
     find_duplicates_for_new_images,
+    find_hash_in_all_types,
     get_char_id_and_name,
     get_hash_id,
+    get_image,
     get_orb_dir_for_char,
     ORB_BLOCK_THRESHOLD,
     update_orb_cache,
 )
-
-
-async def get_image(ev: Event) -> Optional[List[str]]:
-    res = []
-    for content in ev.content:
-        if content.type == "img" and content.data and isinstance(content.data, str) and content.data.startswith("http"):
-            res.append(content.data)
-        elif (
-            content.type == "image"
-            and content.data
-            and isinstance(content.data, str)
-            and content.data.startswith("http")
-        ):
-            res.append(content.data)
-
-    if not res and ev.image:
-        res.append(ev.image)
-
-    return res
 
 
 async def upload_custom_card(
@@ -56,10 +41,11 @@ async def upload_custom_card(
     is_force: bool = False,
 ):
     at_sender = True if ev.group_id else False
+    type_label = CUSTOM_PATH_NAME_MAP.get(target_type, target_type)
 
     upload_images = await get_image(ev)
     if not upload_images:
-        msg = f"[鸣潮] 上传角色{target_type}图失败\n请同时发送图片及其命令\n支持上传的图片类型：面板图/体力图/背景图"
+        msg = f"[鸣潮] 上传角色{type_label}图失败\n请同时发送图片及其命令\n支持上传的图片类型：面板图/体力图/背景图"
         return await bot.send(
             (" " if at_sender else "") + msg,
             at_sender,
@@ -98,7 +84,7 @@ async def upload_custom_card(
             new_images.append(temp_path)
 
     if success:
-        msg = f"[鸣潮]【{char}】上传{target_type}图成功！"
+        msg = f"[鸣潮]【{char}】上传{type_label}图成功！"
         if new_images:
             dup_map = find_duplicates_for_new_images(temp_dir, new_images)
             block_msgs = []
@@ -124,14 +110,19 @@ async def upload_custom_card(
                 block_text = "；".join(block_msgs)
                 msg = f"{msg} 疑似重复: {block_text}，请使用强制上传继续上传"
 
+            success_ids = []
             for img_path in new_images:
                 if img_path not in blocked_paths:
                     update_orb_cache(img_path)
+                    success_ids.append(get_hash_id(img_path.name))
+
+            if success_ids:
+                msg = f"{msg} 上传成功id: {', '.join(success_ids)}"
 
         await bot.send((" " if at_sender else "") + msg, at_sender)
         return
     else:
-        msg = f"[鸣潮]【{char}】上传{target_type}图失败！"
+        msg = f"[鸣潮]【{char}】上传{type_label}图失败！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
 
@@ -140,10 +131,11 @@ async def get_custom_card_list(bot: Bot, ev: Event, char: str, target_type: str 
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
         return await bot.send((" " if at_sender else "") + msg, at_sender)
+    type_label = CUSTOM_PATH_NAME_MAP.get(target_type, target_type)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     # 获取角色文件夹图片数量, 只要图片
@@ -153,7 +145,7 @@ async def get_custom_card_list(bot: Bot, ev: Event, char: str, target_type: str 
     for _, f in enumerate(files, start=1):
         img = await convert_img(f)
         hash_id = get_hash_id(f.name)
-        imgs.append(f"{char}{target_type}图id : {hash_id}")
+        imgs.append(f"{char}{type_label}图id : {hash_id}")
         imgs.append(img)
 
     card_num = WutheringWavesConfig.get_config("CharCardNum").data
@@ -170,10 +162,11 @@ async def delete_custom_card(bot: Bot, ev: Event, char: str, hash_id: str, targe
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
         return await bot.send((" " if at_sender else "") + msg, at_sender)
+    type_label = CUSTOM_PATH_NAME_MAP.get(target_type, target_type)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     files_map = {
@@ -186,10 +179,11 @@ async def delete_custom_card(bot: Bot, ev: Event, char: str, hash_id: str, targe
     hash_ids = [id.strip() for id in hash_id.replace("，", ",").split(",") if id.strip()]
 
     if not hash_ids:
-        msg = f"[鸣潮] 未提供有效的{target_type}图ID！"
+        msg = f"[鸣潮] 未提供有效的{type_label}图ID！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     not_found_ids = []
+    found_in_other = []
     deleted_ids = []
 
     for single_hash_id in hash_ids:
@@ -209,10 +203,23 @@ async def delete_custom_card(bot: Bot, ev: Event, char: str, hash_id: str, targe
     msg_parts = []
     if deleted_ids:
         msg_parts.append(f"成功删除id: {', '.join(deleted_ids)}")
-    if not_found_ids:
-        msg_parts.append(f"未找到id: {', '.join(not_found_ids)}")
+    else:
+        if not_found_ids:
+            for single_hash_id in not_found_ids:
+                matches = find_hash_in_all_types(single_hash_id)
+                if matches:
+                    for t, other_char_id, _ in matches:
+                        char_name = easy_id_to_name(other_char_id, other_char_id)
+                        type_name = CUSTOM_PATH_NAME_MAP.get(t, t)
+                        found_in_other.append(
+                            f"{single_hash_id} 在{char_name}的{type_name}图中找到"
+                        )
+                else:
+                    msg_parts.append(f"未找到id: {single_hash_id}")
+        if found_in_other:
+            msg_parts.append("；".join(found_in_other))
 
-    msg = f"[鸣潮] 角色【{char}】{target_type}图 " + "；".join(msg_parts)
+    msg = f"[鸣潮] 角色【{char}】{type_label}图 " + "；".join(msg_parts)
     return await bot.send((" " if at_sender else "") + msg, at_sender)
 
 
@@ -221,10 +228,11 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     char_id, char, msg = get_char_id_and_name(char)
     if msg:
         return await bot.send((" " if at_sender else "") + msg, at_sender)
+    type_label = CUSTOM_PATH_NAME_MAP.get(target_type, target_type)
 
     temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
     if not temp_dir.exists():
-        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     files_map = {
@@ -234,7 +242,7 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     }
 
     if len(files_map) == 0:
-        msg = f"[鸣潮] 角色【{char}】暂未上传过{target_type}图！"
+        msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     # 删除文件夹包括里面的内容
@@ -247,7 +255,7 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
     except Exception:
         pass
 
-    msg = f"[鸣潮] 删除角色【{char}】的所有{target_type}图成功！"
+    msg = f"[鸣潮] 删除角色【{char}】的所有{type_label}图成功！"
     return await bot.send((" " if at_sender else "") + msg, at_sender)
 
 

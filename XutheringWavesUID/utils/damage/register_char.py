@@ -707,7 +707,7 @@ class Char_1509(CharAbstract):
 
         title = "琳奈-视觉冲击"
         msg = "附近队伍中所有角色谐度破坏增幅提升40点"
-        attr.add_tune_break_boost_points(40, title, msg)
+        attr.add_tune_break_boost(40, title, msg)
 
         if attr.char_template == temp_atk:
             title = "琳奈-合鸣效果-逆光跃彩之约"

@@ -54,8 +54,8 @@ def copy_if_different(src, dst, name, soft=False):
         try:
             if not soft:
                 shutil.copytree(src, dst, dirs_exist_ok=True)
-        except Exception:
-            pass  # 没关系，只返回更新状态
+        except Exception as e:
+            logger.exception(f"[鸣潮] {name} 更新失败！{e}")
         logger.info(f"[鸣潮] {name} 更新完成！")
         return True
     else:
