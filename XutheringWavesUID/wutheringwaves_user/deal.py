@@ -85,9 +85,9 @@ async def add_cookie(ev: Event, ck: str, did: str, is_login: bool = False) -> st
                 update_data={"bat": bat, "did": did, "game_id": WAVES_GAME_ID},
             )
 
-            # 如果是登录模式，更新所有相同did且is_login为True的记录的token
+            # 如果是登录模式，更新该uid和game_id对应的is_login为True的记录的token和did
             if is_login and did:
-                await WavesUser.update_token_by_login(did, ck, ev.user_id, ev.bot_id)
+                await WavesUser.update_token_by_login(data.roleId, WAVES_GAME_ID, ck, did)
 
             res = await WavesBind.insert_waves_uid(ev.user_id, ev.bot_id, data.roleId, ev.group_id, lenth_limit=9)
             if res == 0 or res == -2:
@@ -120,6 +120,7 @@ async def add_cookie(ev: Event, ck: str, did: str, is_login: bool = False) -> st
                         "platform": platform,
                         "did": did,
                         "game_id": PGR_GAME_ID,
+                        "is_login": is_login,
                     },
                 )
             else:
@@ -131,7 +132,12 @@ async def add_cookie(ev: Event, ck: str, did: str, is_login: bool = False) -> st
                     platform=platform,
                     did=did,
                     game_id=PGR_GAME_ID,
+                    is_login=is_login,
                 )
+
+            # 如果是登录模式，更新该uid和game_id对应的is_login为True的记录的token和did
+            if is_login and did:
+                await WavesUser.update_token_by_login(data.roleId, PGR_GAME_ID, ck, did)
 
             res = await WavesBind.insert_uid(
                 ev.user_id,

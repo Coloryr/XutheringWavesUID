@@ -294,30 +294,18 @@ class WavesUser(User, table=True):
     async def update_token_by_login(
         cls,
         session: AsyncSession,
-        new_did: str,
+        uid: str,
+        game_id: int,
         new_token: str,
-        user_id: str,
-        bot_id: str,
+        new_did: str,
     ):
-        """通过bind查找所有绑定的WavesUser，如果is_login为True则更新cookie和did"""
-        # 1. 查找WavesBind，获取所有绑定的uid
-        bind_data = await WavesBind.select_data(user_id, bot_id)
-        if not bind_data or not bind_data.uid:
-            return 0
-
-        # 2. 解析uid列表
-        uid_list = [u for u in bind_data.uid.split("_") if u]
-        if not uid_list:
-            return 0
-
-        # 3. 更新所有is_login为True的记录
+        """根据uid和game_id查找WavesUser，如果is_login为True则更新cookie和did"""
         sql = (
             update(cls)
             .where(
                 and_(
-                    col(cls.user_id) == user_id,
-                    col(cls.bot_id) == bot_id,
-                    col(cls.uid).in_(uid_list),
+                    col(cls.uid) == uid,
+                    col(cls.game_id) == game_id,
                     col(cls.is_login) == True,
                 )
             )
