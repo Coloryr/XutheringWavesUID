@@ -135,7 +135,7 @@ async def draw_card_help():
         ]
     )
 
-    msg = [text, yun, pc, android, ios]
+    msg = [text, pc, android, ios, yun]
     return msg
 
 
