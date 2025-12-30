@@ -76,6 +76,12 @@ class WeaponAbstract(object):
 
         if attr.env_spectro:
             func_list.append("env_spectro")
+            
+        if attr.env_tune_rupture:
+            func_list.append("env_tune_rupture")
+            
+        if attr.env_tune_strain:
+            func_list.append("env_tune_strain")
 
         if attr.env_aero_erosion:
             func_list.append("env_aero_erosion")

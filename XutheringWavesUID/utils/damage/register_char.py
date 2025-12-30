@@ -693,6 +693,8 @@ class Char_1509(CharAbstract):
         isGroup: bool = True,
     ):
         """获得buff"""
+        attr.set_env_tune_rupture()
+        attr.set_env_tune_strain()
         title = "琳奈-延奏技能"
         msg = "下一个登场的角色全伤害加深15%"
         attr.add_dmg_deepen(0.15, title, msg)
