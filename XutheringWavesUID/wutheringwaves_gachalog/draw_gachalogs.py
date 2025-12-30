@@ -107,7 +107,6 @@ async def draw_card_help():
             "3.找到文件`Client.log`并用记事本打开",
             "4.搜索关键字：aki-gm-resources.aki-game",
             "5.复制一整行链接",
-            "\n",
         ]
     )
 
@@ -118,7 +117,6 @@ async def draw_card_help():
             "2.关闭网络或打开飞行模式",
             "3.点开换取记录",
             "4.长按左上角区域，全选，复制",
-            "\n",
         ]
     )
 
@@ -135,7 +133,7 @@ async def draw_card_help():
         ]
     )
 
-    msg = [text, pc, android, ios, yun]
+    msg = [text, pc, android]
     return msg
 
 
