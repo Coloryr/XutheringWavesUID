@@ -1008,7 +1008,7 @@ async def draw_char_detail_img(
     return img
 
 
-async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, waves_id: Optional[str] = None):
+async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, waves_id: Optional[str] = None, is_limit_query=False):
     from ..utils.calc import WuWaCalc
     char, damageId = parse_text_and_number(char)
 
@@ -1016,21 +1016,49 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     if not char_id:
         return f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
     char_name = alias_to_char_name(char)
-    _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-    if not ck:
-        return hint.error_reply(WAVES_CODE_102)
+
+    ck = ""
+    if not is_limit_query:
+        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+        if not ck:
+            return hint.error_reply(WAVES_CODE_102)
 
     # 账户数据
     if waves_id:
         uid = waves_id
-    account_info = await waves_api.get_base_info(uid, ck)
-    if not account_info.success:
-        return account_info.throw_msg()
-    if not account_info.data:
-        return "用户未展示数据"
-    account_info = AccountBaseInfo.model_validate(account_info.data)
+
+    if not is_limit_query:
+        account_info = await waves_api.get_base_info(uid, ck)
+        if not account_info.success:
+            return account_info.throw_msg()
+        if not account_info.data:
+            return "用户未展示数据"
+        account_info = AccountBaseInfo.model_validate(account_info.data)
+        force_resource_id = None
+    else:
+        account_info = AccountBaseInfo.model_validate(
+            {
+                "name": "库洛交个朋友",
+                "id": uid,
+                "level": 100,
+                "worldLevel": 10,
+                "creatTime": 1739375719,
+            }
+        )
+        force_resource_id = char_id
     # 获取数据
-    avatar, role_detail = await get_role_need(ev, char_id, ck, uid, char_name, waves_id)
+    avatar, role_detail = await get_role_need(
+        ev,
+        char_id,
+        ck,
+        uid,
+        char_name,
+        waves_id,
+        is_force_avatar=False,
+        force_resource_id=force_resource_id,
+        is_online_user=False,
+        is_limit_query=is_limit_query,
+    )
     if isinstance(role_detail, str):
         return role_detail
 
