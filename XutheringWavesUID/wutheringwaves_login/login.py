@@ -266,7 +266,7 @@ async def code_login(bot: Bot, ev: Event, text: str, isPage=False):
 
 
 async def add_cookie(ev, token, did) -> Union[WavesUser, str, None]:
-    ck_res = await deal.add_cookie(ev, token, did)
+    ck_res = await deal.add_cookie(ev, token, did, is_login=True)
     if "成功" in ck_res:
         user = await WavesUser.get_user_by_attr(ev.user_id, ev.bot_id, "cookie", token, game_id=WAVES_GAME_ID)
         if user:

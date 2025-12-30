@@ -25,6 +25,7 @@ exec_list.extend(
         'ALTER TABLE WavesUser ADD COLUMN bat TEXT DEFAULT ""',
         'ALTER TABLE WavesUser ADD COLUMN did TEXT DEFAULT ""',
         "ALTER TABLE WavesUser ADD COLUMN game_id INTEGER DEFAULT 3 NOT NULL",
+        'ALTER TABLE WavesUser ADD COLUMN is_login INTEGER DEFAULT 0 NOT NULL',
         'ALTER TABLE WavesBind ADD COLUMN pgr_uid TEXT DEFAULT ""',
         # 2. 数据迁移：使用 pgr_uid 迁移旧数据到新结构
         "UPDATE WavesUser SET uid = COALESCE(NULLIF(uid, ''), pgr_uid) WHERE IFNULL(uid, '') = '' AND IFNULL(pgr_uid, '') != ''",
@@ -127,6 +128,7 @@ class WavesUser(User, table=True):
     bat: str = Field(default="", title="bat")
     did: str = Field(default="", title="did")
     game_id: int = Field(default=3, title="GameID", nullable=False, sa_column_kwargs={"server_default": "3"})
+    is_login: bool = Field(default=False, title="是否waves登录")
 
     @classmethod
     @with_session
@@ -284,6 +286,31 @@ class WavesUser(User, table=True):
         if game_id is not None:
             conditions.append(col(cls.game_id) == game_id)
         sql = delete(cls).where(and_(*conditions))
+        result = await session.execute(sql)
+        return result.rowcount
+
+    @classmethod
+    @with_session
+    async def update_token_by_login(
+        cls,
+        session: AsyncSession,
+        uid: str,
+        game_id: int,
+        new_token: str,
+        new_did: str,
+    ):
+        """根据uid和game_id查找WavesUser，如果is_login为True则更新cookie和did"""
+        sql = (
+            update(cls)
+            .where(
+                and_(
+                    col(cls.uid) == uid,
+                    col(cls.game_id) == game_id,
+                    col(cls.is_login) == True,
+                )
+            )
+            .values(cookie=new_token, did=new_did)
+        )
         result = await session.execute(sql)
         return result.rowcount
 
