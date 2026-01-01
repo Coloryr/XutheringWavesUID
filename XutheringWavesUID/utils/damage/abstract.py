@@ -77,8 +77,8 @@ class WeaponAbstract(object):
         if attr.env_spectro:
             func_list.append("env_spectro")
 
-        if attr.env_aero_erosion:
-            func_list.append("env_aero_erosion")
+        if attr.env_tune_shifting():
+            func_list.append("env_tune_shifting")
 
         if attr.trigger_shield:
             func_list.append("trigger_shield")
@@ -149,6 +149,10 @@ class WeaponAbstract(object):
 
     def env_aero_erosion(self, attr: DamageAttribute, isGroup: bool = False):
         """风蚀效应"""
+        pass
+    
+    def env_tune_shifting(self, attr: DamageAttribute, isGroup: bool = False):
+        """具有偏移"""
         pass
     
     def env_tune_rupture(self, attr: DamageAttribute, isGroup: bool = False):

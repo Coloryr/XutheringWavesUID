@@ -16,8 +16,8 @@ from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..wutheringwaves_user.login_succ import login_success_msg
 
 waves_bind_uid = SV("鸣潮绑定特征码", priority=10)
-waves_add_ck = SV("鸣潮添加token", priority=5)
-waves_del_ck = SV("鸣潮删除token", priority=5)
+waves_add_ck = SV("鸣潮添加token", priority=3)
+waves_del_ck = SV("鸣潮删除token", priority=3)
 waves_get_ck = SV("waves获取ck", area="DIRECT")
 waves_del_all_invalid_ck = SV("鸣潮删除无效token", priority=1, pm=1)
 waves_refresh_bind = SV("waves刷新绑定", priority=5)

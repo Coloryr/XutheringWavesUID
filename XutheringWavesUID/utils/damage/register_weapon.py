@@ -263,7 +263,7 @@ class Weapon_21010056(WeaponAbstract):
         isGroup: bool = False,
     ):
         # 施放变奏技能或附加【异常效应】时才生效
-        if not attr.is_env_abnormal:
+        if not attr.is_env_abnormal():
             return
 
         if attr.char_damage != liberation_damage:
@@ -369,7 +369,7 @@ class Weapon_21010094(WeaponAbstract):
         attr: DamageAttribute,
         isGroup: bool = False,
     ):
-        if not attr.is_env_abnormal:
+        if not attr.is_env_abnormal():
             return
         if attr.char_template == temp_atk:
             dmg = f"{self.param(0)}*{self.param(2)}"
@@ -746,7 +746,7 @@ class Weapon_21020094(WeaponAbstract):
         attr: DamageAttribute,
         isGroup: bool = False,
     ):
-        if not attr.is_env_abnormal:
+        if not attr.is_env_abnormal():
             return
         if attr.char_template == temp_atk:
             dmg = f"{self.param(0)}*{self.param(2)}"
@@ -958,24 +958,13 @@ class Weapon_21030046(WeaponAbstract):
         title = self.get_title()
         msg = f"普攻伤害提高{dmg}"
         attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
-        return True
 
-    def env_tune_rupture(self, attr: DamageAttribute, isGroup: bool = False):
+    def env_tune_shifting(self, attr: DamageAttribute, isGroup: bool = False):
         """震谐·偏移"""
         dmg = f"{self.param(3)}*{self.param(4)}"
         title = self.get_title()
-        msg = f"附加【震谐·偏移】时，全队伤害提高{dmg}"
+        msg = f"普攻期间附加【震谐/集谐·偏移】时，全队伤害提高{dmg}"
         attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
-        return True
-
-    def env_tune_strain(self, attr: DamageAttribute, isGroup: bool = False):
-        """集谐·偏移"""
-        dmg = f"{self.param(3)}*{self.param(4)}"
-        title = self.get_title()
-        msg = f"附加【集谐·偏移】时，全队伤害提高{dmg}"
-        attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
-        return True
-
 
 class Weapon_21030053(WeaponAbstract):
     id = 21030053
@@ -1060,7 +1049,7 @@ class Weapon_21030094(WeaponAbstract):
         attr: DamageAttribute,
         isGroup: bool = False,
     ):
-        if not attr.is_env_abnormal:
+        if not attr.is_env_abnormal():
             return
         if attr.char_template == temp_atk:
             dmg = f"{self.param(0)}*{self.param(2)}"
@@ -1402,7 +1391,7 @@ class Weapon_21040094(WeaponAbstract):
         attr: DamageAttribute,
         isGroup: bool = False,
     ):
-        if not attr.is_env_abnormal:
+        if not attr.is_env_abnormal():
             return
         if attr.char_template == temp_atk:
             dmg = f"{self.param(0)}*{self.param(2)}"
@@ -1824,7 +1813,7 @@ class Weapon_21050094(WeaponAbstract):
         attr: DamageAttribute,
         isGroup: bool = False,
     ):
-        if attr.is_env_abnormal and attr.char_template == temp_atk:
+        if attr.is_env_abnormal() and attr.char_template == temp_atk:
             dmg = f"{self.param(0)}*{self.param(2)}"
             title = self.get_title()
             msg = f"对带有【异常效应】的怪物造成伤害时，自身攻击提升{dmg}"

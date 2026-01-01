@@ -922,29 +922,31 @@ async def draw_char_detail_img(
                 damage_bar,
                 dest=(0, 2600 + ph_sum_value + jineng_len + (dindex + 1) * 60),
             )
+            
+            if len(oneRank.data) > 1:
 
-            dindex += 1
-            damage_bar = damage_bar2.copy() if dindex % 2 == 0 else damage_bar1.copy()
-            damage_bar_draw = ImageDraw.Draw(damage_bar)
-            damage_bar_draw = ImageDraw.Draw(damage_bar)
-            damage_bar_draw.text(
-                (400, 50),
-                "伤害排名" if oneRank.data[1].rank > 0 else "估计伤害排名",
-                "white",
-                waves_font_24,
-                "rm",
-            )
-            damage_bar_draw.text(
-                (850, 50),
-                f"{oneRank.data[1].rank}" if oneRank.data[1].rank > 0 else oneRank.data[1].inter_rank,
-                SPECIAL_GOLD,
-                waves_font_24,
-                "mm",
-            )
-            img.alpha_composite(
-                damage_bar,
-                dest=(0, 2600 + ph_sum_value + jineng_len + (dindex + 1) * 60),
-            )
+                dindex += 1
+                damage_bar = damage_bar2.copy() if dindex % 2 == 0 else damage_bar1.copy()
+                damage_bar_draw = ImageDraw.Draw(damage_bar)
+                damage_bar_draw = ImageDraw.Draw(damage_bar)
+                damage_bar_draw.text(
+                    (400, 50),
+                    "伤害排名" if oneRank.data[1].rank > 0 else "估计伤害排名",
+                    "white",
+                    waves_font_24,
+                    "rm",
+                )
+                damage_bar_draw.text(
+                    (850, 50),
+                    f"{oneRank.data[1].rank}" if oneRank.data[1].rank > 0 else oneRank.data[1].inter_rank,
+                    SPECIAL_GOLD,
+                    waves_font_24,
+                    "mm",
+                )
+                img.alpha_composite(
+                    damage_bar,
+                    dest=(0, 2600 + ph_sum_value + jineng_len + (dindex + 1) * 60),
+                )
 
     banner1 = Image.open(TEXT_PATH / "banner4.png")
     right_image_temp.alpha_composite(banner1, dest=(-9, 0)) # 因为属性图不是居中对称的，banner偏移和属性居中对齐
@@ -1012,7 +1014,7 @@ async def draw_char_detail_img(
     return img
 
 
-async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, waves_id: Optional[str] = None):
+async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, waves_id: Optional[str] = None, is_limit_query=False):
     from ..utils.calc import WuWaCalc
     char, damageId = parse_text_and_number(char)
 
@@ -1020,21 +1022,49 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     if not char_id:
         return f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
     char_name = alias_to_char_name(char)
-    _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-    if not ck:
-        return hint.error_reply(WAVES_CODE_102)
+
+    ck = ""
+    if not is_limit_query:
+        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+        if not ck:
+            return hint.error_reply(WAVES_CODE_102)
 
     # 账户数据
     if waves_id:
         uid = waves_id
-    account_info = await waves_api.get_base_info(uid, ck)
-    if not account_info.success:
-        return account_info.throw_msg()
-    if not account_info.data:
-        return "用户未展示数据"
-    account_info = AccountBaseInfo.model_validate(account_info.data)
+
+    if not is_limit_query:
+        account_info = await waves_api.get_base_info(uid, ck)
+        if not account_info.success:
+            return account_info.throw_msg()
+        if not account_info.data:
+            return "用户未展示数据"
+        account_info = AccountBaseInfo.model_validate(account_info.data)
+        force_resource_id = None
+    else:
+        account_info = AccountBaseInfo.model_validate(
+            {
+                "name": "库洛交个朋友",
+                "id": uid,
+                "level": 100,
+                "worldLevel": 10,
+                "creatTime": 1739375719,
+            }
+        )
+        force_resource_id = char_id
     # 获取数据
-    avatar, role_detail = await get_role_need(ev, char_id, ck, uid, char_name, waves_id)
+    avatar, role_detail = await get_role_need(
+        ev,
+        char_id,
+        ck,
+        uid,
+        char_name,
+        waves_id,
+        is_force_avatar=False,
+        force_resource_id=force_resource_id,
+        is_online_user=False,
+        is_limit_query=is_limit_query,
+    )
     if isinstance(role_detail, str):
         return role_detail
 

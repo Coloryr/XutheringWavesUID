@@ -372,7 +372,7 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
             return await bot.send(im, at_sender)
 
 
-@waves_new_char_detail.on_regex(rf"^(?P<waves_id>\d+)?(?P<char>{PATTERN})权重$", block=True)
+@waves_new_char_detail.on_regex(rf"^(?P<waves_id>\d+)?(?P<char>{PATTERN})(权重|qz)$", block=True)
 async def send_char_detail_msg2_weight(bot: Bot, ev: Event):
     waves_id = ev.regex_dict.get("waves_id")
     char = ev.regex_dict.get("char")
@@ -380,12 +380,25 @@ async def send_char_detail_msg2_weight(bot: Bot, ev: Event):
     if waves_id and len(waves_id) != 9:
         return
 
+    is_limit_query = False
+    if isinstance(char, str) and ("极限" in char or "limit" in char):
+        is_limit_query = True
+        char = char.replace("极限", "").replace("limit", "")
+
+    if not char:
+        return
+
+    if is_limit_query:
+        im = await draw_char_score_img(ev, "1", char, ev.user_id, is_limit_query=is_limit_query)
+        if isinstance(im, str) or isinstance(im, bytes):
+            return await bot.send(im)
+        else:
+            return
+
     user_id = ruser_id(ev)
     uid = await WavesBind.get_uid_by_game(user_id, ev.bot_id)
     if not uid:
         return await bot.send(error_reply(WAVES_CODE_103))
-    if not char:
-        return
 
     im = await draw_char_score_img(ev, uid, char, user_id, waves_id)  # type: ignore
     at_sender = False

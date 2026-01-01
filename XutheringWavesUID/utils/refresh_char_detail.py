@@ -246,7 +246,7 @@ async def refresh_char(
     if request_role_ids:
         local_roles = await get_all_roleid_detail_info_int(uid)
         has_local_role = bool(local_roles and any(rid in local_roles for rid in request_role_ids))
-        if not has_local_role:
+        if not has_local_role and is_self_ck:
             owned_role_info = await waves_api.get_owned_role_info(uid, ck)
             if not owned_role_info.success or isinstance(owned_role_info.data, str):
                 return owned_role_info.throw_msg()

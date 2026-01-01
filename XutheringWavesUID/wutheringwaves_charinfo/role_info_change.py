@@ -314,43 +314,61 @@ def parse_main(content: str) -> list[tuple[str, list[str], str]]:
 def parse_phantom_position(
     content: str,
 ) -> list[PhantomInfo]:
-    # 修改正则表达式，使位置转换部分变为可选
-    position_pattern = rf"(?:(\d+))?({PATTERN})(?:\s*(\d)到(\d))*"
-    position_matches = re.finditer(position_pattern, content)
+    logger.debug(f"[声骸解析] 输入content: {content}")
+
+    # 先去掉"声骸"前缀（如果有）
+    content = content.replace("声骸", "").strip()
+
+    # 先提取所有位置转换信息 "X到Y"
+    transfer_pattern = r"(\d)到(\d)"
+    transfer_matches = list(re.finditer(transfer_pattern, content))
+
+    # 收集位置对
+    positions = []
+    toPositions = []
+    for transfer in transfer_matches:
+        position = transfer.group(1)
+        to_position = transfer.group(2)
+        logger.debug(f"[声骸解析] 位置转换: {position}到{to_position}")
+        if (
+            position
+            and to_position
+            and int(position) <= 5
+            and int(to_position) <= 5
+            and int(position) >= 1
+            and int(to_position) >= 1
+        ):
+            positions.append(position)
+            toPositions.append(to_position)
+
+    # 从内容中移除所有位置转换信息，剩下的就是UID和角色名
+    clean_content = re.sub(r"\s*\d到\d\s*", "", content).strip()
+
+    logger.debug(f"[声骸解析] 清理后的内容: {clean_content}")
+
+    # 提取可选的9位UID和角色名
+    uid = None
+    charName = clean_content
+
+    # 检查是否以9位数字开头（UID）
+    uid_match = re.match(r"^(\d{9})\s*(.+)$", clean_content)
+    if uid_match:
+        uid = uid_match.group(1)
+        charName = uid_match.group(2).strip()
+
+    logger.debug(f"[声骸解析] 最终结果: uid={uid}, charName={charName}, positions={positions}, toPositions={toPositions}")
+
+    # 构造结果
+    phantom_info = PhantomInfo()
+    phantom_info.uid = uid
+    phantom_info.charName = charName
+    phantom_info.positions = positions
+    phantom_info.toPositions = toPositions
+
     results = []
-
-    for match in position_matches:
-        base_content = match.group(0)
-        uid = match.group(1)
-        role_name = match.group(2)
-
-        phantom_info = PhantomInfo()
-        phantom_info.uid = uid if uid and len(uid) == 9 else None
-        phantom_info.charName = role_name
-        phantom_info.positions = []
-        phantom_info.toPositions = []
-
-        # 如果存在位置转换信息，则解析
-        if "到" in base_content:
-            transfer_pattern = r"(\d)到(\d)"
-            transfer_matches = re.finditer(transfer_pattern, base_content)
-            for transfer in transfer_matches:
-                position = transfer.group(1)
-                to_position = transfer.group(2)
-                if (
-                    position
-                    and to_position
-                    and int(position) <= 5
-                    and int(to_position) <= 5
-                    and int(position) >= 1
-                    and int(to_position) >= 1
-                ):
-                    phantom_info.positions.append(position)
-                    phantom_info.toPositions.append(to_position)
-
-        # 无论是否有位置信息，只要有角色名就添加到结果中
-        if phantom_info.charName:
-            results.append(phantom_info)
+    # 只有角色名不为空时才添加
+    if phantom_info.charName:
+        results.append(phantom_info)
 
     return results
 
