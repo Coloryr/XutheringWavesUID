@@ -12,7 +12,7 @@ from ..wutheringwaves_config.wutheringwaves_config import WutheringWavesConfig
 
 guide_map = {
     "金铃子攻略组": "JinLingZi",
-    "結星": "JieXing",
+    "丸子": "VanZi",
     "Moealkyne": "Moealkyne",
     "小沐XMu": "XMu",
     "小羊早睡不遭罪": "XiaoYang",

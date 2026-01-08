@@ -17,6 +17,18 @@ cfg_path = MAIN_PATH / "config.json"
 show_cfg_path = MAIN_PATH / "XutheringWavesUID" / "show_config.json"
 BACKUP_PATH = MAIN_PATH / "backup"
 
+# 此次迁移是更改JieXing为VanZi
+if (MAIN_PATH / "XutheringWavesUID" / "guide_new" / "JieXing").exists():
+    if not (MAIN_PATH / "XutheringWavesUID" / "guide_new" / "VanZi").exists():
+        shutil.move(
+            str(MAIN_PATH / "XutheringWavesUID" / "guide_new" / "JieXing"),
+            str(MAIN_PATH / "XutheringWavesUID" / "guide_new" / "VanZi"),
+        )
+        logger.info("[XutheringWavesUID] 已将結星重命名为丸子")
+    else:
+        shutil.rmtree(MAIN_PATH / "XutheringWavesUID" / "guide_new" / "JieXing")
+        logger.info("[XutheringWavesUID] 检测到重命名后资源，已删除旧资源")
+
 # 此次迁移是删除错误的背景id
 TO_DEL = MAIN_PATH / "XutheringWavesUID" / "resuorce" / "role_bg" / "1402.webp"
 if TO_DEL.exists():
