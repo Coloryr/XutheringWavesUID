@@ -114,7 +114,8 @@ async def draw_calendar_img(ev: Event, uid: str):
     content_total_row = 1 + (len(content.content) - 1) // 2 if content else 0
     total_high = title_high + banner_high + temp_high + content_total_row * event_high + bar2_high + footer_high
     if gacha_char_list:
-        total_high += (char_bar_high + star_fg_high * len(gacha_char_list)) * 2
+        total_high += (char_bar_high + star_fg_high * 2) * 2
+        # total_high += (char_bar_high + star_fg_high * len(gacha_char_list)) * 2
         total_high += temp_high
         total_high += bar1_high
 
@@ -352,10 +353,14 @@ async def get_calendar_bg(w: int, h: int, bg: str = "bg1") -> Image.Image:
 
 def draw_gacha(gacha_list, img, _high):
     star_fg_high = 150
-    for i, gacha_list in enumerate(gacha_list):
+    all_nodes = [gacha["nodes"][0] for gacha in gacha_list[:-1]] + gacha_list[-1]["nodes"]
+    gacha_nodes = [all_nodes[:len(all_nodes)//2], all_nodes[len(all_nodes)//2:]]
+    # for i, gacha_list in enumerate(gacha_list):
+    for i, gacha_list in enumerate(gacha_nodes):
         gacha_bg = Image.new("RGBA", (1200, star_fg_high), (0, 0, 0, 0))
-        for j, gacha in enumerate(gacha_list["nodes"]):
-            if j == 0:
+        # for j, gacha in enumerate(gacha_list["nodes"]):
+        for j, gacha in enumerate(gacha_list):
+            if i == 0:
                 star_fg = Image.open(TEXT_PATH / "star5_fg.png")
                 star_bg = Image.open(TEXT_PATH / "star5_bg.png")
             else:
