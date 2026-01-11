@@ -17,6 +17,11 @@ cfg_path = MAIN_PATH / "config.json"
 show_cfg_path = MAIN_PATH / "XutheringWavesUID" / "show_config.json"
 BACKUP_PATH = MAIN_PATH / "backup"
 
+# 此次迁移是更改JieXing为VanZi
+if (MAIN_PATH / "XutheringWavesUID" / "guide_new" / "JieXing").exists():
+    shutil.rmtree(MAIN_PATH / "XutheringWavesUID" / "guide_new" / "JieXing")
+    logger.info("[XutheringWavesUID] 资源已更新，已删除旧资源")
+
 # 此次迁移是删除错误的背景id
 TO_DEL = MAIN_PATH / "XutheringWavesUID" / "resuorce" / "role_bg" / "1402.webp"
 if TO_DEL.exists():

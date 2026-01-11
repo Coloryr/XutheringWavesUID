@@ -1,4 +1,5 @@
 import copy
+import re
 from typing import Union, Optional
 
 from msgspec import json as msgjson
@@ -79,6 +80,42 @@ def get_breach(breach: Union[int, None], level: int):
     return breach
 
 
+def extract_param_index(skill_desc: str, search_pattern: str) -> int:
+    """
+    从技能描述中提取参数索引
+
+    Args:
+        skill_desc: 技能描述文本，如 "莫宁的共鸣效率提升{4}..."
+        search_pattern: 搜索模式，如 "共鸣效率提升"
+
+    Returns:
+        参数索引，如果找不到则返回 0
+
+    Examples:
+        >>> extract_param_index("莫宁的共鸣效率提升{4}", "共鸣效率提升")
+        4
+        >>> extract_param_index("攻击提升15%", "攻击提升")
+        0
+    """
+    # 在描述中查找搜索模式之后是否有 {数字} 的模式
+    pattern_index = skill_desc.find(search_pattern)
+    if pattern_index == -1:
+        return 0
+
+    # 从搜索模式的位置开始，查找后面的 {数字}
+    rest_of_desc = skill_desc[pattern_index + len(search_pattern):pattern_index + len(search_pattern) + 20]
+
+    # 使用正则表达式匹配 {数字}
+    match = re.search(r'\{(\d+)\}', rest_of_desc)
+    if match:
+        try:
+            return int(match.group(1))
+        except (ValueError, IndexError):
+            pass
+
+    return 0
+
+
 def get_char_detail(char_id: Union[str, int], level: int, breach: Union[int, None] = None) -> WavesCharResult:
     """
     breach 突破
@@ -116,7 +153,17 @@ def get_char_detail(char_id: Union[str, int], level: int, breach: Union[int, Non
                     name = name.replace("提升", "").replace("全", "")
                     if name not in result.fixed_skill:
                         result.fixed_skill[name] = "0%"
-                    result.fixed_skill[name] = sum_percentages(skill_info["param"][0], result.fixed_skill[name])
+
+                    # 从描述中提取参数索引
+                    search_pattern = name if skill_info["desc"].startswith(name) else f"{char_data['name']}的{name}"
+                    param_index = extract_param_index(skill_info["desc"], search_pattern)
+
+                    # 尝试获取参数值
+                    try:
+                        param_value = skill_info["param"][param_index]
+                        result.fixed_skill[name] = sum_percentages(param_value, result.fixed_skill[name])
+                    except (IndexError, KeyError, TypeError) as e:
+                        logger.warning(f"get_char_detail extract_param_index failed for char_id {char_id}, skill {name}: {e}")
 
     return result
 

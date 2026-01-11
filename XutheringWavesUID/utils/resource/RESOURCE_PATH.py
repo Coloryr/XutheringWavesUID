@@ -39,7 +39,7 @@ MOEALKYNE_GUIDE_PATH = GUIDE_PATH / "Moealkyne"
 # 金铃子攻略组 攻略库
 JINLINGZI_GUIDE_PATH = GUIDE_PATH / "JinLingZi"
 # 結星 攻略库
-JIEXING_GUIDE_PATH = GUIDE_PATH / "JieXing"
+VANZI_GUIDE_PATH = GUIDE_PATH / "VanZi"
 # 小羊 攻略库
 XIAOYANG_GUIDE_PATH = GUIDE_PATH / "XiaoYang"
 # 吃我无痕 攻略库
@@ -101,7 +101,7 @@ def init_dir():
         XMU_GUIDE_PATH,
         MOEALKYNE_GUIDE_PATH,
         JINLINGZI_GUIDE_PATH,
-        JIEXING_GUIDE_PATH,
+        VANZI_GUIDE_PATH,
         XIAOYANG_GUIDE_PATH,
         XFM_GUIDE_PATH,
         CUSTOM_CARD_PATH,

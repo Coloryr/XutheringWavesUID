@@ -263,8 +263,6 @@ class Weapon_21010056(WeaponAbstract):
         isGroup: bool = False,
     ):
         # 施放变奏技能或附加【异常效应】时才生效
-        if not attr.is_env_abnormal():
-            return
 
         if attr.char_damage != liberation_damage:
             return
@@ -274,6 +272,9 @@ class Weapon_21010056(WeaponAbstract):
         msg = f"施放变奏技能或附加【异常效应】时，共鸣解放伤害加成提升{dmg}"
         attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
 
+        if not attr.is_env_abnormal():
+            return
+        
         # 千咲：满层时，附加异常效应时全属性伤害加成
         if attr.role and attr.role.role.roleId == 1508:
             dmg2 = f"{self.param(4)}"

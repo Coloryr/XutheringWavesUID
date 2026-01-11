@@ -325,7 +325,7 @@ async def get_qq_avatar(
     avatar_url: Optional[str] = None,
     size: int = 640,
 ) -> Optional[Image.Image]:
-    if qid:
+    if qid and isinstance(qid, int) or (isinstance(qid, str) and qid.isdigit()):
         avatar_url = f"http://q1.qlogo.cn/g?b=qq&nk={qid}&s={size}"
     elif avatar_url is None:
         return None  # 并非 QQ 来源
