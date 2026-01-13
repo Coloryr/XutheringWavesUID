@@ -56,6 +56,7 @@ country_color_map = {
     "黑海岸": (28, 55, 118),
     "瑝珑": (140, 113, 58),
     "黎那汐塔": (95, 52, 39),
+    "罗伊冰原": (141, 159, 77),
 }
 
 progress_color = [
@@ -144,7 +145,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     explore_bar = Image.open(TEXT_PATH / "explore_bar.png")
     max_len = 357
     hi = base_info_h
-    for mi, _explore in enumerate(explore_data.exploreList):
+    for mi, _explore in enumerate(explore_data.exploreList[::-1]):
         _explore: ExploreArea
         _explore_title = explore_title.copy()
         _explore_title = await change_color(_explore_title, country_color_map.get(_explore.country.countryName, YELLOW))
