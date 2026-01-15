@@ -124,22 +124,22 @@ async def new_draw_char_hold_rate(ev: Event, data, group_id: str = "") -> bytes:
     title_mask_draw.text((300, 430), title_text, "white", waves_font_58, "lm")
 
     # count
-    title = f"样本数量: {data.get('total_player_count', 0)} 人" if group_id else "数据由用户自愿上传，仅供参考"
+    title = f"样本数量: {data.get('total_player_count', 0)} 人" if group_id else "数据由玩家自愿上传，仅供参考，不代表全体玩家"
     title_mask_draw.text(
-        (300, 500),
+        (300, 520),
         title,
         "white",
         waves_font_36,
         "lm",
     )
-    # declar = "数据更新依赖面板刷新，数据仅供参考"
-    # title_mask_draw.text(
-    #     (300, 550),
-    #     declar,
-    #     "white",
-    #     waves_font_24,
-    #     "lm",
-    # )
+    declar = "本数据库从未公开样本总数和具体数据，请注意辨别"
+    title_mask_draw.text(
+        (820, 560),
+        declar,
+        "white",
+        waves_font_20,
+        "lm",
+    )
 
     img.paste(title_bg, (0, 0), title_bg)
     img.paste(title_mask, (0, 0), title_mask)
