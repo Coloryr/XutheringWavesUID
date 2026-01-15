@@ -27,6 +27,7 @@ class LevelExp(BaseModel):
 class SkillLevel(BaseModel):
     name: str
     param: List[List[str]]
+    format: Optional[str] = None
 
 
 class Skill(BaseModel):

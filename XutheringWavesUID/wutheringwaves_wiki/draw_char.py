@@ -656,7 +656,14 @@ async def parse_char_skill_rate(skillLevels: Optional[Dict[str, SkillLevel]]):
 
     for _, skillLevel in skillLevels.items():
         row = [skillLevel.name]
-        row.extend(skillLevel.param[0][5:10])
+        # 应用 format 格式化数值
+        param_values = skillLevel.param[0][5:10]
+        if skillLevel.format:
+            # 使用 format 字符串格式化每个值
+            formatted_values = [skillLevel.format.format(v) for v in param_values]
+            row.extend(formatted_values)
+        else:
+            row.extend(param_values)
         rows.append(row)
 
     font = waves_font_12
