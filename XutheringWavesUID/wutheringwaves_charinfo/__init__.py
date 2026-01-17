@@ -210,7 +210,7 @@ async def send_card_info(bot: Bot, ev: Event):
     msg, num_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
     if isinstance(msg, str) or isinstance(msg, bytes):
         await bot.send_option(msg, buttons)
-    if num_updated <= 1:
+    if num_updated <= 1 and isinstance(msg, bytes):
         from ..wutheringwaves_config import PREFIX
         single_refresh_notice = f"本次刷新少于2个角色\n如仅需刷新单角色，建议如 {PREFIX}刷新莫宁面板"
         await bot.send(f" {single_refresh_notice}" if ev.group_id else single_refresh_notice, at_sender=ev.group_id is not None)
