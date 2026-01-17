@@ -61,7 +61,13 @@ def remove_urls_from_data(data):
     url_pattern = re.compile(r'https?://[^\s"\'<>]+')
 
     if isinstance(data, dict):
-        return {key: remove_urls_from_data(value) for key, value in data.items()}
+        result = {}
+        for key, value in data.items():
+            if key == "description":
+                result[key] = ""
+            else:
+                result[key] = remove_urls_from_data(value)
+        return result
     elif isinstance(data, list):
         return [remove_urls_from_data(item) for item in data]
     elif isinstance(data, str):
