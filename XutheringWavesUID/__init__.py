@@ -10,6 +10,28 @@ from gsuid_core.data_store import get_res_path
 
 Plugins(name="XutheringWavesUID", force_prefix=["ww"], allow_empty_prefix=False)
 
+# 安装 Bot 消息发送 Hook
+from .utils.bot_send_hook import install_bot_hooks
+from .utils.database.models import WavesSubscribe
+
+# 注册 WavesSubscribe 的 hook
+async def waves_bot_check_hook(group_id: str, bot_self_id: str):
+    """XutheringWavesUID 的 bot 检测 hook"""
+    logger.debug(f"[XutheringWavesUID Hook] bot_check_hook 被调用: group_id={group_id}, bot_self_id={bot_self_id}")
+
+    if group_id:
+        try:
+            await WavesSubscribe.check_and_update_bot(group_id, bot_self_id)
+        except Exception as e:
+            logger.warning(f"[XutheringWavesUID] Bot检测失败: {e}")
+
+# 安装 hooks 并注册
+install_bot_hooks()
+from .utils.bot_send_hook import register_target_send_hook
+register_target_send_hook(waves_bot_check_hook)
+
+logger.info("[XutheringWavesUID] Bot 消息发送 hook 已注册")
+
 
 MAIN_PATH = get_res_path()
 PLAYERS_PATH = MAIN_PATH / "XutheringWavesUID" / "players"

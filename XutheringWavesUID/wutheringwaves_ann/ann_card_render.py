@@ -9,7 +9,6 @@ from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import PREFIX
 from ..utils.resource.RESOURCE_PATH import waves_templates, TEMP_PATH
 
-# Optional Import for Playwright
 def _import_playwright():
     try:
         from playwright.async_api import async_playwright
@@ -43,12 +42,9 @@ def get_logo_b64() -> Optional[str]:
 def get_footer_b64() -> Optional[str]:
     try:
         current_file_path = Path(__file__).resolve()
-        # gsuid_core/gsuid_core/plugins/XutheringWavesUID/XutheringWavesUID/wutheringwaves_ann/ann_card_render.py
-        # texture2d is at ../utils/texture2d/
         footer_path = current_file_path.parent.parent / "utils" / "texture2d" / "footer_black.png"
         
         if not footer_path.exists():
-            # Try white as fallback
             footer_path = current_file_path.parent.parent / "utils" / "texture2d" / "footer_white.png"
             
         if not footer_path.exists():
@@ -94,7 +90,10 @@ async def render_html(template_name: str, context: dict) -> Optional[bytes]:
                     logger.debug(f"[鸣潮] 等待网络空闲超时 (可能部分资源加载缓慢): {e}")
 
                 logger.debug("[鸣潮] 正在截图...")
-                screenshot = await page.screenshot(full_page=True, type='jpeg', quality=90)
+                # Screenshot only the container element to avoid extra whitespace
+                container = page.locator(".container")
+                screenshot = await container.screenshot(type='jpeg', quality=90)
+                
                 await browser.close()
                 logger.debug(f"[鸣潮] HTML渲染成功, 图片大小: {len(screenshot)} bytes")
                 return screenshot
@@ -117,7 +116,6 @@ async def ann_list_card() -> bytes:
         if not ann_list:
             raise Exception("获取游戏公告失败,请检查接口是否正常")
 
-        # Grouping Logic
         grouped = {}
         for item in ann_list:
             t = item.get("eventType")
@@ -140,20 +138,23 @@ async def ann_list_card() -> bytes:
                 continue
             
             section_items = []
-            # Limit to 9 items per section
             for item in grouped[t][:9]:
+                if not item.get("id") or not item.get("postTitle"):
+                    continue
+                    
                 section_items.append({
                     "id": str(item.get("id", "")),
-                    "postTitle": item.get("postTitle", "未知公告"),
+                    "postTitle": item.get("postTitle", ""),
                     "date_str": format_date(item.get("publishTime", 0)),
                     "coverUrl": item.get("coverUrl", "")
                 })
             
-            sections.append({
-                "name": CONFIGS[t]["name"],
-                "color": CONFIGS[t]["color"],
-                "ann_list": section_items
-            })
+            if section_items:
+                sections.append({
+                    "name": CONFIGS[t]["name"],
+                    "color": CONFIGS[t]["color"],
+                    "ann_list": section_items
+                })
 
         context = {
             "title": "鸣潮公告",
@@ -204,7 +205,6 @@ async def ann_detail_card(ann_id: int, is_check_time=False) -> Union[bytes, str,
 
         post_content = res["postContent"]
         
-        # Insert cover image if no images at start
         content_type2_first = [x for x in post_content if x["contentType"] == 2]
         if not content_type2_first and "coverImages" in res:
             _node = res["coverImages"][0]
@@ -214,7 +214,6 @@ async def ann_detail_card(ann_id: int, is_check_time=False) -> Union[bytes, str,
         if not post_content:
             return "未找到该公告"
 
-        # Process content for template
         processed_content = []
         for item in post_content:
             ctype = item.get("contentType")

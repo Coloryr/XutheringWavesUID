@@ -15,8 +15,10 @@ from .ann_card_render import ann_list_card, ann_detail_card
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.resource.RESOURCE_PATH import ANN_CARD_PATH, CALENDAR_PATH
+from ..utils.database.models import WavesSubscribe
 
 sv_ann = SV("鸣潮公告")
+sv_ann_clear_cache = SV("鸣潮公告缓存清理", pm=0, priority=3)
 sv_ann_sub = SV("订阅鸣潮公告", pm=3)
 
 task_name_ann = "订阅鸣潮公告"
@@ -48,6 +50,11 @@ async def sub_ann_(bot: Bot, ev: Event):
         return await bot.send("请在群聊中订阅")
     if not WutheringWavesConfig.get_config("WavesAnnOpen").data:
         return await bot.send("鸣潮公告推送功能已关闭")
+
+    logger.info(f"[鸣潮公告] 群 {ev.group_id} 订阅公告，bot_id={ev.bot_id}, bot_self_id={ev.bot_self_id}")
+
+    if ev.group_id:
+        await WavesSubscribe.check_and_update_bot(ev.group_id, ev.bot_self_id)
 
     # 检查是否已订阅
     data = await gs_subscribe.get_subscribe(task_name_ann)
@@ -231,7 +238,7 @@ async def clean_cache_directories(days: int) -> str:
     return result_msg
 
 
-@sv_ann.on_fullmatch(("删除公告缓存", "删除日历缓存", "清理缓存", "删除缓存"))
+@sv_ann_clear_cache.on_fullmatch(("删除公告缓存", "删除日历缓存", "清理缓存", "删除缓存"))
 async def clean_cache_(bot: Bot, ev: Event):
     """手动清理缓存指令"""
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data
