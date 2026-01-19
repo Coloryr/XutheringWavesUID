@@ -98,7 +98,7 @@ async def draw_update_log_img() -> Union[bytes, str]:
     img = get_waves_bg(950, 20 + 475 + 80 * len(_CACHED_LOGS))
     img.paste(log_title, (0, 0), log_title)
     img_draw = ImageDraw.Draw(img)
-    img_draw.text((475, 432), "WWUID 更新记录", "white", gs_font_30, "mm")
+    img_draw.text((475, 432), "XWUID 更新记录", "white", gs_font_30, "mm")
 
     for index, raw_log in enumerate(_CACHED_LOGS):
         emojis, text = _extract_leading_emojis(raw_log)

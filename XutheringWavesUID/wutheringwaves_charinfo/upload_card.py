@@ -7,6 +7,7 @@ from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import httpx
+from PIL import Image
 
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
@@ -60,7 +61,8 @@ async def upload_custom_card(
 
     success = True
     new_images = []
-    for upload_image in upload_images:
+    size_check_failed = []
+    for index, upload_image in enumerate(upload_images, start=1):
         name = f"{char}_{int(time.time() * 1000)}.jpg"
         temp_path = temp_dir / name
 
@@ -81,7 +83,34 @@ async def upload_custom_card(
                 # 成功
                 success = False
                 break
+
+            # 尺寸检查
+            try:
+                with Image.open(temp_path) as img:
+                    w, h = img.size
+                    if target_type in ["card", "stamina"]:
+                        # 面板图和体力图：宽大于高则拒绝
+                        if w > h:
+                            size_check_failed.append(f"第{index}张图片尺寸错误，面板图和体力图需要竖版图片（宽 ≤ 高）")
+                            temp_path.unlink()
+                            continue
+                    elif target_type == "bg":
+                        # 背景图：高大于宽则拒绝
+                        if h > w:
+                            size_check_failed.append(f"第{index}张图片尺寸错误，背景图需要横版图片（高 ≤ 宽）")
+                            temp_path.unlink()
+                            continue
+            except Exception as e:
+                logger.warning(f"[鸣潮] 检查图片尺寸失败: {e}")
+
             new_images.append(temp_path)
+
+    if size_check_failed:
+        if not new_images:
+            return await bot.send(
+                (" " if at_sender else "") + "[鸣潮] 上传失败！\n" + "\n".join(size_check_failed),
+                at_sender,
+            )
 
     if success:
         msg = f"[鸣潮]【{char}】上传{type_label}图成功！"

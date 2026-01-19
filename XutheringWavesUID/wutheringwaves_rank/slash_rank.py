@@ -222,14 +222,23 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
         rank_dt = parse_rank_date(rankInfoList.data.start_date)
         if rank_dt:
             period_label = f"第{get_slash_period_number(rank_dt)}期"
+    date_text = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     if period_label:
+        period_pos = (225, 360)
+        title_bg_draw.text(period_pos, period_label, GREY, waves_font_20, "lm")
+        try:
+            period_width = title_bg_draw.textlength(period_label, font=waves_font_20)
+        except Exception:
+            period_width = waves_font_20.getsize(period_label)[0]
         title_bg_draw.text(
-            (225, 360),
-            period_label,
+            (period_pos[0] + period_width + 16, period_pos[1]),
+            date_text,
             GREY,
             waves_font_20,
             "lm",
         )
+    else:
+        title_bg_draw.text((225, 360), date_text, GREY, waves_font_20, "lm")
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")

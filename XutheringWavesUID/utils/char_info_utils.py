@@ -8,7 +8,7 @@ from gsuid_core.logger import logger
 from ..utils.api.model import RoleDetailData
 from .resource.RESOURCE_PATH import PLAYER_PATH
 
-PATTERN = r"[\u4e00-\u9fa5a-zA-Z0-9\U0001F300-\U0001FAFF\U00002600-\U000027BF-—·()（）]{1,15}"
+PATTERN = r"[\u4e00-\u9fa5a-zA-Z0-9\U0001F300-\U0001FAFF\U00002600-\U000027BF\U00002B00-\U00002BFF\U00003200-\U000032FF-—·()（）]{1,15}"
 
 async def get_all_role_detail_info_list(
     uid: str,

@@ -10,6 +10,8 @@ sys.path.append(str(MAIN_PATH))
 
 # 配置文件
 CONFIG_PATH = MAIN_PATH / "config.json"
+GUIDE_CONFIG_PATH = MAIN_PATH / "guide_config.json"
+GACHA_CONFIG_PATH = MAIN_PATH / "gacha_config.json"
 
 # 用户数据保存文件
 PLAYER_PATH = MAIN_PATH / "players"
@@ -73,6 +75,7 @@ SLASH_PATH = OTHER_PATH / "slash"
 CHALLENGE_PATH = OTHER_PATH / "challenge"
 ANN_CARD_PATH = OTHER_PATH / "ann_card"
 POKER_PATH = OTHER_PATH / "poker"
+WIKI_CACHE_PATH = OTHER_PATH / "wiki"
 
 # 基础别名文件路径
 ALIAS_PATH = MAIN_PATH / "alias"
@@ -108,6 +111,7 @@ def init_dir():
         OTHER_PATH,
         CALENDAR_PATH,
         ANN_CARD_PATH,
+        WIKI_CACHE_PATH,
         BUILD_PATH,
         BUILD_TEMP,
         MAP_BUILD_PATH,

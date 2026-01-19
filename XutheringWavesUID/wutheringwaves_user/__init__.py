@@ -35,10 +35,9 @@ def get_ck_and_devcode(text: str, split_str: str = ",") -> tuple[str, str]:
 
 
 msg_notify = [
-    "[鸣潮] 该命令末尾需要跟正确的token，did",
+    "[鸣潮] 格式错误！",
     f"例如【{PREFIX}添加token token】或【{PREFIX}添加token token,did】",
-    "",
-    "当前did位数不正确（32位、36位、40位），请检查后重新添加",
+    "当前did位数不正确（32位、36位、40位），如无did则不需要加逗号，请检查后重新添加",
 ]
 
 
@@ -160,7 +159,7 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
 
     if "绑定" in ev.command:
         if not uid:
-            msg = f"该命令需要带上正确的uid!\n{PREFIX}绑定uid"
+            msg = f"该命令需要带上正确的9位uid!\n如：{PREFIX}绑定123456789"
             return await bot.send((" " if at_sender else "") + msg, at_sender)
         uid_list = await WavesBind.get_uid_list_by_game(qid, ev.bot_id)
         cookie_uid_list = await WavesUser.select_user_cookie_uids(qid)

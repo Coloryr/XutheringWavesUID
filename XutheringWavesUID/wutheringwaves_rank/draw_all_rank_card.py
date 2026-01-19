@@ -124,12 +124,12 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
         pass
     char_id = char_name_to_char_id(char)
     if not char_id:
-        return f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
+        return "未找到指定角色, 请检查输入是否正确！"
     char_name = alias_to_char_name(char)
 
     char_model = get_char_model(char_id)
     if not char_model:
-        return f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
+        return f"[鸣潮] 角色名【{char}】暂未适配！\n"
 
     attribute_name = ATTRIBUTE_ID_MAP[char_model.attributeId]
 
@@ -265,7 +265,7 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
 
         weapon_model = get_weapon_model(rank.weapon_id)
         if not weapon_model:
-            logger.warning(f"武器名【{rank.weapon_id}】无法找到, 可能暂未适配, 请先检查输入是否正确！")
+            logger.warning(f"武器无法找到, 可能暂未适配, 请先检查输入是否正确！")
             continue
 
         weapon_icon = await get_square_weapon(rank.weapon_id)

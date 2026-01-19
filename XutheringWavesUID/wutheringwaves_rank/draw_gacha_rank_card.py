@@ -1,3 +1,4 @@
+import time
 import asyncio
 from typing import Dict, List, Tuple, Union, Optional
 from pathlib import Path
@@ -30,6 +31,7 @@ from ..wutheringwaves_gachalog.draw_gachalogs import get_gacha_stats
 TEXT_PATH = Path(__file__).parent / "texture2d"
 avatar_mask = Image.open(TEXT_PATH / "avatar_mask.png")
 pic_cache = None
+GACHA_GREEN = (90, 220, 120)
 
 
 class GachaRankCard:
@@ -65,6 +67,7 @@ class GachaRankCard:
 
 async def get_all_gacha_rank_info(
     users: List[WavesBind],
+    min_pull: int,
     tokenLimitFlag: bool = False,
     wavesTokenUsersMap: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> List[GachaRankCard]:
@@ -88,8 +91,6 @@ async def get_all_gacha_rank_info(
                     continue
 
                 rankInfo = GachaRankCard(user.user_id, uid, stats)
-
-                min_pull = WutheringWavesConfig.get_config("GachaRankMin").data
                 if rankInfo.total_count < min_pull:
                     continue
 
@@ -128,16 +129,21 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
     tokenLimitFlag, wavesTokenUsersMap = await get_gacha_rank_token_condition(ev)
 
     # 获取配置的最小抽数阈值
-    min_pull = WutheringWavesConfig.get_config("GachaRankMin").data
+    from ..utils.gacha_config import get_group_gacha_min
+
+    min_pull = get_group_gacha_min(ev.group_id) or WutheringWavesConfig.get_config("GachaRankMin").data
 
     # 解析参数以获取排序类型
     text = ev.text.strip() if ev.text else ""
     sort_reverse = False
+    sort_gacha_num = False
     if text:
         if "非" in text:
             sort_reverse = True
         elif "欧" in text:
             sort_reverse = False
+        elif "抽" in text:
+            sort_gacha_num = True
 
     # 获取群里的所有用户
     users = await WavesBind.get_group_all_uid(ev.group_id)
@@ -149,7 +155,7 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
             msg.append(f"当前排行开启了登录验证，请使用命令【{PREFIX}登录】登录后此功能！")
         return "\n".join(msg)
 
-    rankInfoList = await get_all_gacha_rank_info(list(users), tokenLimitFlag, wavesTokenUsersMap)
+    rankInfoList = await get_all_gacha_rank_info(list(users), min_pull, tokenLimitFlag, wavesTokenUsersMap)
     if len(rankInfoList) == 0:
         msg = []
         msg.append(f"[鸣潮] 群【{ev.group_id}】暂无抽卡排行数据")
@@ -159,7 +165,10 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
         return "\n".join(msg)
 
     # 按加权抽数排序（分数越低越欧，反向排序则是非）
-    rankInfoList.sort(key=lambda i: i.weighted, reverse=sort_reverse)
+    if sort_gacha_num:
+        rankInfoList.sort(key=lambda i: i.total_count, reverse=True)
+    else:
+        rankInfoList.sort(key=lambda i: i.weighted, reverse=sort_reverse)
     rankInfoList_with_id = list(enumerate(rankInfoList, start=1))
 
     # 获取自己的排名
@@ -212,13 +221,13 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
     text_bar_draw.text((40, 60), "排行说明", (150, 150, 150), waves_font_28, "lm")
     text_bar_draw.text(
         (185, 50),
-        f"1. 仅显示总抽数≥{min_pull}的玩家",
+        f"1. 仅显示导入总抽数≥{min_pull}的玩家（至少为前6个月的连续记录）",
         SPECIAL_GOLD,
         waves_font_20,
         "lm",
     )
     text_bar_draw.text(
-        (185, 85), "2. UP/武器为平均抽数。加权 = 实际抽数 / (角色数×81 + 武器数×54)", SPECIAL_GOLD, waves_font_20, "lm"
+        (185, 85), "2. 加权抽数 = 实际抽数 / (角色数×81 + 武器数×54)，欧非分界线为 100", SPECIAL_GOLD, waves_font_20, "lm"
     )
 
     card_img.alpha_composite(text_bar_img, (0, header_height))
@@ -236,6 +245,8 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
     title_text = "#抽卡群排行"
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
+    time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    title_bg_draw.text((225, 360), time_str, (150, 150, 150), waves_font_20, "lm")
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")
@@ -296,17 +307,27 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
             uid_color = RED
         role_bg_draw.text((210, 70), f"{rankInfo.uid}", uid_color, waves_font_20, "lm")
 
+        def get_stat_color(value: float, low: float, high: float):
+            if value > high:
+                return RED
+            if value < low:
+                return GACHA_GREEN
+            return "white"
+
         # UP平均抽数
-        role_bg_draw.text((460, 30), "UP", SPECIAL_GOLD, waves_font_20, "mm")
-        role_bg_draw.text((460, 70), f"{rankInfo.char_avg:.1f}", "white", waves_font_28, "mm")
+        up_color = get_stat_color(rankInfo.char_avg, 76, 86)
+        role_bg_draw.text((460, 30), "UP平均", SPECIAL_GOLD, waves_font_20, "mm")
+        role_bg_draw.text((460, 70), f"{rankInfo.char_avg:.1f}", up_color, waves_font_28, "mm")
 
         # 武器平均抽数
-        role_bg_draw.text((600, 30), "武器", SPECIAL_GOLD, waves_font_20, "mm")
-        role_bg_draw.text((600, 70), f"{rankInfo.weapon_avg:.1f}", "white", waves_font_28, "mm")
+        weapon_color = get_stat_color(rankInfo.weapon_avg, 49, 59)
+        role_bg_draw.text((600, 30), "武器平均", SPECIAL_GOLD, waves_font_20, "mm")
+        role_bg_draw.text((600, 70), f"{rankInfo.weapon_avg:.1f}", weapon_color, waves_font_28, "mm")
 
         # 加权抽数
+        weighted_color = get_stat_color(rankInfo.weighted, 90, 110)
         role_bg_draw.text((740, 30), "加权", SPECIAL_GOLD, waves_font_20, "mm")
-        role_bg_draw.text((740, 70), f"{rankInfo.weighted:.1f}", "lightgreen", waves_font_28, "mm")
+        role_bg_draw.text((740, 70), f"{rankInfo.weighted:.1f}", weighted_color, waves_font_28, "mm")
 
         # 总抽数
         role_bg_draw.text((880, 30), "总抽数", SPECIAL_GOLD, waves_font_20, "mm")

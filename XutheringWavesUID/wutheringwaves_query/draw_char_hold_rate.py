@@ -1,4 +1,5 @@
 import copy
+import time
 import asyncio
 from typing import Dict, Union
 from pathlib import Path
@@ -126,7 +127,7 @@ async def new_draw_char_hold_rate(ev: Event, data, group_id: str = "") -> bytes:
     # count
     title = f"样本数量: {data.get('total_player_count', 0)} 人" if group_id else "数据由玩家自愿上传，仅供参考，不代表全体玩家"
     title_mask_draw.text(
-        (300, 520),
+        (300, 500),
         title,
         "white",
         waves_font_36,
@@ -134,12 +135,14 @@ async def new_draw_char_hold_rate(ev: Event, data, group_id: str = "") -> bytes:
     )
     declar = "本数据库从未公开样本总数和具体数据，请注意辨别"
     title_mask_draw.text(
-        (820, 560),
+        (610, 560),
         declar,
-        "white",
+        (180, 180, 180),
         waves_font_20,
         "lm",
     )
+    time_str = time.strftime("%Y-%m-%d", time.localtime())
+    title_mask_draw.text((1090, 560), time_str, "white", waves_font_20, "lm")
 
     img.paste(title_bg, (0, 0), title_bg)
     img.paste(title_mask, (0, 0), title_mask)

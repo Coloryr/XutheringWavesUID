@@ -4,6 +4,8 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.subscribe import gs_subscribe
 
+from ..utils.database.waves_subscribe import WavesSubscribe
+
 sv_master = SV("联系主人", pm=0)
 master_name_ann = "联系主人"
 
@@ -18,6 +20,9 @@ async def rover_sign_result(bot: Bot, ev: Event):
         option = "关闭"
     else:
         option = "开启"
+
+    if ev.group_id and option == "开启":
+        await WavesSubscribe.check_and_update_bot(ev.group_id, ev.bot_self_id)
 
     if option == "关闭":
         await gs_subscribe.delete_subscribe("single", master_name_ann, ev)

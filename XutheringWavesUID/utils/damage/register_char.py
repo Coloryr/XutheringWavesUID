@@ -6,6 +6,7 @@ from .utils import (
     CHAR_ATTR_FREEZING,
     CHAR_ATTR_CELESTIAL,
     temp_atk,
+    temp_def,
     hit_damage,
     skill_damage,
     attack_damage,
@@ -238,6 +239,8 @@ class Char_1209(CharAbstract):
         isGroup: bool = True,
     ):
         """获得buff"""
+        attr.increment_tune_strain_interfered()
+        
         title = "莫宁-延奏技能"
         msg = "队伍中所有角色全伤害加深25%"
         attr.add_dmg_deepen(0.25, title, msg)
@@ -246,16 +249,15 @@ class Char_1209(CharAbstract):
         msg = "谐振场生效范围内偏谐值累积效率提升50%"
         attr.add_offtune_buildup_rate(0.5, title, msg)
 
-        title = "莫宁-强谐振场"
-        msg = "强谐振场生效范围内防御提升20%"
-        attr.add_def_percent(0.2, title, msg)
+        if attr.char_template == temp_def:
+            title = "莫宁-强谐振场"
+            msg = "强谐振场生效范围内防御提升20%"
+            attr.add_def_percent(0.2, title, msg)
 
-        extra_regen = max(attr.energy_regen - 1, 0)
-        dmg_bonus = min(extra_regen * 0.25, 0.4)
-        if dmg_bonus > 0 and (attr.env_tune_rupture or attr.env_tune_strain):
+        if attr.env_tune_rupture or attr.env_tune_strain:
             title = "莫宁-干涉标记"
-            msg = "对干涉标记目标伤害提升"
-            attr.add_dmg_bonus(dmg_bonus, title, msg)
+            msg = "对干涉标记目标伤害提升40%"
+            attr.add_dmg_bonus(0.4, title, msg)
         
         if attr.char_template == temp_atk:
             title = "莫宁-合鸣效果-星构寻辉之环"
@@ -263,20 +265,18 @@ class Char_1209(CharAbstract):
             attr.add_atk_percent(0.25, title, msg)
 
         if chain >= 2:
-            crit_dmg_bonus = min(extra_regen * 0.2, 0.32)
-            if crit_dmg_bonus > 0 and (attr.env_tune_rupture or attr.env_tune_strain):
-                title = "莫宁-二链"
-                msg = "共鸣效率超过100%时，对干涉标记目标暴击伤害提升"
-                attr.add_crit_dmg(crit_dmg_bonus, title, msg)
+            title = "莫宁-二链"
+            msg = f"共鸣效率超过100%时，对干涉标记目标暴击伤害提升32%"
+            attr.add_crit_dmg(0.32, title, msg)
 
             title = "莫宁-二链"
             msg = "谐振场、强谐振场偏谐值累积效率额外提升20%"
             attr.add_offtune_buildup_rate(0.2, title, msg)
 
-        # 拓界者
-        weapon_clz = WavesWeaponRegister.find_class(21010045)
+        # 宙算仪轨
+        weapon_clz = WavesWeaponRegister.find_class(21010066)
         if weapon_clz and attr.env_tune_strain:
-            w = weapon_clz(21010045, 90, 6, resonLevel)
+            w = weapon_clz(21010066, 90, 6, resonLevel)
             w.do_action("cast_healing", attr, isGroup)
 
 
@@ -695,6 +695,7 @@ class Char_1509(CharAbstract):
         """获得buff"""
         attr.set_env_tune_rupture()
         attr.set_env_tune_strain()
+        attr.increment_tune_strain_interfered()
         title = "琳奈-延奏技能"
         msg = "下一个登场的角色全伤害加深15%"
         attr.add_dmg_deepen(0.15, title, msg)
@@ -715,6 +716,11 @@ class Char_1509(CharAbstract):
             title = "琳奈-合鸣效果-逆光跃彩之约"
             msg = "攻击提升15%，谐度破坏增幅累计提升攻击15%"
             attr.add_atk_percent(0.3, title, msg)
+            
+        if chain >= 2:
+            title = "琳奈-二链"
+            msg = "施放延奏技能时，使下一个登场的角色全伤害加深25%"
+            attr.add_dmg_deepen(0.25, title, msg)
 
         title = "琳奈-声骸技能-海维夏"
         msg = "全属性伤害加成提升10.00%"

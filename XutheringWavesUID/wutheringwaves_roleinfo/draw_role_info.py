@@ -56,7 +56,11 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
     if not role_info.success:
         return role_info.throw_msg()
 
-    role_info = RoleList.model_validate(role_info.data)
+    try:
+        role_info = RoleList.model_validate(role_info.data)
+    except Exception:
+        return "用户未展示角色数据"
+
     role_info.roleList.sort(key=lambda i: (i.level, i.starLevel, i.roleId), reverse=True)
 
     # 账户数据

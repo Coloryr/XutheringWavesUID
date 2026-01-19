@@ -179,8 +179,9 @@ async def get_role_pile(resource_id: Union[int, str], custom: bool = False) -> t
 
     name = f"role_pile_{resource_id}.png"
     path = ROLE_PILE_PATH / name
-    return False, Image.open(path).convert("RGBA")
-
+    if os.path.exists(path):
+        return False, Image.open(path).convert("RGBA")
+    return False, Image.open(ROLE_PILE_PATH / "role_pile_1503.png").convert("RGBA")
 
 async def get_role_pile_with_path(
     resource_id: Union[int, str],
@@ -196,8 +197,9 @@ async def get_role_pile_with_path(
 
     name = f"role_pile_{resource_id}.png"
     path = ROLE_PILE_PATH / name
-    return False, Image.open(path).convert("RGBA"), path
-
+    if os.path.exists(path):
+        return False, Image.open(path).convert("RGBA"), path
+    return False, Image.open(ROLE_PILE_PATH / "role_pile_1503.png").convert("RGBA"), None
 
 async def get_role_pile_default(resource_id: Union[int, str], custom: bool = False) -> Image.Image:
     if custom:

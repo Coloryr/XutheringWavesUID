@@ -30,7 +30,7 @@ sv_gacha_rank = SV("waves抽卡排行", priority=0)
 sv_get_gachalog_by_link = SV("waves导入抽卡链接", area="DIRECT")
 sv_import_gacha_log = SV("waves导入抽卡记录", area="DIRECT")
 sv_export_json_gacha_log = SV("waves导出抽卡记录")
-sv_delete_gacha_log = SV("waves删除抽卡记录", pm=0)
+sv_delete_gacha_log = SV("waves删除抽卡记录")
 sv_delete_import_gacha_log = SV("waves删除抽卡导入", pm=0)
 
 DATA_PATH = get_res_path()
@@ -103,6 +103,7 @@ async def get_gacha_log_by_link(bot: Bot, ev: Event):
             # 导入合并后的数据
             merged_json_str = json.dumps(merged_data, ensure_ascii=False)
             im = await import_gachalogs(ev, merged_json_str, "json", uid, force_overwrite=True)
+            await bot.send("导入仅包含早于本地记录的部分，此后请使用链接导入更新数据，或删除抽卡记录后再次链接导入+合并！")
             return await bot.send(im)
 
         except Exception as e:
@@ -227,6 +228,10 @@ async def delete_gacha_history(bot: Bot, ev: Event):
     if not uid.isdigit() or len(uid) != 9:
         return await bot.send(f"请附带特征码，例如【{PREFIX}删除抽卡记录123456789】")
 
+    is_self, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
+    if (not ck or not is_self) and not ev.user_pm == 0:
+        return await bot.send(f"UID{uid}未登录或Cookie失效，不允许删除抽卡记录")
+
     player_dir = PLAYER_PATH / uid
     gacha_log_file = player_dir / "gacha_logs.json"
     if not gacha_log_file.exists():
@@ -241,11 +246,12 @@ async def delete_gacha_history(bot: Bot, ev: Event):
         dst_file = backup_dir / f"gacha_logs_{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.json"
 
     try:
+        # 备份抽卡记录到 backup/gacha_backup/{uid}/ 目录
         shutil.move(str(gacha_log_file), dst_file)
     except Exception as e:
         return await bot.send(f"移动抽卡记录失败：{e}")
 
-    await bot.send(f"UID{uid}抽卡记录已删除")
+    await bot.send(f"UID{uid}抽卡记录已删除！")
 
 
 @sv_delete_import_gacha_log.on_command(("删除抽卡导入", "删除导入记录", "删除导入抽卡"), block=True)

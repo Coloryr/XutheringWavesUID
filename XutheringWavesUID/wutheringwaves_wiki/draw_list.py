@@ -15,6 +15,7 @@ from ..utils.image import (
     get_square_weapon,
     get_attribute_effect,
 )
+from ..utils.resource.constant import WEAPON_TYPE_ID_MAP
 from ..wutheringwaves_config import PREFIX
 from ..utils.ascension.sonata import sonata_id_data
 from ..utils.ascension.weapon import weapon_id_data
@@ -40,17 +41,10 @@ async def draw_weapon_list(weapon_type: str):
     if not weapon_id_data:
         return "[鸣潮][武器列表]暂无数据"
 
-    # 武器类型映射
-    weapon_type_map = {
-        1: "长刃",
-        2: "迅刀",
-        3: "佩枪",
-        4: "臂铠",
-        5: "音感仪",
-    }
+    weapon_type = weapon_type.replace("臂甲", "臂铠").replace("讯刀", "迅刀")
 
     # 创建反向映射（中文类型 → 数字类型）
-    reverse_type_map = {v: k for k, v in weapon_type_map.items()}
+    reverse_type_map = {v: k for k, v in WEAPON_TYPE_ID_MAP.items()}
     logger.debug(f"正在处理武器类型：{weapon_type}")
     logger.debug(f"正在处理武器列表：{reverse_type_map}")
 
@@ -113,7 +107,7 @@ async def draw_weapon_list(weapon_type: str):
     # 按武器类型遍历所有分组
     for weapon_type, weapons in sorted_groups:
         # 获取类型名称
-        type_name = weapon_type_map.get(weapon_type, f"未知类型{weapon_type}")
+        type_name = WEAPON_TYPE_ID_MAP.get(weapon_type, f"未知类型{weapon_type}")
 
         # 绘制类型标题
         draw.text((50, y_offset), type_name, font=waves_font_24, fill=SPECIAL_GOLD)
@@ -186,29 +180,34 @@ async def draw_weapon_list(weapon_type: str):
     return await convert_img(img)
 
 
-async def draw_sonata_list():
-    # 确保数据已加载
+async def draw_sonata_list(version: str = ""):
     if not sonata_id_data:
         return "[鸣潮][套装列表]暂无数据"
+    
+    if version:
+        version = version.split(".")[0] + ".0"
 
-    # 收集所有声骸套装数据
     sonata_groups = defaultdict(list)
     for data in sonata_id_data.values():
         name = data.get("name", "未知套装")
         set_list = data.get("set", {})
-        # 按名称字数分组
         from_version = data.get("version", "10.0")
+
+        if version and from_version != version:
+            continue
+
         sonata_groups[from_version].append({"name": name, "set": set_list})
 
-    # 按字数从小到大排序
-    sorted_groups = sorted(sonata_groups.items(), key=lambda x: float(x[0]))
+    if version and not sonata_groups:
+        return f"[鸣潮][套装列表]未找到版本 {version} 的套装数据"
 
-    # 创建背景图（高度暂定，后面会调整）
+    sorted_groups = sorted(sonata_groups.items(), key=lambda x: float(x[0]), reverse=True)
+
     img = get_waves_bg(900, 3000, "bg6")
     draw = ImageDraw.Draw(img)
 
     # 绘制标题
-    title = "声骸套装一览"
+    title = f"声骸套装一览 - {version}版本" if version else "声骸套装一览"
     draw.text((440, 30), title, font=waves_font_24, fill=SPECIAL_GOLD, anchor="mt")
 
     # 当前绘制位置

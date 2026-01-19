@@ -1,3 +1,4 @@
+import re
 import json
 import asyncio
 from typing import Dict, List, Union, Optional
@@ -55,6 +56,25 @@ class SemaphoreManager:
 
 
 semaphore_manager = SemaphoreManager()
+
+
+def remove_urls_from_data(data):
+    url_pattern = re.compile(r'https?://[^\s"\'<>]+')
+
+    if isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            if key == "description":
+                result[key] = ""
+            else:
+                result[key] = remove_urls_from_data(value)
+        return result
+    elif isinstance(data, list):
+        return [remove_urls_from_data(item) for item in data]
+    elif isinstance(data, str):
+        return url_pattern.sub('', data)
+    else:
+        return data
 
 
 async def send_card(
@@ -148,7 +168,8 @@ async def save_card_info(
                     del old_data[piaobo_id]
 
         old = old_data.get(role_id)
-        if old != item:
+        cleaned_item = remove_urls_from_data(item)
+        if old != cleaned_item:
             refresh_update[role_id] = item
         else:
             refresh_unchanged[role_id] = item
@@ -160,8 +181,10 @@ async def save_card_info(
     await send_card(uid, user_id, save_data, is_self_ck, token, role_info, waves_data)
 
     try:
+        # 移除所有 URL 后再保存
+        cleaned_data = remove_urls_from_data(save_data)
         async with aiofiles.open(path, "w", encoding="utf-8") as file:
-            await file.write(json.dumps(save_data, ensure_ascii=False))
+            await file.write(json.dumps(cleaned_data, ensure_ascii=False))
     except Exception as e:
         logger.exception(f"save_card_info save failed {path}:", e)
 

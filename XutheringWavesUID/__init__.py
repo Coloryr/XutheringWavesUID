@@ -10,7 +10,31 @@ from gsuid_core.data_store import get_res_path
 
 Plugins(name="XutheringWavesUID", force_prefix=["ww"], allow_empty_prefix=False)
 
+# 安装 Bot 消息发送 Hook
+from .utils.bot_send_hook import install_bot_hooks
+from .utils.database.waves_subscribe import WavesSubscribe
 
+# 注册 WavesSubscribe 的 hook
+async def waves_bot_check_hook(group_id: str, bot_self_id: str):
+    """XutheringWavesUID 的 bot 检测 hook"""
+    logger.debug(f"[XutheringWavesUID Hook] bot_check_hook 被调用: group_id={group_id}, bot_self_id={bot_self_id}")
+
+    if group_id:
+        try:
+            await WavesSubscribe.check_and_update_bot(group_id, bot_self_id)
+        except Exception as e:
+            logger.warning(f"[XutheringWavesUID] Bot检测失败: {e}")
+
+# 安装 hooks 并注册
+install_bot_hooks()
+from .utils.bot_send_hook import register_target_send_hook, register_send_hook
+register_target_send_hook(waves_bot_check_hook)
+register_send_hook(waves_bot_check_hook)
+
+logger.info("[XutheringWavesUID] Bot 消息发送 hook 已注册")
+
+
+# 迁移部分
 MAIN_PATH = get_res_path()
 PLAYERS_PATH = MAIN_PATH / "XutheringWavesUID" / "players"
 cfg_path = MAIN_PATH / "config.json"
@@ -49,30 +73,6 @@ if show_cfg_path.exists():
         with open(show_cfg_path, "w", encoding="utf-8") as f:
             f.write(show_cfg_text)
         Path(MAIN_PATH / "show_config_back.json").unlink()
-
-# 此次迁移是因为支持工坊抽卡记录，以防出现bug，先备份所有抽卡记录
-# if PLAYERS_PATH.exists():
-#     gacha_backup_path = BACKUP_PATH / "gacha_backup"
-#     gacha_backup_path.mkdir(parents=True, exist_ok=True)
-#     backup_count = 0
-#     for player_dir in PLAYERS_PATH.iterdir():
-#         if not player_dir.is_dir():
-#             continue
-#         src_file = player_dir / "gacha_logs.json"
-#         if not src_file.exists():
-#             continue
-#         dst_dir = gacha_backup_path / player_dir.name
-#         dst_dir.mkdir(parents=True, exist_ok=True)
-#         dst_file = dst_dir / "gacha_logs.json"
-#         if dst_file.exists():
-#             continue
-#         try:
-#             shutil.copy2(src_file, dst_file)
-#             backup_count += 1
-#         except Exception as e:
-#             logger.warning(f"[XutheringWavesUID] 备份抽卡记录失败 {player_dir.name}: {e}")
-#     if backup_count > 0:
-#         logger.info(f"[XutheringWavesUID] 抽卡记录备份完成，共 {backup_count} 个玩家")
 
 # 此次迁移是因为初次实现抽卡排行时，uid字段拿错导致的下划线连接多uid
 if PLAYERS_PATH.exists():

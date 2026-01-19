@@ -29,11 +29,11 @@ class CharAliasOps:
 
         std_char_name = alias_to_char_name_optional(char_name)
         if not std_char_name:
-            return f"角色【{char_name}】不存在，请检查名称"
+            return "未找到指定角色，请检查输入！"
 
         check_new_alias = alias_to_char_name_optional(new_alias)
         if not check_new_alias:
-            return f"别名【{new_alias}】不存在，无法删除"
+            return "未找到指定角色，请检查输入！"
 
         if std_char_name not in self.custom_data:
             return f"角色【{char_name}】不存在别名文件内，请检查文件"
@@ -51,7 +51,7 @@ class CharAliasOps:
 
         std_char_name = alias_to_char_name_optional(char_name)
         if not std_char_name:
-            return f"角色【{char_name}】不存在，请检查名称"
+            return "未找到指定角色，请检查输入！"
 
         check_new_alias = alias_to_char_name_optional(new_alias)
         if check_new_alias:
@@ -79,10 +79,10 @@ async def action_char_alias(action: str, char_name: str, new_alias: str) -> str:
 async def char_alias_list(char_name: str):
     std_char_name = alias_to_char_name_optional(char_name)
     if not std_char_name:
-        return f"角色【{char_name}】不存在，请检查名称"
+        return "未找到指定角色，请检查输入！"
 
     alias_list = alias_to_char_name_list(char_name)
     if not alias_list:
-        return f"角色【{char_name}】不存在，请检查名称"
+        return f"角色【{char_name}】不存在，请检查输入"
 
-    return f"角色{std_char_name}别名列表：" + ", ".join(alias_list)
+    return f"角色{std_char_name}别名列表：" + " ".join(alias_list)

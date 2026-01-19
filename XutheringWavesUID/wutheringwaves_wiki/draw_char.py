@@ -32,6 +32,13 @@ from ..utils.fonts.waves_fonts import (
     waves_font_origin,
 )
 
+from .char_wiki_render import (
+    draw_char_skill_render,
+    draw_char_chain_render,
+    draw_char_forte_render,
+    PLAYWRIGHT_AVAILABLE,
+)
+
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
 
@@ -45,7 +52,40 @@ async def draw_char_wiki(char_id: str, query_role_type: str):
     return ""
 
 
+async def draw_char_skill(char_id: str):
+    if PLAYWRIGHT_AVAILABLE:
+        try:
+            res = await draw_char_skill_render(char_id)
+            if res:
+                return res
+        except Exception:
+            pass
+    return await draw_char_skill_pil(char_id)
+
+
+async def draw_char_chain(char_id: str):
+    if PLAYWRIGHT_AVAILABLE:
+        try:
+            res = await draw_char_chain_render(char_id)
+            if res:
+                return res
+        except Exception:
+            pass
+    return await draw_char_chain_pil(char_id)
+
+
 async def draw_char_forte(char_id: str):
+    if PLAYWRIGHT_AVAILABLE:
+        try:
+            res = await draw_char_forte_render(char_id)
+            if res:
+                return res
+        except Exception:
+            pass
+    return await draw_char_forte_pil(char_id)
+
+
+async def draw_char_forte_pil(char_id: str):
     char_model: Optional[CharacterModel] = get_char_model(char_id)
     if char_model is None:
         return ""
@@ -161,7 +201,7 @@ async def parse_char_forte_data(data: Dict, char_id: str):
             for img_path_str in image_list:
                 img_name = os.path.basename(img_path_str)
                 # If it doesn't end with .png, append it, or check existing files
-                if not img_name.lower().endswith(('.png', '.webp', '.jpg')):
+                if not img_name.lower().endswith((".png", ".webp", ".jpg")):
                      img_name += ".png"
                 
                 local_img_path = MAP_FORTE_PATH / char_id / img_name
@@ -245,7 +285,7 @@ async def draw_text_block(title, lines, width, title_font, content_font, title_c
 async def draw_mixed_text(desc_text, input_list, width, font, color, x_pad, y_pad, shadow_rad, line_sp):
     # Prepare content segments
     segments = []
-    parts = re.split(r"\{(\d+)\}", desc_text)
+    parts = re.split(r"{(\d+)}", desc_text)
 
     for i, part in enumerate(parts):
         if i % 2 == 0:
@@ -283,7 +323,7 @@ async def draw_mixed_text(desc_text, input_list, width, font, color, x_pad, y_pa
         if seg["type"] == "text":
             text = seg["content"]
             for char in text:
-                if char == '\n':
+                if char == '\\n':
                     current_y += (row_height if row_height > 0 else font_size) + line_sp
                     current_x = x_pad + shadow_rad
                     row_height = 0
@@ -319,7 +359,7 @@ async def draw_mixed_text(desc_text, input_list, width, font, color, x_pad, y_pa
     return img.crop((0, 0, width, int(final_h)))
 
 
-async def draw_char_skill(char_id: str):
+async def draw_char_skill_pil(char_id: str):
     char_model: Optional[CharacterModel] = get_char_model(char_id)
     if char_model is None:
         return ""
@@ -357,7 +397,7 @@ async def draw_char_skill(char_id: str):
     return card_img
 
 
-async def draw_char_chain(char_id: str):
+async def draw_char_chain_pil(char_id: str):
     char_model: Optional[CharacterModel] = get_char_model(char_id)
     if char_model is None:
         return ""
@@ -656,7 +696,14 @@ async def parse_char_skill_rate(skillLevels: Optional[Dict[str, SkillLevel]]):
 
     for _, skillLevel in skillLevels.items():
         row = [skillLevel.name]
-        row.extend(skillLevel.param[0][5:10])
+        # 应用 format 格式化数值
+        param_values = skillLevel.param[0][5:10]
+        if skillLevel.format:
+            # 使用 format 字符串格式化每个值
+            formatted_values = [skillLevel.format.format(v) for v in param_values]
+            row.extend(formatted_values)
+        else:
+            row.extend(param_values)
         rows.append(row)
 
     font = waves_font_12

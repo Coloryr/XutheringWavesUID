@@ -83,7 +83,7 @@ async def get_char_card_list(bot: Bot, ev: Event):
 
 
 @waves_delete_char_card.on_regex(
-    rf"^删除(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9,，]+)$", block=True
+    rf"^删除(?P<char>{PATTERN})(?P<type>面板|面包|🍞|体力|每日|mr|背景|bg)图\s*(?P<hash_id>[a-zA-Z0-9,，]+)$", block=True
 )
 async def delete_char_card(bot: Bot, ev: Event):
     char = ev.regex_dict.get("char")
@@ -139,7 +139,7 @@ async def repeated_char_card(bot: Bot, ev: Event):
 
 
 @waves_char_card_single.on_regex(
-    rf"^(查看|提取)(?P<char>{PATTERN})?(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9]+)?$",
+    rf"^(查看|提取|获取)(?P<char>{PATTERN})?(?P<type>面板|面包|🍞|card|体力|每日|mr|背景|bg)图(?P<hash_id>[a-zA-Z0-9]+)?$",
     block=True,
 )
 async def get_char_card_single(bot: Bot, ev: Event):
@@ -207,9 +207,13 @@ async def send_card_info(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg, _ = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
+    msg, num_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
     if isinstance(msg, str) or isinstance(msg, bytes):
-        return await bot.send_option(msg, buttons)
+        await bot.send_option(msg, buttons)
+    if num_updated <= 1 and isinstance(msg, bytes):
+        from ..wutheringwaves_config import PREFIX
+        single_refresh_notice = f"本次刷新少于2个角色\n如仅需刷新单角色，建议如 {PREFIX}刷新莫宁面板"
+        await bot.send(f" {single_refresh_notice}" if ev.group_id else single_refresh_notice, at_sender=ev.group_id is not None)
 
 
 @waves_new_get_one_char_info.on_regex(
@@ -223,7 +227,7 @@ async def send_one_char_detail_msg(bot: Bot, ev: Event):
         return
     char_id = char_name_to_char_id(char)
     if not char_id or len(char_id) != 4:
-        return await bot.send(f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！")
+        return await bot.send(f"[鸣潮] 角色无法找到, 请先检查输入是否正确！")
     refresh_type = [char_id]
     if char_id in SPECIAL_CHAR:
         refresh_type = SPECIAL_CHAR.copy()[char_id]
@@ -237,8 +241,8 @@ async def send_one_char_detail_msg(bot: Bot, ev: Event):
     from .draw_refresh_char_card import draw_refresh_char_detail_img
 
     buttons = []
-    msg, is_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
-    if is_updated: # 必定有图片
+    msg, num_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons, refresh_type)
+    if num_updated > 0: # 必定有图片
         from ..wutheringwaves_config import WutheringWavesConfig
         refresh_behavior = WutheringWavesConfig.get_config("RefreshSingleCharBehavior").data
 
@@ -281,7 +285,7 @@ async def send_char_detail_msg(bot: Bot, ev: Event):
 
 
 @waves_new_char_detail.on_regex(
-    rf"(?P<waves_id>\d+)?(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
+    rf"(?P<waves_id>\d{{9}})?(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
     block=True,
 )
 async def send_char_detail_msg2(bot: Bot, ev: Event):
@@ -304,7 +308,7 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
         char = char.replace("极限", "").replace("limit", "")
 
     if damage:
-        char = f"{char}{damage}"
+        char = f"{char}伤害{damage}"
     if not char:
         return
     logger.debug(f"[鸣潮] [角色面板] CHAR: {char} {ev.regex_dict}")
@@ -372,7 +376,7 @@ async def send_char_detail_msg2(bot: Bot, ev: Event):
             return await bot.send(im, at_sender)
 
 
-@waves_new_char_detail.on_regex(rf"^(?P<waves_id>\d+)?(?P<char>{PATTERN})(权重|qz)$", block=True)
+@waves_new_char_detail.on_regex(rf"^(?P<waves_id>\d{{9}})?(?P<char>{PATTERN})(权重|qz)$", block=True)
 async def send_char_detail_msg2_weight(bot: Bot, ev: Event):
     waves_id = ev.regex_dict.get("waves_id")
     char = ev.regex_dict.get("char")

@@ -267,12 +267,12 @@ async def get_waves_token_condition(ev):
 async def draw_rank_img(bot: Bot, ev: Event, char: str, rank_type: str) -> Union[str, bytes]:
     char_id = char_name_to_char_id(char)
     if not char_id:
-        return f"[鸣潮] 角色名【{char}】无法找到, 可能暂未适配, 请先检查输入是否正确！\n"
+        return "未找到指定角色, 请检查输入是否正确！"
     char_name = alias_to_char_name(char)
 
     rankDetail = DamageRankRegister.find_class(char_id)
     if not rankDetail and rank_type == "伤害":
-        return f"[鸣潮] 角色【{char_name}排行】暂未适配伤害计算，请等待作者更新！\n"
+        return f"[鸣潮] 角色【{char_name}排行】暂无伤害计算，请等待更新！"
 
     if char_id in SPECIAL_CHAR:
         find_char_id = SPECIAL_CHAR[char_id]

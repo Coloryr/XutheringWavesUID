@@ -106,7 +106,7 @@ async def draw_card_help():
             "2.在鸣潮安装的目录下进入目录：`Wuthering Waves\\Wuthering Waves Game\\Client\\Saved\\Logs`",
             "3.找到文件`Client.log`并用记事本打开",
             "4.搜索关键字：aki-gm-resources.aki-game",
-            "5.复制一整行链接",
+            "5.复制一整行链接"
         ]
     )
 
@@ -116,7 +116,7 @@ async def draw_card_help():
             "1.打开游戏抽卡界面",
             "2.关闭网络或打开飞行模式",
             "3.点开换取记录",
-            "4.长按左上角区域，全选，复制",
+            "4.长按左上角区域，全选，复制"
         ]
     )
 
@@ -128,8 +128,7 @@ async def draw_card_help():
             "3.点击`请求`",
             "4.点击最下方的`查看JSON`，全选，复制",
             "国服域名：[gmserver-api.aki-game2.com]",
-            "国际服域名：[gmserver-api.aki-game2.net]",
-            "\n",
+            "国际服域名：[gmserver-api.aki-game2.net]"
         ]
     )
 

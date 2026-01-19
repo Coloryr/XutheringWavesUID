@@ -11,12 +11,15 @@ from gsuid_core.utils.database.base_models import (
     Bind,
     Push,
     User,
+    BaseModel,
     with_session,
 )
+from gsuid_core.utils.database.models import Subscribe
+
+from .waves_subscribe import WavesSubscribe
 
 exec_list.extend(
     [
-        # 1. 添加新字段（如果不存在）
         'ALTER TABLE WavesUser ADD COLUMN pgr_uid TEXT DEFAULT ""',
         'ALTER TABLE WavesUser ADD COLUMN record_id TEXT DEFAULT ""',
         'ALTER TABLE WavesUser ADD COLUMN platform TEXT DEFAULT ""',
@@ -27,12 +30,12 @@ exec_list.extend(
         "ALTER TABLE WavesUser ADD COLUMN game_id INTEGER DEFAULT 3 NOT NULL",
         'ALTER TABLE WavesUser ADD COLUMN is_login INTEGER DEFAULT 0 NOT NULL',
         'ALTER TABLE WavesBind ADD COLUMN pgr_uid TEXT DEFAULT ""',
-        # 2. 数据迁移：使用 pgr_uid 迁移旧数据到新结构
+        'ALTER TABLE WavesUser ADD COLUMN created_time INTEGER',
+        'ALTER TABLE WavesUser ADD COLUMN last_used_time INTEGER',
         "UPDATE WavesUser SET uid = COALESCE(NULLIF(uid, ''), pgr_uid) WHERE IFNULL(uid, '') = '' AND IFNULL(pgr_uid, '') != ''",
         "UPDATE WavesUser SET game_id = 2 WHERE IFNULL(pgr_uid, '') != ''",
         "UPDATE WavesUser SET game_id = CASE WHEN IFNULL(game_id, 0) = 0 THEN 3 ELSE game_id END WHERE IFNULL(pgr_uid, '') = ''",
         "UPDATE WavesUser SET game_id = 3 WHERE game_id IS NULL",
-        # 3. 清理：删除 WavesUser 中的废弃字段（WavesBind 保留 pgr_uid 用于绑定战双UID）
         "ALTER TABLE WavesUser DROP COLUMN pgr_sign_switch",
         "ALTER TABLE WavesUser DROP COLUMN pgr_uid",
     ]
@@ -129,6 +132,8 @@ class WavesUser(User, table=True):
     did: str = Field(default="", title="did")
     game_id: int = Field(default=3, title="GameID", nullable=False, sa_column_kwargs={"server_default": "3"})
     is_login: bool = Field(default=False, title="是否waves登录")
+    created_time: Optional[int] = Field(default=None, title="创建时间")
+    last_used_time: Optional[int] = Field(default=None, title="最后使用时间")
 
     @classmethod
     @with_session
@@ -278,14 +283,36 @@ class WavesUser(User, table=True):
         bot_id: str,
         game_id: Optional[int] = None,
     ):
-        conditions = [
+        # 先查询该用户的这个uid记录，检查is_login状态
+        query_conditions = [
             col(cls.user_id) == user_id,
             col(cls.uid) == uid,
             col(cls.bot_id) == bot_id,
         ]
         if game_id is not None:
-            conditions.append(col(cls.game_id) == game_id)
-        sql = delete(cls).where(and_(*conditions))
+            query_conditions.append(col(cls.game_id) == game_id)
+
+        query_sql = select(cls).where(and_(*query_conditions))
+        query_result = await session.execute(query_sql)
+        user_record = query_result.scalars().first()
+
+        # 如果该记录存在且is_login为True，删除所有相同uid的记录
+        if user_record and user_record.is_login:
+            conditions = [col(cls.uid) == uid]
+            if game_id is not None:
+                conditions.append(col(cls.game_id) == game_id)
+            sql = delete(cls).where(and_(*conditions))
+        else:
+            # 否则只删除当前用户的记录
+            conditions = [
+                col(cls.user_id) == user_id,
+                col(cls.uid) == uid,
+                col(cls.bot_id) == bot_id,
+            ]
+            if game_id is not None:
+                conditions.append(col(cls.game_id) == game_id)
+            sql = delete(cls).where(and_(*conditions))
+
         result = await session.execute(sql)
         return result.rowcount
 
@@ -299,7 +326,15 @@ class WavesUser(User, table=True):
         new_token: str,
         new_did: str,
     ):
-        """根据uid和game_id查找WavesUser，如果is_login为True则更新cookie和did"""
+        """根据uid和game_id查找WavesUser，如果is_login为True且在活跃天数内则更新cookie和did"""
+        import time
+
+        # 获取活跃天数配置
+        from ...wutheringwaves_config import WutheringWavesConfig
+        active_days = WutheringWavesConfig.get_config("ActiveUserDays").data
+        current_time = int(time.time())
+        threshold_time = current_time - (active_days * 24 * 60 * 60)
+
         sql = (
             update(cls)
             .where(
@@ -307,12 +342,99 @@ class WavesUser(User, table=True):
                     col(cls.uid) == uid,
                     col(cls.game_id) == game_id,
                     col(cls.is_login) == True,
+                    col(cls.last_used_time) != null(),
+                    col(cls.last_used_time) >= threshold_time,
                 )
             )
             .values(cookie=new_token, did=new_did)
         )
         result = await session.execute(sql)
         return result.rowcount
+
+    @classmethod
+    @with_session
+    async def update_last_used_time(
+        cls,
+        session: AsyncSession,
+        uid: str,
+        user_id: str,
+        bot_id: str,
+        game_id: Optional[int] = None,
+    ):
+        """更新最后使用时间，如果创建时间为空则同时设置创建时间
+
+        会更新所有具有相同 uid 和 cookie 的记录
+        """
+        import time
+
+        current_time = int(time.time())
+
+        # 先查询当前用户获取 cookie
+        filters = [
+            cls.user_id == user_id,
+            cls.uid == uid,
+            cls.bot_id == bot_id,
+        ]
+        if game_id is not None:
+            filters.append(cls.game_id == game_id)
+
+        result = await session.execute(select(cls).where(*filters))
+        user = result.scalars().first()
+
+        if user and user.cookie:
+            # 更新所有具有相同 user_id 和 cookie 的记录
+            all_users_result = await session.execute(
+                select(cls).where(
+                    and_(
+                        col(cls.user_id) == user_id,
+                        col(cls.cookie) == user.cookie,
+                    )
+                )
+            )
+            all_users = all_users_result.scalars().all()
+
+            # 批量更新
+            for u in all_users:
+                u.last_used_time = current_time
+                if u.created_time is None:
+                    u.created_time = current_time
+
+            return True
+        return False
+
+    @classmethod
+    @with_session
+    async def get_active_user_count(
+        cls: Type[T_WavesUser],
+        session: AsyncSession,
+        active_days: int,
+    ) -> int:
+        """获取活跃用户数量
+
+        Args:
+            active_days: 活跃认定天数
+
+        Returns:
+            活跃用户数量
+        """
+        import time
+
+        current_time = int(time.time())
+        threshold_time = current_time - (active_days * 24 * 60 * 60)
+
+        sql = select(cls).where(
+            and_(
+                or_(col(cls.status) == null(), col(cls.status) == ""),
+                col(cls.cookie) != null(),
+                col(cls.cookie) != "",
+                col(cls.last_used_time) != null(),
+                col(cls.last_used_time) >= threshold_time,
+            )
+        )
+
+        result = await session.execute(sql)
+        data = result.scalars().all()
+        return len(data)
 
 
 class WavesPush(Push, table=True):
@@ -359,3 +481,15 @@ class WavesPushAdmin(GsAdminModel):
 
     # 配置管理模型
     model = WavesPush
+
+
+@site.register_admin
+class WavesSubscribeAdmin(GsAdminModel):
+    pk_name = "group_id"
+    page_schema = PageSchema(
+        label="鸣潮Bot-群组绑定",
+        icon="fa fa-link",
+    )  # type: ignore
+
+    # 配置管理模型
+    model = WavesSubscribe

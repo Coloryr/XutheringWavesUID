@@ -398,8 +398,16 @@
       {
         "name": "抽卡排行",
         "desc": "抽卡排行",
-        "eg": "抽卡排行(欧/非)",
+        "eg": "抽卡排行(欧/非/抽数)",
         "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "删除抽卡记录",
+        "desc": "删除抽卡记录",
+        "eg": "删除抽卡记录uid",
+        "need_ck": true,
         "need_sk": false,
         "need_admin": false
       }
@@ -520,7 +528,7 @@
       {
         "name": "合鸣/套装效果",
         "desc": "合鸣/套装效果",
-        "eg": "套装列表",
+        "eg": "套装列表3.0",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
@@ -615,6 +623,22 @@
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
+      },
+      {
+          "name": "排除攻略提供方",
+          "desc": "设置排除特定攻略提供方",
+          "eg": "设置排除攻略 作者1，作者2",
+          "need_ck": false,
+          "need_sk": false,
+          "need_admin": true
+      },
+      {
+        "name": "设置抽卡条件",
+        "desc": "设置群抽卡排行阈值",
+        "eg": "设置抽卡条件 1200",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
       }
     ]
   },
@@ -663,6 +687,14 @@
         "need_admin": true
       },
       {
+        "name": "清理缓存",
+        "desc": "清理过期的公告和日历图片缓存",
+        "eg": "清理缓存",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
+      },
+      {
         "name": "压缩面板图",
         "desc": "压缩面板图",
         "eg": "压缩面板图",
@@ -690,14 +722,6 @@
         "name": "添加/删除角色别名",
         "desc": "添加/删除角色别名",
         "eg": "添加油壶别名杂鱼",
-        "need_ck": false,
-        "need_sk": false,
-        "need_admin": true
-      },
-      {
-        "name": "删除抽卡记录",
-        "desc": "删除抽卡记录",
-        "eg": "删除抽卡记录uid",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true

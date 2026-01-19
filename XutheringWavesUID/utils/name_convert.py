@@ -171,6 +171,12 @@ def alias_to_char_name(char_name: str) -> str:
     return char_name
 
 
+def is_valid_char_name(char_name: str) -> bool:
+    ensure_data_loaded()
+    all_names = set(char_alias_data.keys()) | {alias for aliases in char_alias_data.values() for alias in aliases}
+    return char_name in sorted(all_names, key=len, reverse=True)
+
+
 def alias_to_char_name_optional(char_name: Optional[str]) -> Optional[str]:
     ensure_data_loaded()
     if not char_name:

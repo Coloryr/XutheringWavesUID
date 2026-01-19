@@ -114,8 +114,9 @@ async def draw_calendar_img(ev: Event, uid: str):
     content_total_row = 1 + (len(content.content) - 1) // 2 if content else 0
     total_high = title_high + banner_high + temp_high + content_total_row * event_high + bar2_high + footer_high
     if gacha_char_list:
-        total_high += (char_bar_high + star_fg_high * 2) * 2
+        # total_high += (char_bar_high + star_fg_high * 2) * 2
         # total_high += (char_bar_high + star_fg_high * len(gacha_char_list)) * 2
+        total_high += (char_bar_high + star_fg_high * (len(gacha_char_list) + 4) // 2)
         total_high += temp_high
         total_high += bar1_high
 
@@ -130,12 +131,13 @@ async def draw_calendar_img(ev: Event, uid: str):
     await draw_banner(wiki_home, img)
 
     _high = title_high + banner_high
+    _max_gacha_height = _high
     # 卡池title
     if gacha_char_list:
         bar1 = Image.open(TEXT_PATH / "bar1.png")
-        img.paste(bar1, (0, _high), bar1)
-        _high = _high + bar1_high
-        char_bar = Image.open(TEXT_PATH / "char_bar.png")
+        img.paste(bar1, (0, _max_gacha_height), bar1)
+        _max_gacha_height = _high + bar1_high
+        char_bar = Image.open(TEXT_PATH / "char_bar_half.png")
 
         if gacha_char_list[0]["dateRange"]:
             char_bar_draw = ImageDraw.Draw(char_bar)
@@ -146,25 +148,28 @@ async def draw_calendar_img(ev: Event, uid: str):
                 char_bar_draw.text((310, 110), f"{left}", color, ww_font_24, "lm")
             char_bar_draw.text((220, 110), f"{status}", "white", ww_font_24, "lm")
 
-        img.paste(char_bar, (0, _high), char_bar)
-        _high += char_bar_high
-        _high = draw_gacha(gacha_char_list, img, _high)
+        img.paste(char_bar, (0, _max_gacha_height), char_bar)
+        _max_gacha_height += char_bar_high
+        _max_gacha_height = draw_gacha(gacha_char_list, img, _max_gacha_height)
 
     if gacha_weapon_list:
-        _high += temp_high
-        weapon_bar: ImageFile = Image.open(TEXT_PATH / "weapon_bar.png")
+        weapon_bar: ImageFile = Image.open(TEXT_PATH / "weapon_bar_half.png")
+        _high = _high + bar1_high
         if gacha_weapon_list[0]["dateRange"]:
             weapon_bar_draw = ImageDraw.Draw(weapon_bar)
             dateRange = gacha_weapon_list[0]["dateRange"]
             status, left, color = get_date_range(dateRange, now)
             if left:
                 status = f"{status}: "
-                weapon_bar_draw.text((310, 110), f"{left}", color, ww_font_24, "lm")
-            weapon_bar_draw.text((220, 110), f"{status}", "white", ww_font_24, "lm")
+                weapon_bar_draw.text((310-83, 110), f"{left}", color, ww_font_24, "lm")
+            weapon_bar_draw.text((210-83, 110), f"{status}", "white", ww_font_24, "lm")
 
-        img.paste(weapon_bar, (0, _high), weapon_bar)
+        img.paste(weapon_bar, (600, _high), weapon_bar)
         _high += weapon_bar_high
-        _high = draw_gacha(gacha_weapon_list, img, _high)
+        _high = draw_gacha(gacha_weapon_list, img, _high, x_shift=517)
+        _max_gacha_height = max(_max_gacha_height, _high)
+        
+    _high = _max_gacha_height
 
     # 活动bar
     _high += temp_high
@@ -261,6 +266,21 @@ async def draw_calendar_img(ev: Event, uid: str):
             _high += event_high
 
     img = add_footer(img)
+
+    kuro_calendar_path = CALENDAR_PATH / "calendar.png"
+    if kuro_calendar_path.exists():
+        try:
+            custom_calendar = Image.open(kuro_calendar_path).convert("RGBA")
+            calendar_width = int(custom_calendar.width * img.height / custom_calendar.height)
+            custom_calendar = custom_calendar.resize((calendar_width, img.height), Image.Resampling.LANCZOS)
+
+            new_img = Image.new("RGBA", (img.width + custom_calendar.width, img.height), (255, 255, 255, 0))
+            new_img.paste(img, (0, 0))
+            new_img.paste(custom_calendar, (img.width, 0), custom_calendar)
+            img = new_img
+        except Exception:
+            pass
+
     img = await convert_img(img)
     return img
 
@@ -351,16 +371,16 @@ async def get_calendar_bg(w: int, h: int, bg: str = "bg1") -> Image.Image:
     return crop_center_img(img, w, h)
 
 
-def draw_gacha(gacha_list, img, _high):
+def draw_gacha(gacha_list, img, _high, x_shift = 0):
     star_fg_high = 150
     all_nodes = [gacha["nodes"][0] for gacha in gacha_list[:-1]] + gacha_list[-1]["nodes"]
-    gacha_nodes = [all_nodes[:len(all_nodes)//2], all_nodes[len(all_nodes)//2:]]
+    gacha_nodes = [all_nodes[i:i+2] for i in range(0, len(all_nodes), 2)]
     # for i, gacha_list in enumerate(gacha_list):
     for i, gacha_list in enumerate(gacha_nodes):
         gacha_bg = Image.new("RGBA", (1200, star_fg_high), (0, 0, 0, 0))
         # for j, gacha in enumerate(gacha_list["nodes"]):
         for j, gacha in enumerate(gacha_list):
-            if i == 0:
+            if 2 * i + j < len(all_nodes) - 3:
                 star_fg = Image.open(TEXT_PATH / "star5_fg.png")
                 star_bg = Image.open(TEXT_PATH / "star5_bg.png")
             else:
@@ -378,16 +398,16 @@ def draw_gacha(gacha_list, img, _high):
                 rank_draw.rectangle([0, 0, 60, 25], fill=(255, 255, 255) + (int(0.9 * 255),))
                 rank_draw.text((30, 12), f"{gacha_name}", "black", ww_font_20, "mm")
             else:
-                name_bg = Image.new("RGBA", (80, 25), color=(255, 255, 255, 0))
+                name_bg = Image.new("RGBA", (10 + 20 * len(gacha_name), 25), color=(255, 255, 255, 0))
                 rank_draw = ImageDraw.Draw(name_bg)
-                rank_draw.rectangle([0, 0, 80, 25], fill=(255, 255, 255) + (int(0.9 * 255),))
-                rank_draw.text((40, 12), f"{gacha_name}", "black", ww_font_20, "mm")
+                rank_draw.rectangle([0, 0, 10 + 20 * len(gacha_name), 25], fill=(255, 255, 255) + (int(0.9 * 255),))
+                rank_draw.text((5 + 10 * len(gacha_name), 12), f"{gacha_name}", "black", ww_font_20, "mm")
 
             gacha_bg.paste(star_bg_temp, (80 + j * 260, 0))
             gacha_bg.alpha_composite(star_fg, (80 + j * 260, 0))
             gacha_bg.alpha_composite(name_bg, (90 + j * 260, 110))
 
-        img.alpha_composite(gacha_bg, (0, _high))
+        img.alpha_composite(gacha_bg, (x_shift, _high))
         _high += star_fg_high
     return _high
 
