@@ -12,6 +12,7 @@ from gsuid_core.utils.image.convert import convert_img
 from .slash_rank import get_avatar
 from ..utils.image import (
     RED,
+    GREY,
     SPECIAL_GOLD,
     get_ICON,
     add_footer,
@@ -157,13 +158,10 @@ async def filter_active_group_users(
                 threshold_time = current_time - (active_days * 24 * 60 * 60)
                 if last_active_time is None:
                     is_active = False
-                    reason = "no_record"
                 elif last_active_time < threshold_time:
                     is_active = False
-                    reason = "expired"
                 else:
                     is_active = True
-                    reason = "active"
             except Exception:
                 is_active = False
             return user_id, is_active
@@ -300,7 +298,7 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
     time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-    title_bg_draw.text((225, 360), time_str, (150, 150, 150), waves_font_20, "lm")
+    title_bg_draw.text((225, 360), time_str, GREY, waves_font_20, "lm")
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")

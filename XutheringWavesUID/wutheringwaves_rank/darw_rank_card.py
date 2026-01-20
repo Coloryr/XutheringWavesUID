@@ -298,13 +298,10 @@ async def filter_active_group_users(
                 threshold_time = current_time - (active_days * 24 * 60 * 60)
                 if last_active_time is None:
                     is_active = False
-                    reason = "no_record"
                 elif last_active_time < threshold_time:
                     is_active = False
-                    reason = "expired"
                 else:
                     is_active = True
-                    reason = "active"
             except Exception:
                 is_active = False
             return user_id, is_active

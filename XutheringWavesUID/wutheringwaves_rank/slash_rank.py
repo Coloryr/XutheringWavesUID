@@ -126,6 +126,7 @@ def parse_rank_date(date_str: str) -> Optional[datetime]:
 
 
 def get_score_color(score: int):
+    """总排行分数颜色"""
     if score >= 30000:
         return (255, 0, 0)
     elif score >= 25000:
@@ -138,6 +139,22 @@ def get_score_color(score: int):
         return (53, 152, 219)
     else:
         return (255, 255, 255)
+
+
+def get_local_score_color(score: int):
+    """本地排行分数颜色"""
+    if score >= 30000:
+        return (255, 0, 0)
+    elif score >= 20000:
+        return (234, 183, 4)
+    elif score >= 10000:
+        return (185, 106, 217)
+    elif score >= 5500:
+        return (22, 145, 121)
+    elif score >= 4500:
+        return (53, 152, 219)
+    else:
+        return (200, 200, 200)
 
 
 async def get_rank(item: SlashRankItem) -> Optional[SlashRankRes]:
@@ -725,7 +742,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         role_bg_draw.text(
             (880, 55),
             f"{rankInfo.score}",
-            get_score_color(rankInfo.score),
+            get_local_score_color(rankInfo.score),
             waves_font_44,
             "mm",
         )
@@ -791,7 +808,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
                         role_bg_draw.text(
                             (450 + half_index * 230, 80),
                             f"{slash_half.score}",
-                            get_score_color(slash_half.score),
+                            get_local_score_color(slash_half.score),
                             waves_font_20,
                             "mm",
                         )
