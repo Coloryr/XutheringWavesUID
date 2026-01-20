@@ -94,7 +94,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "RankUseToken": GsBoolConfig(
         "有token才能进排行",
         "有token才能进排行",
-        False,
+        True,
     ),
     "GachaRankMin": GsIntConfig("抽卡排行最小抽数阈值", "抽卡排行中只显示总抽数达到此阈值的玩家", 1000),
     "DelInvalidCookie": GsBoolConfig(

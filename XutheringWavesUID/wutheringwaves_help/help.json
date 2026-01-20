@@ -640,14 +640,6 @@
         "need_sk": false,
         "need_admin": true
       },
-      {
-          "name": "删除群成员",
-          "desc": "删除过期的群成员绑定",
-          "eg": "删除群成员uid123456789",
-          "need_ck": false,
-          "need_sk": false,
-          "need_admin": true
-      }
     ]
   },
   "bot主人功能": {

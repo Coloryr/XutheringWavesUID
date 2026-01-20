@@ -585,7 +585,7 @@ async def draw_rank_img(bot: Bot, ev: Event, char: str, rank_type: str) -> Union
     title_draw.text((20, 420), f"{rank_row_title}", SPECIAL_GOLD, waves_font_16, "lm")
     title_draw.text((90, 420), f"{rank_row}", GREY, waves_font_16, "lm")
     if tokenLimitFlag:
-        rank_row = f"2.使用命令【{PREFIX}登录】登录过，且近期活跃的用户"
+        rank_row = f"2.使用命令【{PREFIX}登录】登录过，且近期活跃的用户" if WutheringWavesConfig.get_config("RankActiveFilterGroup").data else f"2.使用命令【{PREFIX}登录】登录过的用户"
         title_draw.text((90, 438), f"{rank_row}", GREY, waves_font_16, "lm")
 
     if rank_type == "伤害":

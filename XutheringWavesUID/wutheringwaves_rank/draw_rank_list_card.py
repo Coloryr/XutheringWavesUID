@@ -432,7 +432,7 @@ async def draw_rank_list(bot: Bot, ev: Event, threshold: int = 175) -> Union[str
         waves_font_20,
         "lm",
     )
-    text_bar_draw.text((185, 85), "2. 仅显示近期活跃用户，至多显示声骸分数最高的前8个角色", SPECIAL_GOLD, waves_font_20, "lm")
+    text_bar_draw.text((185, 85), "2. 仅显示近期活跃用户，至多显示声骸分数最高的前8个角色" if WutheringWavesConfig.get_config("RankActiveFilterGroup").data else "2. 至多显示声骸分数最高的前8个角色", SPECIAL_GOLD, waves_font_20, "lm")
 
     # 备注 - 排行标准，根据阈值动态生成文案
     temp_notes = f"排行标准：以所有角色声骸分数总和（角色分数>={threshold}（{threshold_label}级））为排序的综合排名"

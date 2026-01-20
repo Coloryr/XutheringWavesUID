@@ -275,7 +275,7 @@ async def draw_gacha_rank_card(bot, ev: Event) -> Union[str, bytes]:
     text_bar_draw.text((40, 60), "排行说明", (150, 150, 150), waves_font_28, "lm")
     text_bar_draw.text(
         (185, 50),
-        f"1. 仅显示导入总抽数≥{min_pull}且近期活跃的玩家（至少为前6个月的连续记录）",
+        f"1. 仅显示导入总抽数≥{min_pull}且近期活跃的玩家（至少为前6个月的连续记录）" if WutheringWavesConfig.get_config("RankActiveFilterGroup").data else f"1. 仅显示导入总抽数≥{min_pull}的玩家（至少为前6个月的连续记录）",
         SPECIAL_GOLD,
         waves_font_20,
         "lm",
