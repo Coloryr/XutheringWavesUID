@@ -799,6 +799,8 @@ class WavesApi:
         res = await self._waves_request(ANN_CONTENT_URL, "POST", headers, data=data)
         if res.success:
             raw_data = res.model_dump()
+            if "headCodeUrl" in raw_data["data"]:
+                raw_data["data"]["postDetail"]["headCodeUrl"] = raw_data["data"]["headCodeUrl"]
             self.ann_map[post_id] = raw_data["data"]["postDetail"]
             return raw_data["data"]["postDetail"]
         return {}

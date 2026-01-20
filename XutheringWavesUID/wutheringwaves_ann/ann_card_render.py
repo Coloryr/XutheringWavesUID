@@ -52,7 +52,7 @@ async def ann_list_card() -> bytes:
                 continue
             
             section_items = []
-            for item in grouped[t][:9]:
+            for item in grouped[t][:6]:
                 if not item.get("id") or not item.get("postTitle"):
                     continue
 
@@ -161,9 +161,19 @@ async def ann_detail_card(ann_id: int, is_check_time=False) -> Union[bytes, str,
                         "coverB64": cover_b64,     # base64 版本
                     })
 
+        # 获取用户信息
+        user_name = res.get("userName", "鸣潮")
+        head_code_url = res.get("headCodeUrl", "")
+        user_avatar = ""
+        if head_code_url:
+            user_avatar = await get_image_b64_with_cache(head_code_url, ANN_CARD_PATH)
+
         context = {
             "title": res.get("postTitle", "公告详情"),
             "subtitle": f"发布时间: {res.get('postTime', '未知')}",
+            "post_time": res.get('postTime', '未知'),
+            "user_name": user_name,
+            "user_avatar": user_avatar,
             "is_list": False,
             "content": processed_content,
             "logo_b64": get_logo_b64(),
