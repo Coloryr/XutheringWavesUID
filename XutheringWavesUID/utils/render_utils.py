@@ -1,11 +1,11 @@
 import base64
+import asyncio
+import time
 from typing import Union, Optional
 from pathlib import Path
 
 from gsuid_core.logger import logger
 from .resource.RESOURCE_PATH import TEMP_PATH
-
-
 def _import_playwright():
     """导入并返回 playwright async_playwright
 
@@ -25,8 +25,66 @@ def _import_playwright():
 async_playwright = _import_playwright()
 PLAYWRIGHT_AVAILABLE = async_playwright is not None
 
+_playwright = None
+_browser = None
+_browser_lock = asyncio.Lock()
+_browser_uses = 0
+_last_used = 0.0
+_active_contexts = 0
+
+_MAX_BROWSER_USES = 1000
+_BROWSER_IDLE_TTL = 3600
+
+
+async def _ensure_browser():
+    """Get a reusable browser instance; restart periodically to bound memory."""
+    global _playwright, _browser, _browser_uses, _last_used, _active_contexts
+
+    if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
+        return None
+
+    async with _browser_lock:
+        now = time.monotonic()
+
+        if _browser is not None and not _browser.is_connected():
+            try:
+                await _browser.close()
+            except Exception:
+                pass
+            _browser = None
+
+        need_restart = (
+            _browser is None
+            or _browser_uses >= _MAX_BROWSER_USES
+            or (_last_used > 0 and now - _last_used > _BROWSER_IDLE_TTL)
+        )
+
+        if need_restart and _browser is not None and _active_contexts > 0:
+            need_restart = False
+
+        if need_restart:
+            if _browser is not None:
+                try:
+                    await _browser.close()
+                except Exception:
+                    pass
+                _browser = None
+
+            if _playwright is None:
+                _playwright = await async_playwright().start()
+
+            _browser = await _playwright.chromium.launch(
+                args=["--no-sandbox", "--disable-setuid-sandbox"]
+            )
+            _browser_uses = 0
+
+        _last_used = now
+        return _browser
+
 
 async def render_html(waves_templates, template_name: str, context: dict) -> Optional[bytes]:
+    global _browser_uses, _last_used, _active_contexts
+
     if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
         return None
 
@@ -43,12 +101,15 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
             raise e
 
         try:
-            logger.debug("[鸣潮] 进入 async_playwright 上下文...")
-            async with async_playwright() as p:
-                logger.debug("[鸣潮] 启动浏览器...")
-                browser = await p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
-                page = await browser.new_page(viewport={"width": 1200, "height": 1000})
+            logger.debug("[鸣潮] 获取复用浏览器实例...")
+            browser = await _ensure_browser()
+            if browser is None:
+                return None
 
+            context_obj = await browser.new_context(viewport={"width": 1200, "height": 1000})
+            _active_contexts += 1
+            try:
+                page = await context_obj.new_page()
                 logger.debug("[鸣潮] 加载HTML内容...")
                 await page.set_content(html_content)
 
@@ -81,10 +142,16 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
 
                 logger.debug("[鸣潮] 正在截图...")
                 screenshot = await container.screenshot(type='jpeg', quality=90)
-
-                await browser.close()
                 logger.debug(f"[鸣潮] HTML渲染成功, 图片大小: {len(screenshot)} bytes")
                 return screenshot
+            finally:
+                try:
+                    await context_obj.close()
+                except Exception:
+                    pass
+                _active_contexts = max(0, _active_contexts - 1)
+                _browser_uses += 1
+                _last_used = time.monotonic()
         except Exception as e:
             logger.error(f"[鸣潮] Playwright execution failed: {e}")
             raise e
