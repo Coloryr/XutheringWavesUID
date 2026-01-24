@@ -434,7 +434,7 @@
         <div class="footer-stats">
             <!-- Weekly Boss -->
             <div class="mini-stat">
-                <div class="mini-val" style="color: {% if weekly_boss.total and weekly_boss.left == weekly_boss.total %}#fff{% else %}{{ weekly_boss.color }}{% endif %};">{{ weekly_boss.left }}<span style="font-size: 24px; color:rgba(255,255,255,0.5);">/{{ weekly_boss.total }}</span></div>
+                <div class="mini-val" style="color: {% if weekly_boss.total and weekly_boss.left == weekly_boss.total %}#fff{% else %}{{ urgent_color }}{% endif %};">{{ weekly_boss.left }}<span style="font-size: 24px; color:rgba(255,255,255,0.5);">/{{ weekly_boss.total }}</span></div>
                 <div class="mini-label">战歌重奏</div>
             </div>
 
@@ -446,7 +446,7 @@
 
             <!-- Rogue -->
             <div class="mini-stat">
-                <div class="mini-val" style="color: {% if weekly_rogue.total and weekly_rogue.cur == weekly_rogue.total %}#fff{% else %}{{ weekly_rogue.color }}{% endif %};">{{ weekly_rogue.cur }}</div>
+                <div class="mini-val" style="color: {% if weekly_rogue.total and weekly_rogue.cur == weekly_rogue.total %}#fff{% else %}{{ urgent_color }}{% endif %};">{{ weekly_rogue.cur }}</div>
                 <div class="mini-label">千道门扉</div>
             </div>
 
