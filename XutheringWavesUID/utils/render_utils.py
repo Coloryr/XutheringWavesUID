@@ -2,6 +2,7 @@ import base64
 import asyncio
 import time
 import re
+import logging
 from typing import Union, Optional
 from pathlib import Path
 
@@ -10,6 +11,10 @@ from gsuid_core.config import core_config, CONFIG_DEFAULT
 from gsuid_core.app_life import app as fastapi_app
 from fastapi.staticfiles import StaticFiles
 from .resource.RESOURCE_PATH import TEMP_PATH
+
+logging.getLogger("uvicorn.access").addFilter(
+    lambda record: "/waves/fonts" not in record.getMessage()
+)
 
 TEMPLATES_ABS_PATH = Path(__file__).parent.parent / "templates"
 
