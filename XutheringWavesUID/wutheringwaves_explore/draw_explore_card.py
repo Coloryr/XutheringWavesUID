@@ -154,7 +154,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
                 "incomplete_sub_areas": incomplete_sub_areas
             })
         
-        bg_img = get_custom_waves_bg(1000, -1, "bg3", crop=False)
+        bg_img = get_custom_waves_bg(bg = "bg3", crop=False)
         bg_url = pil_to_b64(bg_img)
 
         context = {

@@ -322,6 +322,7 @@ def get_custom_waves_bg(  # 不是所有地方都适合替换为custom，函数�
     bg: str = "bg",
     crop: bool = True,
 ):
+    assert not crop or (w != 0 and h != 0), "裁剪图片时需要指定宽高"
     img: Optional[Image.Image] = None
     if ShowConfig.get_config("CardBg").data:
         bg_path = Path(ShowConfig.get_config("CardBgPath").data)
