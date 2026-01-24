@@ -443,7 +443,7 @@ async def get_role_need(
             elif is_online_user and not change_list_regex:
                 return (
                     None,
-                    f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新面板]进行刷新!",
+                    f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
                 )
             else:
                 # 未上线的角色，构造一个数据
@@ -451,7 +451,7 @@ async def get_role_need(
                 if not gen_role_detail:
                     return (
                         None,
-                        f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新面板]进行刷新!",
+                        f"[鸣潮] 未找到【{char_name}】角色信息!",
                     )
                 role_detail = gen_role_detail
 

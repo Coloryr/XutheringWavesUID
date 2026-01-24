@@ -1,12 +1,16 @@
 import os
 import json
 import random
+import warnings
 from typing import Dict, List
 from pathlib import Path
 from datetime import datetime
 
 import aiofiles
 from PIL import Image, ImageDraw
+
+# 忽略PIL解压缩炸弹警告
+warnings.filterwarnings('ignore', category=Image.DecompressionBombWarning)
 
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img

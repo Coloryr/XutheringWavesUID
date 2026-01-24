@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import time
 
 from gsuid_core.sv import SV
 from gsuid_core.aps import scheduler
@@ -11,13 +12,15 @@ from gsuid_core.models import Event
 from .deal import add_cookie, get_cookie, refresh_bind, delete_cookie
 from ..utils.button import WavesButton
 from ..utils.constants import WAVES_GAME_ID
-from ..utils.database.models import WavesBind, WavesUser
+from ..utils.database.models import WavesBind, WavesUser, WavesStaminaRecord
+from ..utils.database.waves_user_activity import WavesUserActivity
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..wutheringwaves_user.login_succ import login_success_msg
 
 waves_bind_uid = SV("鸣潮绑定特征码", priority=10)
 waves_add_ck = SV("鸣潮添加token", priority=3)
 waves_del_ck = SV("鸣潮删除token", priority=3)
+waves_del_mem = SV("鸣潮删除群成员", priority=3)
 waves_get_ck = SV("waves获取ck", area="DIRECT")
 waves_del_all_invalid_ck = SV("鸣潮删除无效token", priority=1, pm=1)
 waves_refresh_bind = SV("waves刷新绑定", priority=5)
@@ -112,6 +115,119 @@ async def delete_all_invalid_cookie(bot: Bot, ev: Event):
     del_len = await WavesUser.delete_all_invalid_cookie()
     msg = f"[鸣潮] 已删除无效token【{del_len}】个"
     await bot.send((" " if at_sender else "") + msg, at_sender)
+
+
+@waves_del_mem.on_regex(("^删除群成员\\s*(?:[uU][iI][dD])?\\s*(?P<uid>\\d+)$",), block=True)
+async def waves_delete_group_member(bot: Bot, ev: Event):
+    if not ev.group_id:
+        return await bot.send("[鸣潮] 该命令仅限群聊使用")
+
+    if ev.user_pm is None or ev.user_pm > 3:
+        return await bot.send("[鸣潮] 需要群管理才可删除")
+
+    target_uid = ev.regex_dict.get("uid") if hasattr(ev, "regex_dict") else None
+    if not target_uid:
+        return await bot.send(f"[鸣潮] 格式错误，例如：{PREFIX}删除群成员123456789（游戏UID）")
+    binds = await WavesBind.get_binds_by_uid(target_uid)
+    if not binds:
+        return await bot.send(f"[鸣潮] 未找到 UID {target_uid} 的绑定记录")
+
+    updated = 0
+    for bind in binds:
+        uid_list = [u for u in (bind.uid or "").split("_") if u]
+        pgr_uid_list = [u for u in (bind.pgr_uid or "").split("_") if u]
+        if target_uid not in uid_list and target_uid not in pgr_uid_list:
+            continue
+
+        group_list = [g for g in (bind.group_id or "").split("_") if g]
+        if ev.group_id not in group_list:
+            continue
+
+        group_list = [g for g in group_list if g != ev.group_id]
+        new_group_id = "_".join(group_list)
+        await WavesBind.update_data(
+            user_id=bind.user_id,
+            bot_id=bind.bot_id,
+            **{"group_id": new_group_id},
+        )
+        updated += 1
+
+    if updated == 0:
+        return await bot.send(f"[鸣潮] UID {target_uid} 在本群无绑定记录")
+
+    return await bot.send(f"[鸣潮] 已移除 UID {target_uid} 在本群的 {updated} 条绑定记录")
+
+
+@waves_del_mem.on_regex(("^(删除|清除|清理)不活跃(?:群成员)?\\s*$",), block=True)
+async def waves_delete_inactive_group_members(bot: Bot, ev: Event):
+    if not ev.group_id:
+        return await bot.send("[鸣潮] 该命令仅限群聊使用")
+
+    if ev.user_pm is None or ev.user_pm > 3:
+        return await bot.send("[鸣潮] 需要群管理才可删除")
+
+    binds = await WavesBind.get_group_all_uid(ev.group_id)
+    if not binds:
+        return await bot.send(f"[鸣潮] 群【{ev.group_id}】暂无绑定记录")
+
+    active_days = WutheringWavesConfig.get_config("ActiveUserDays").data
+    threshold_time = int(time.time()) - (active_days * 24 * 60 * 60)
+    bot_self_id = ev.bot_self_id or ""
+
+    uid_to_user_pairs: Dict[str, set[tuple[str, str]]] = {}
+
+    for bind in binds:
+        if not bind.user_id:
+            continue
+        platform = bind.bot_id or ev.bot_id
+
+        uid_list = [u for u in (bind.uid or "").split("_") if u]
+        pgr_uid_list = [u for u in (bind.pgr_uid or "").split("_") if u]
+        for uid in uid_list + pgr_uid_list:
+            uid_to_user_pairs.setdefault(uid, set()).add((bind.user_id, platform))
+
+    if not uid_to_user_pairs:
+        return await bot.send(f"[鸣潮] 群【{ev.group_id}】暂无绑定记录")
+
+    inactive_uids: set[str] = set()
+    for uid, user_pairs in uid_to_user_pairs.items():
+        latest_time = None
+        for user_id, platform in user_pairs:
+            last_active_time = await WavesUserActivity.get_user_last_active_time(
+                user_id, platform, bot_self_id
+            )
+            if last_active_time is not None:
+                if latest_time is None or last_active_time > latest_time:
+                    latest_time = last_active_time
+        if latest_time is None or latest_time < threshold_time:
+            inactive_uids.add(uid)
+
+    if not inactive_uids:
+        return await bot.send("[鸣潮] 本群暂无不活跃群成员")
+
+    updated = 0
+    for bind in binds:
+        group_list = [g for g in (bind.group_id or "").split("_") if g]
+        if ev.group_id not in group_list:
+            continue
+        uid_list = [u for u in (bind.uid or "").split("_") if u]
+        pgr_uid_list = [u for u in (bind.pgr_uid or "").split("_") if u]
+        if not any(uid in inactive_uids for uid in uid_list + pgr_uid_list):
+            continue
+
+        new_group_list = [g for g in group_list if g != ev.group_id]
+        await WavesBind.update_data(
+            user_id=bind.user_id,
+            bot_id=bind.bot_id,
+            **{"group_id": "_".join(new_group_list)},
+        )
+        updated += 1
+        
+    logger.info(f"[鸣潮] 已移除不活跃群成员 UID 数：{len(inactive_uids)}，更新绑定记录数：{updated}")
+
+    return await bot.send(
+        f"[鸣潮] 已移除不活跃群成员，UID 数：{len(inactive_uids)}"
+    )
 
 
 @scheduler.scheduled_job("cron", hour=23, minute=30)
@@ -217,6 +333,10 @@ async def send_waves_bind_uid_msg(bot: Bot, ev: Event):
             **{WavesBind.get_gameid_name(None): None},
         )
         if retcode == 0:
+            try:
+                await WavesStaminaRecord.delete_by_user(qid, ev.bot_id)
+            except Exception:
+                logger.exception("[鸣潮] 删除全部特征码时清理体力记录失败")
             msg = "[鸣潮] 删除全部特征码成功！"
             return await bot.send((" " if at_sender else "") + msg, at_sender)
         else:

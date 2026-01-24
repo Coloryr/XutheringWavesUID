@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from gsuid_core.logger import logger
 
-from .resource.RESOURCE_PATH import GACHA_CONFIG_PATH
+from ..utils.resource.RESOURCE_PATH import GACHA_CONFIG_PATH
 
 
 def load_gacha_config() -> Dict[str, int]:

@@ -45,6 +45,7 @@ from ..utils.api.wwapi import (
 )
 from ..utils.ascension.char import get_char_model
 from ..utils.database.models import WavesBind, WavesUser
+from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
     waves_font_12,
@@ -125,6 +126,7 @@ def parse_rank_date(date_str: str) -> Optional[datetime]:
 
 
 def get_score_color(score: int):
+    """总排行分数颜色"""
     if score >= 30000:
         return (255, 0, 0)
     elif score >= 25000:
@@ -137,6 +139,22 @@ def get_score_color(score: int):
         return (53, 152, 219)
     else:
         return (255, 255, 255)
+
+
+def get_local_score_color(score: int):
+    """本地排行分数颜色"""
+    if score >= 30000:
+        return (255, 0, 0)
+    elif score >= 20000:
+        return (234, 183, 4)
+    elif score >= 10000:
+        return (185, 106, 217)
+    elif score >= 5500:
+        return (22, 145, 121)
+    elif score >= 4500:
+        return (53, 152, 219)
+    else:
+        return (200, 200, 200)
 
 
 async def get_rank(item: SlashRankItem) -> Optional[SlashRankRes]:
@@ -702,8 +720,15 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
                 if challenge.halfList:
                     for slash_half in challenge.halfList:
                         for slash_role in slash_half.roleList:
-                            chain_count = await get_role_chain_count(rankInfo.uid, slash_role.roleId)
-                            char_gold_total += (chain_count + 1) if chain_count >= 0 else 0
+                            role_id = slash_role.roleId
+
+                            if role_id in SPECIAL_CHAR_INT_ALL:
+                                continue
+
+                            char_model = get_char_model(role_id)
+                            if char_model and char_model.starLevel == 5:
+                                chain_count = await get_role_chain_count(rankInfo.uid, role_id)
+                                char_gold_total += (chain_count + 1) if chain_count >= 0 else 0
 
         role_bg_draw.text((210, 40), f"角色金数: {char_gold_total}", "white", waves_font_18, "lm")
 
@@ -717,7 +742,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
         role_bg_draw.text(
             (880, 55),
             f"{rankInfo.score}",
-            get_score_color(rankInfo.score),
+            get_local_score_color(rankInfo.score),
             waves_font_44,
             "mm",
         )
@@ -783,7 +808,7 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
                         role_bg_draw.text(
                             (450 + half_index * 230, 80),
                             f"{slash_half.score}",
-                            get_score_color(slash_half.score),
+                            get_local_score_color(slash_half.score),
                             waves_font_20,
                             "mm",
                         )

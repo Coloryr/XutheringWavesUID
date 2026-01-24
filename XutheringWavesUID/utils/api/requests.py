@@ -799,6 +799,8 @@ class WavesApi:
         res = await self._waves_request(ANN_CONTENT_URL, "POST", headers, data=data)
         if res.success:
             raw_data = res.model_dump()
+            if "headCodeUrl" in raw_data["data"]:
+                raw_data["data"]["postDetail"]["headCodeUrl"] = raw_data["data"]["headCodeUrl"]
             self.ann_map[post_id] = raw_data["data"]["postDetail"]
             return raw_data["data"]["postDetail"]
         return {}
@@ -823,6 +825,14 @@ class WavesApi:
                 continue
             raw_data = res.model_dump()
             value = [{**x, "id": int(x["postId"])} for x in raw_data["data"]["postList"]]
+            self.ann_list_data.extend(value)
+
+        res = await self.get_bbs_list("10011001", pageIndex=1, pageSize=9)
+        if res.success:
+            raw_data = res.model_dump()
+            post_list = raw_data["data"]["postList"]
+            post_list.sort(key=lambda x: x.get("showTime", 0), reverse=True)
+            value = [{**x, "id": int(x["postId"]), "eventType": 4} for x in post_list]
             self.ann_list_data.extend(value)
 
         return self.ann_list_data

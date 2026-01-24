@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from gsuid_core.logger import logger
 
-from .resource.RESOURCE_PATH import GUIDE_CONFIG_PATH
+from ..utils.resource.RESOURCE_PATH import GUIDE_CONFIG_PATH
 
 
 def load_guide_config() -> Dict:

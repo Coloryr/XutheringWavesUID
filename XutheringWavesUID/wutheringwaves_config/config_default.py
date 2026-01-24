@@ -94,7 +94,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "RankUseToken": GsBoolConfig(
         "有token才能进排行",
         "有token才能进排行",
-        False,
+        True,
     ),
     "GachaRankMin": GsIntConfig("抽卡排行最小抽数阈值", "抽卡排行中只显示总抽数达到此阈值的玩家", 1000),
     "DelInvalidCookie": GsBoolConfig(
@@ -230,15 +230,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
             "refresh_and_send_separately",
         ],
     ),
-    "HelpShowSign": GsBoolConfig(
-        "帮助是否显示签到帮助（重启生效）",
-        "需自行安装签到插件、使用相同前缀并关闭签到插件的帮助",
-        False,
-    ),
     "HelpExtraModules": GsListStrConfig(
         "帮助显示额外模块（重启生效）",
-        "在帮助中额外显示的模块：todayecho(梭哈)、scoreecho(评分)，需自行安装对应插件",
-        ["todayecho", "scoreecho"],
+        "在帮助中额外显示的模块：roversign(签到)、todayecho(梭哈)、scoreecho(评分)、roverreminder(体力推送)，需自行安装对应插件",
+        [],
+        ["roversign", "todayecho", "scoreecho", "roverreminder", "all"],
     ),
     "ActiveUserDays": GsIntConfig(
         "活跃账号认定天数",
@@ -251,5 +247,10 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "自动删除创建时间早于此天数的公告和日历图片缓存，每次启动和每天定时执行",
         42,
         3650,
+    ),
+    "RankActiveFilterGroup": GsBoolConfig(
+        "群排行仅活跃用户",
+        "群排行（角色/练度/抽卡）是否仅统计活跃账号",
+        True,
     ),
 }
