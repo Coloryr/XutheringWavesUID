@@ -439,7 +439,7 @@
         <div class="footer-stats">
             <!-- Weekly Boss -->
             <div class="mini-stat">
-                <div class="mini-val" style="color: {{ weekly_boss.color }};">{{ weekly_boss.left }}<span style="font-size: 24px; color:rgba(255,255,255,0.5);">/{{ weekly_boss.total }}</span></div>
+                <div class="mini-val" style="color: {% if weekly_boss.total and weekly_boss.left == weekly_boss.total %}#fff{% else %}{{ weekly_boss.color }}{% endif %};">{{ weekly_boss.left }}<span style="font-size: 24px; color:rgba(255,255,255,0.5);">/{{ weekly_boss.total }}</span></div>
                 <div class="mini-label">战歌重奏</div>
             </div>
 
@@ -452,21 +452,21 @@
             <!-- Rogue -->
             <div class="mini-stat">
                 <div class="mini-val" style="color: {% if weekly_rogue.total and weekly_rogue.cur == weekly_rogue.total %}#fff{% else %}{{ weekly_rogue.color }}{% endif %};">{{ weekly_rogue.cur }}</div>
-                <div class="mini-label" style="color: {% if weekly_rogue.total and weekly_rogue.cur == weekly_rogue.total %}#fff{% else %}{{ weekly_rogue.color }}{% endif %};">千道门扉</div>
+                <div class="mini-label">千道门扉</div>
             </div>
 
             <!-- Tower -->
-            <div class="mini-stat" {% if tower.urgent %}style="color: {{ urgent_color }};"{% endif %}>
-                <div class="mini-val" {% if tower.urgent %}style="color: inherit;"{% endif %}>{{ tower.cur }}<span style="font-size: 20px; color: {% if tower.urgent %}inherit{% else %}rgba(255,255,255,0.7){% endif %}">/{{ tower.total }}</span></div>
-                <div class="mini-label" {% if tower.urgent %}style="color: inherit;"{% endif %}>逆境深塔</div>
-                <div class="mini-sub" {% if tower.urgent %}style="color: inherit;"{% endif %}>{{ tower.time_text }}</div>
+            <div class="mini-stat">
+                <div class="mini-val" {% if tower.urgent %}style="color: {{ urgent_color }};"{% endif %}>{{ tower.cur }}<span style="font-size: 20px; color: {% if tower.urgent %}inherit{% else %}rgba(255,255,255,0.7){% endif %}">/{{ tower.total }}</span></div>
+                <div class="mini-label">逆境深塔</div>
+                <div class="mini-sub">{{ tower.time_text }}</div>
             </div>
 
             <!-- Slash Tower -->
-            <div class="mini-stat" {% if slash_tower.urgent %}style="color: {{ urgent_color }};"{% endif %}>
-                <div class="mini-val" {% if slash_tower.urgent %}style="color: inherit;"{% endif %}>{{ slash_tower.cur }}<span style="font-size: 20px; color: {% if slash_tower.urgent %}inherit{% else %}rgba(255,255,255,0.7){% endif %}">/{{ slash_tower.total }}</span></div>
-                <div class="mini-label" {% if slash_tower.urgent %}style="color: inherit;"{% endif %}>冥歌海墟</div>
-                <div class="mini-sub" {% if slash_tower.urgent %}style="color: inherit;"{% endif %}>{{ slash_tower.time_text }}</div>
+            <div class="mini-stat">
+                <div class="mini-val" {% if slash_tower.urgent %}style="color: {{ urgent_color }};"{% endif %}>{{ slash_tower.cur }}<span style="font-size: 20px; color: {% if slash_tower.urgent %}inherit{% else %}rgba(255,255,255,0.7){% endif %}">/{{ slash_tower.total }}</span></div>
+                <div class="mini-label">冥歌海墟</div>
+                <div class="mini-sub">{{ slash_tower.time_text }}</div>
             </div>
         </div>
     </div>

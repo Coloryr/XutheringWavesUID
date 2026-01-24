@@ -290,7 +290,6 @@ async def _render_stamina_card(
     # 颜色定义
     color_red = "#BA372A"
     color_yellow = "#FFCB3B"
-    color_green = "#00FF00"
     urgent_color = URGENT_COLOR
     
     # 加载本地资源并转Base64
@@ -373,12 +372,12 @@ async def _render_stamina_card(
     boss_limit = account_info.weeklyInstCountLimit if account_info.weeklyInstCountLimit else 3
     boss_used = account_info.weeklyInstCount if account_info.weeklyInstCount else 0
     boss_left = max(0, boss_limit - boss_used)
-    boss_color = urgent_color if boss_used > 0 else color_green 
+    boss_color = urgent_color 
     
     # Rogue
     rogue_cur = account_info.rougeScore if account_info.rougeScore else 0
     rogue_total = account_info.rougeScoreLimit if account_info.rougeScoreLimit else 0
-    rogue_color = color_red if rogue_cur != rogue_total else color_green
+    rogue_color = color_red
     
     # Tower
     tower_cur = daily_info.towerData.cur if daily_info.towerData else 0
