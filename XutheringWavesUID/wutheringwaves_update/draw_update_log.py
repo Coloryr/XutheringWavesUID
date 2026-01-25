@@ -15,7 +15,7 @@ from ..utils.fonts.waves_fonts import emoji_font, waves_font_origin
 def _get_git_logs() -> List[str]:
     try:
         process = subprocess.Popen(
-            ["git", "log", "--pretty=format:%s", "-40"],
+            ["git", "log", "--pretty=format:%s", "-100"],
             cwd=str(Path(__file__).parents[2]),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

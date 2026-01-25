@@ -288,10 +288,8 @@ async def _render_stamina_card(
     # 准备上下文数据
     
     # 颜色定义
-    color_red = "#BA372A"
+    color_red = URGENT_COLOR
     color_yellow = "#FFCB3B"
-    color_green = "#00FF00"
-    urgent_color = URGENT_COLOR
     
     # 加载本地资源并转Base64
     def load_b64(filename):
@@ -373,17 +371,16 @@ async def _render_stamina_card(
     boss_limit = account_info.weeklyInstCountLimit if account_info.weeklyInstCountLimit else 3
     boss_used = account_info.weeklyInstCount if account_info.weeklyInstCount else 0
     boss_left = max(0, boss_limit - boss_used)
-    boss_color = urgent_color if boss_used > 0 else color_green 
-    
+
     # Rogue
     rogue_cur = account_info.rougeScore if account_info.rougeScore else 0
     rogue_total = account_info.rougeScoreLimit if account_info.rougeScoreLimit else 0
-    rogue_color = color_red if rogue_cur != rogue_total else color_green
     
     # Tower
-    tower_cur = daily_info.towerData.cur if daily_info.towerData else 0
-    tower_total = daily_info.towerData.total if daily_info.towerData else 0
-    tower_refresh = daily_info.towerData.refreshTimeStamp if daily_info.towerData else 0
+    tower_data = getattr(daily_info, 'towerData', None)
+    tower_cur = tower_data.cur if tower_data else 0
+    tower_total = tower_data.total if tower_data else 0
+    tower_refresh = tower_data.refreshTimeStamp if tower_data else 0
     tower_urgent = False
     if tower_refresh > curr_time:
          remain_days = (datetime.fromtimestamp(tower_refresh) - datetime.now()).days
@@ -394,9 +391,10 @@ async def _render_stamina_card(
          tower_time_text = "已结束"
 
     # Slash Tower (冥歌海墟)
-    slash_cur = daily_info.slashTowerData.cur if daily_info.slashTowerData else 0
-    slash_total = daily_info.slashTowerData.total if daily_info.slashTowerData else 0
-    slash_refresh = daily_info.slashTowerData.refreshTimeStamp if daily_info.slashTowerData else 0
+    slash_data = getattr(daily_info, 'slashTowerData', None)
+    slash_cur = slash_data.cur if slash_data else 0
+    slash_total = slash_data.total if slash_data else 0
+    slash_refresh = slash_data.refreshTimeStamp if slash_data else 0
     slash_urgent = False
     if slash_refresh > curr_time:
          remain_days = (datetime.fromtimestamp(slash_refresh) - datetime.now()).days
@@ -450,12 +448,10 @@ async def _render_stamina_card(
         "weekly_boss": {
             "left": boss_left,
             "total": boss_limit,
-            "color": boss_color
         },
         "weekly_rogue": {
             "cur": rogue_cur,
             "total": rogue_total,
-            "color": rogue_color
         },
         "tower": {
             "cur": tower_cur,

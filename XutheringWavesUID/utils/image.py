@@ -304,7 +304,7 @@ async def get_attribute_effect(name: str = "") -> Image.Image:
     if (TEXT_PATH / "attribute_effect" / f"attr_{name}.png").exists():
         return Image.open(TEXT_PATH / "attribute_effect" / f"attr_{name}.png").convert("RGBA")
     else:
-        return Image.open(TEXT_PATH / "attribute_effect" / "attr_不绝余音.png").convert("RGBA")
+        return Image.open(TEXT_PATH / "attribute_effect" / "attr.png").convert("RGBA")
 
 
 async def get_weapon_type(name: str = "") -> Image.Image:  # 出新武器改这里
@@ -322,6 +322,7 @@ def get_custom_waves_bg(  # 不是所有地方都适合替换为custom，函数�
     bg: str = "bg",
     crop: bool = True,
 ):
+    assert not crop or (w != 0 and h != 0), "裁剪图片时需要指定宽高"
     img: Optional[Image.Image] = None
     if ShowConfig.get_config("CardBg").data:
         bg_path = Path(ShowConfig.get_config("CardBgPath").data)
@@ -330,7 +331,7 @@ def get_custom_waves_bg(  # 不是所有地方都适合替换为custom，函数�
             if crop and img:
                 img = crop_center_img(img, w, h)
     if not img:
-        img = get_waves_bg(w, h, bg)
+        img = get_waves_bg(w, h, bg, crop=crop)
 
     img = _get_custom_gaussian_blur(img)
     return img

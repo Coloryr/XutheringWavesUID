@@ -1,17 +1,32 @@
 import base64
+import asyncio
+import time
+import re
+import logging
 from typing import Union, Optional
 from pathlib import Path
 
 from gsuid_core.logger import logger
+from gsuid_core.config import core_config, CONFIG_DEFAULT
+from gsuid_core.app_life import app as fastapi_app
+from fastapi.staticfiles import StaticFiles
 from .resource.RESOURCE_PATH import TEMP_PATH
 
+logging.getLogger("uvicorn.access").addFilter(
+    lambda record: "/waves/fonts" not in record.getMessage()
+)
+
+TEMPLATES_ABS_PATH = Path(__file__).parent.parent / "templates"
+
+class CORSStaticFiles(StaticFiles):
+    """Custom StaticFiles class to add CORS headers only for served files."""
+    async def get_response(self, path: str, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, HEAD"
+        return response
 
 def _import_playwright():
-    """导入并返回 playwright async_playwright
-
-    Returns:
-        async_playwright 模块或None（如果未安装）
-    """
     try:
         from playwright.async_api import async_playwright
         return async_playwright
@@ -25,9 +40,98 @@ def _import_playwright():
 async_playwright = _import_playwright()
 PLAYWRIGHT_AVAILABLE = async_playwright is not None
 
+_playwright = None
+_browser = None
+_browser_lock = asyncio.Lock()
+_browser_uses = 0
+_last_used = 0.0
+_active_contexts = 0
+
+_MAX_BROWSER_USES = 1000
+_BROWSER_IDLE_TTL = 3600
+
+_FONT_CSS_NAME = "fonts.css"
+_FONTS_DIR = TEMP_PATH / "fonts"
+
+
+def _mount_fonts() -> None:
+    try:
+        for route in fastapi_app.routes:
+            if getattr(route, "path", None) == "/waves/fonts":
+                return
+        if _FONTS_DIR.exists():
+            fastapi_app.mount(
+                "/waves/fonts",
+                CORSStaticFiles(directory=_FONTS_DIR),
+                name="wwuid_fonts",
+            )
+        logger.debug("[鸣潮] 已挂载字体静态路由 (CORS Enabled)")
+    except Exception as e:
+        logger.warning(f"[鸣潮] 挂载字体静态路由失败: {e}")
+
+
+def _get_local_base_url() -> str:
+    host = core_config.get_config("HOST") or CONFIG_DEFAULT["HOST"]
+    port = core_config.get_config("PORT") or CONFIG_DEFAULT["PORT"]
+    if host in ("0.0.0.0", "0.0.0.0:"):
+        host = "127.0.0.1"
+    return f"http://{host}:{port}"
+
+
+_mount_fonts()
+
+
+async def _ensure_browser():
+    """Get a reusable browser instance; restart periodically to bound memory."""
+    global _playwright, _browser, _browser_uses, _last_used, _active_contexts
+
+    if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
+        return None
+
+    async with _browser_lock:
+        now = time.monotonic()
+
+        if _browser is not None and not _browser.is_connected():
+            try:
+                await _browser.close()
+            except Exception:
+                pass
+            _browser = None
+
+        need_restart = (
+            _browser is None
+            or _browser_uses >= _MAX_BROWSER_USES
+            or (_last_used > 0 and now - _last_used > _BROWSER_IDLE_TTL)
+        )
+
+        if need_restart and _browser is not None and _active_contexts > 0:
+            need_restart = False
+
+        if need_restart:
+            if _browser is not None:
+                try:
+                    await _browser.close()
+                except Exception:
+                    pass
+                _browser = None
+
+            if _playwright is None:
+                _playwright = await async_playwright().start()
+
+            _browser = await _playwright.chromium.launch(
+                args=["--no-sandbox", "--disable-setuid-sandbox"]
+            )
+            _browser_uses = 0
+
+        _last_used = now
+        return _browser
+
 
 async def render_html(waves_templates, template_name: str, context: dict) -> Optional[bytes]:
+    global _browser_uses, _last_used, _active_contexts
+
     if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
+        logger.warning("[鸣潮] Playwright 未安装，无法渲染，将回退到 PIL 渲染（如有）")
         return None
 
     try:
@@ -36,19 +140,35 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
 
         try:
             template = waves_templates.get_template(template_name)
+            font_css_path = _FONTS_DIR / _FONT_CSS_NAME
+            
+            base_url = _get_local_base_url()
+            
+            if font_css_path.exists():
+                context.setdefault(
+                    "font_css_url",
+                    f"{base_url}/waves/fonts/{_FONT_CSS_NAME}",
+                )
             html_content = template.render(**context)
             logger.debug(f"[鸣潮] HTML渲染完成: {template_name}")
         except Exception as e:
             logger.error(f"[鸣潮] Template render failed: {e}")
             raise e
 
-        try:
-            logger.debug("[鸣潮] 进入 async_playwright 上下文...")
-            async with async_playwright() as p:
-                logger.debug("[鸣潮] 启动浏览器...")
-                browser = await p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
-                page = await browser.new_page(viewport={"width": 1200, "height": 1000})
+        font_css_path = _FONTS_DIR / _FONT_CSS_NAME
+        if not font_css_path.exists():
+            logger.warning("[鸣潮] fonts.css 不存在，继续使用原始字体链接。")
 
+        try:
+            logger.debug("[鸣潮] 获取复用浏览器实例...")
+            browser = await _ensure_browser()
+            if browser is None:
+                return None
+
+            context_obj = await browser.new_context(viewport={"width": 1200, "height": 1000})
+            _active_contexts += 1
+            try:
+                page = await context_obj.new_page()
                 logger.debug("[鸣潮] 加载HTML内容...")
                 await page.set_content(html_content)
 
@@ -81,10 +201,16 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
 
                 logger.debug("[鸣潮] 正在截图...")
                 screenshot = await container.screenshot(type='jpeg', quality=90)
-
-                await browser.close()
                 logger.debug(f"[鸣潮] HTML渲染成功, 图片大小: {len(screenshot)} bytes")
                 return screenshot
+            finally:
+                try:
+                    await context_obj.close()
+                except Exception:
+                    pass
+                _active_contexts = max(0, _active_contexts - 1)
+                _browser_uses += 1
+                _last_used = time.monotonic()
         except Exception as e:
             logger.error(f"[鸣潮] Playwright execution failed: {e}")
             raise e
