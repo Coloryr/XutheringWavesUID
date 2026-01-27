@@ -173,6 +173,14 @@
         "need_admin": false
       },
       {
+        "name": "库洛币",
+        "desc": "查询库洛币",
+        "eg": "库洛币",
+        "need_ck": true,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
         "name": "日历",
         "desc": "日历",
         "eg": "日历",

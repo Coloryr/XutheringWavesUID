@@ -12,7 +12,7 @@ from ..utils.database.models import WavesBind
 
 sv_bbs = SV("鸣潮库洛币")
 
-@sv_bbs.on_fullmatch(("库洛币", "库洛币", "coin"), block=True)
+@sv_bbs.on_fullmatch(("库洛币", "库币", "coin"), block=True)
 async def kuro_coin_(bot: Bot, ev: Event):
     """查询库洛币"""
     logger.info("[鸣潮]开始执行[库洛币]")
