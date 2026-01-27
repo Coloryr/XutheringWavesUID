@@ -138,20 +138,35 @@ class DailyData(BaseModel):
     weeklyRougeData: Optional[WeeklyRougeData] = None
 
 
+class RoleSkin(BaseModel):
+    """角色皮肤"""
+    isAddition: Optional[bool] = None
+    picUrl: Optional[str] = None
+    priority: Optional[int] = None
+    quality: Optional[int] = None
+    qualityName: Optional[str] = None
+    skinIcon: Optional[str] = None
+    skinId: Optional[int] = None
+    skinName: Optional[str] = None
+
+
 class Role(BaseModel):
     roleId: int
     level: int
     breach: Optional[int] = None
     roleName: str
-    roleIconUrl: Optional[str]
-    rolePicUrl: Optional[str]
+    roleIconUrl: Optional[str] = None
+    rolePicUrl: Optional[str] = None
     starLevel: int
     attributeId: int
-    attributeName: Optional[str]
+    attributeName: Optional[str] = None
     weaponTypeId: int
-    weaponTypeName: Optional[str]
-    acronym: str
+    weaponTypeName: Optional[str] = None
+    acronym: Optional[str] = None
     chainUnlockNum: Optional[int] = None
+    isMainRole: Optional[bool] = None
+    totalSkillLevel: Optional[int] = None
+    roleSkin: Optional[RoleSkin] = None
     # mapRoleId: int | None
 
 

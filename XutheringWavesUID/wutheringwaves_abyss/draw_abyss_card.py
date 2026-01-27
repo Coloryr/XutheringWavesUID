@@ -1,333 +1,229 @@
 from typing import Union
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from gsuid_core.models import Event
-from gsuid_core.utils.image.convert import convert_img
+from gsuid_core.logger import logger
 
-from .period import get_tower_period_number
 from ..utils.hint import error_reply
-from ..utils.util import get_version
-from ..utils.image import GOLD, GREY, add_footer, get_waves_bg
-from ..utils.api.model import (
-    RoleList,
-    AbyssFloor,
-    AbyssChallenge,
-    RoleDetailData,
-    AccountBaseInfo,
-)
-from ..utils.api.wwapi import ABYSS_TYPE_MAP, AbyssDetail, AbyssItem
-from ..utils.char_info_utils import get_all_roleid_detail_info
-from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_108
-from ..utils.imagetool import draw_pic, draw_pic_with_ring
 from ..utils.waves_api import waves_api
-from ..utils.queues.const import QUEUE_ABYSS_RECORD
-from ..utils.queues.queues import push_item
-from ..wutheringwaves_config import PREFIX
-from ..utils.fonts.waves_fonts import (
-    waves_font_18,
-    waves_font_25,
-    waves_font_26,
-    waves_font_30,
-    waves_font_32,
-    waves_font_36,
-    waves_font_40,
-    waves_font_42,
+from ..utils.error_reply import WAVES_CODE_102
+from ..utils.api.model import (
+    AccountBaseInfo,
+    RoleDetailData,
+    Role,
+    RoleList,
 )
-from ..utils.hint import error_reply
-from ..utils.image import GOLD, GREY, add_footer, get_waves_bg
-from ..utils.util import get_version
+from ..utils.ascension.char import get_char_detail
+from ..utils.waves_api import waves_api
+from ..wutheringwaves_config import WutheringWavesConfig
+from ..utils.render_utils import (
+    PLAYWRIGHT_AVAILABLE,
+    render_html,
+    get_footer_b64,
+)
+from ..utils.resource.RESOURCE_PATH import waves_templates
+from ..utils.image import (
+    pil_to_b64,
+    get_waves_bg,
+    get_event_avatar,
+    get_square_avatar,
+    CHAIN_COLOR,
+)
+from ..utils.char_info_utils import get_all_roleid_detail_info
+from .period import get_tower_period_number
+from .draw_abyss_card_pil import (
+    draw_abyss_img as draw_abyss_img_pil,
+    get_abyss_data,
+    ABYSS_ERROR_MESSAGE_NO_UNLOCK,
+    ABYSS_ERROR_MESSAGE_NO_DEEP,
+)
+
+from ..utils.error_reply import WAVES_CODE_108
 from ..utils.limit_request import check_request_rate_limit
-
-TEXT_PATH = Path(__file__).parent / "texture2d"
-
-ABYSS_ERROR_MESSAGE_NO_DATA = "当前暂无深塔数据\n"
-ABYSS_ERROR_MESSAGE_NO_UNLOCK = "深塔暂未解锁\n"
-ABYSS_ERROR_MESSAGE_NO_DEEP = "当前暂无深境区深塔数据\n"
-no_login_msg = [
-    "[鸣潮]",
-    ">您当前为仅绑定鸣潮特征码",
-    f">请使用命令【{PREFIX}登录】后查询详细深塔数据",
-    "",
-]
-ABYSS_ERROR_MESSAGE_LOGIN = "\n".join(no_login_msg)
-
-
-async def get_abyss_data(uid: str, ck: str, is_self_ck: bool):
-    if is_self_ck:
-        abyss_data = await waves_api.get_abyss_data(uid, ck)
-    else:
-        abyss_data = await waves_api.get_abyss_index(uid, ck)
-
-    if not abyss_data.success:
-        return abyss_data.throw_msg()
-
-    abyss_data = abyss_data.data
-    if not abyss_data or (isinstance(abyss_data, dict) and not abyss_data.get("isUnlock", False)):
-        if not is_self_ck:
-            return ABYSS_ERROR_MESSAGE_LOGIN
-        return ABYSS_ERROR_MESSAGE_NO_DATA
-    else:
-        return AbyssChallenge.model_validate(abyss_data)
-
 
 async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]:
     if check_request_rate_limit():
         return error_reply(WAVES_CODE_108)
-    
-    is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-    if not ck:
-        return error_reply(WAVES_CODE_102)
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
+        return await draw_abyss_img_pil(ev, uid, user_id)
 
-    # succ, game_info = await waves_api.get_game_role_info(ck)
-    # if not succ:
-    #     return game_info
-    # game_info = KuroRoleInfo(**game_info)
+    TEXT_PATH = Path(__file__).parent / "texture2d"
 
-    command = ev.command
-    text = ev.text.strip()
-    difficultyName = "深境区"
-    if "超载" in text or "超载" in command:
-        difficultyName = "超载区"
-    elif "稳定" in text or "稳定" in command:
-        difficultyName = "稳定区"
-    elif "实验" in text or "实验" in command:
-        difficultyName = "实验区"
+    try:
+        is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+        if not ck:
+            return error_reply(WAVES_CODE_102)
 
-    # 账户数据
-    account_info = await waves_api.get_base_info(uid, ck)
-    if not account_info.success:
-        return account_info.throw_msg()
-    if not account_info.data:
-        return "用户未展示数据"
-    account_info = AccountBaseInfo.model_validate(account_info.data)
+        command = ev.command
+        text = ev.text.strip()
+        difficultyName = "深境区"
+        if "超载" in text or "超载" in command:
+            difficultyName = "超载区"
+        elif "稳定" in text or "稳定" in command:
+            difficultyName = "稳定区"
+        elif "实验" in text or "实验" in command:
+            difficultyName = "实验区"
 
-    # 共鸣者信息
-    role_info = await waves_api.get_role_info(uid, ck)
-    if not role_info.success:
-        return role_info.throw_msg()
+        account_info_res = await waves_api.get_base_info(uid, ck)
+        if not account_info_res.success:
+            return account_info_res.throw_msg()
+        if not account_info_res.data:
+            return "用户未展示数据"
+        account_info = AccountBaseInfo.model_validate(account_info_res.data)
 
-    role_info = RoleList.model_validate(role_info.data)
+        abyss_data = await get_abyss_data(uid, ck, is_self_ck)
+        if isinstance(abyss_data, str) or not abyss_data:
+            return abyss_data
+        if not abyss_data.isUnlock:
+            return ABYSS_ERROR_MESSAGE_NO_UNLOCK
 
-    # 深塔
-    abyss_data = await get_abyss_data(uid, ck, is_self_ck)
-    if isinstance(abyss_data, str) or not abyss_data:
-        return abyss_data
-    if not abyss_data.isUnlock:
-        return ABYSS_ERROR_MESSAGE_NO_UNLOCK
+        if not abyss_data.difficultyList:
+            return ABYSS_ERROR_MESSAGE_NO_DEEP
 
-    if not abyss_data.difficultyList:
-        return ABYSS_ERROR_MESSAGE_NO_DEEP
+        abyss_check = next(
+            (abyss for abyss in abyss_data.difficultyList if abyss.difficultyName == "深境区"),
+            None,
+        )
+        if not abyss_check:
+            return ABYSS_ERROR_MESSAGE_NO_DEEP
 
-    abyss_check = next(
-        (abyss for abyss in abyss_data.difficultyList if abyss.difficultyName == "深境区"),
-        None,
-    )
-    if not abyss_check:
-        return ABYSS_ERROR_MESSAGE_NO_DEEP
+        needAbyss = None
+        for _abyss in abyss_data.difficultyList:
+            if _abyss.difficultyName != difficultyName:
+                continue
+            needAbyss = _abyss
+            break
+        if not needAbyss:
+            return ABYSS_ERROR_MESSAGE_NO_DEEP
 
-    needAbyss = None
-    for _abyss in abyss_data.difficultyList:
-        if _abyss.difficultyName != difficultyName:
-            continue
-        needAbyss = _abyss
-        break
-    if not needAbyss:
-        return ABYSS_ERROR_MESSAGE_NO_DEEP
+        avatar = await get_event_avatar(ev)
+        avatar_url = pil_to_b64(avatar)
 
-    frameHigh = sum([len(i.floorList) * 141 + 90 + 50 for i in needAbyss.towerAreaList if i.floorList]) + 100 + 50
+        role_detail_info_map = await get_all_roleid_detail_info(uid)
 
-    h = frameHigh + 220
-    card_img = get_waves_bg(950, h, "bg4")
+        role_info_res = await waves_api.get_role_info(uid, ck)
+        role_info_list = []
+        if role_info_res.success and role_info_res.data:
+            try:
+                role_info = RoleList.model_validate(role_info_res.data)
+                role_info_list = role_info.roleList
+            except Exception:
+                pass
 
-    # 基础信息 名字 特征码
-    base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-    base_info_draw = ImageDraw.Draw(base_info_bg)
-    base_info_draw.text((275, 120), f"{account_info.name[:7]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
-    card_img.paste(base_info_bg, (15, 20), base_info_bg)
+        towers_data = []
+        for tower in needAbyss.towerAreaList:
+            floors_data = []
+            for floor in (tower.floorList or []):
+                floor_num_map = {1: "一", 2: "二", 3: "三", 4: "四"}
+                floor_name = floor_num_map.get(floor.floor, str(floor.floor))
 
-    # 头像 头像环
-    avatar, avatar_ring = await draw_pic_with_ring(ev)
-    card_img.paste(avatar, (25, 70), avatar)
-    card_img.paste(avatar_ring, (35, 80), avatar_ring)
+                try:
+                    abyss_bg = Image.open(TEXT_PATH / f"abyss_bg_{floor.floor}.jpg").convert("RGBA")
+                    abyss_bg_url = pil_to_b64(abyss_bg)
+                except Exception:
+                    abyss_bg_url = ""
 
-    # 账号基本信息，由于可能会没有，放在一起
-    if account_info.is_full:
-        title_bar = Image.open(TEXT_PATH / "title_bar.png")
-        title_bar_draw = ImageDraw.Draw(title_bar)
-        title_bar_draw.text((660, 125), "账号等级", GREY, waves_font_26, "mm")
-        title_bar_draw.text((660, 78), f"Lv.{account_info.level}", "white", waves_font_42, "mm")
-
-        title_bar_draw.text((810, 125), "世界等级", GREY, waves_font_26, "mm")
-        title_bar_draw.text((810, 78), f"Lv.{account_info.worldLevel}", "white", waves_font_42, "mm")
-        card_img.paste(title_bar, (-20, 70), title_bar)
-
-    # 添加深塔期数显示（右上角）
-    period_text = f"第{get_tower_period_number()}期"
-    card_draw = ImageDraw.Draw(card_img)
-    card_draw.text((475, 50), period_text, "white", waves_font_30, "mm")
-
-    # 根据面板数据获取详细信息
-    role_detail_info_map = await get_all_roleid_detail_info(uid)
-
-    # frame
-    frame = Image.open(TEXT_PATH / "frame.png")
-    frame = frame.resize((frame.size[0], frameHigh))
-
-    yset = 100  # 起始
-    for _abyss in abyss_data.difficultyList:
-        if _abyss.difficultyName != difficultyName:
-            continue
-        for tower_index, tower in enumerate(_abyss.towerAreaList):
-            tower_name_bg = Image.open(TEXT_PATH / f"tower_name_bg{tower.areaId}.png")
-            tower_name_bg_draw = ImageDraw.Draw(tower_name_bg)
-            tower_name_bg_draw.text(
-                (170, 50),
-                f"{difficultyName}-{tower.areaName}",
-                "white",
-                waves_font_36,
-                "lm",
-            )
-            if is_self_ck:
-                tower_name_bg_draw.text(
-                    (500, 60),
-                    f"{tower.star}/{tower.maxStar}",
-                    "white",
-                    waves_font_32,
-                    "mm",
-                )
-            frame.paste(tower_name_bg, (-20, yset), tower_name_bg)
-
-            yset += 90  # tower_name_bg high
-            if not tower.floorList:
-                tower.floorList = [AbyssFloor(**{"floor": 1, "picUrl": "", "star": 0, "roleList": None})]
-            for floor_index, floor in enumerate(tower.floorList):
-                abyss_bg = Image.open(TEXT_PATH / f"abyss_bg_{floor.floor}.jpg").convert("RGBA")
-                abyss_bg = abyss_bg.resize((abyss_bg.size[0] + 100, abyss_bg.size[1]))
-                abyss_bg_temp = Image.new("RGBA", abyss_bg.size)
-                name_bg = Image.open(TEXT_PATH / "name_bg.png")
-                name_bg_draw = ImageDraw.Draw(name_bg)
-                if floor.floor == 1:
-                    _floor = "一"
-                elif floor.floor == 2:
-                    _floor = "二"
-                elif floor.floor == 3:
-                    _floor = "三"
-                elif floor.floor == 4:
-                    _floor = "四"
-                name_bg_draw.text((70, 50), f"第{_floor}层", "white", waves_font_40, "lm")
-                abyss_bg_temp.paste(name_bg, (0, 0), name_bg)
-
-                # 星数
-                for i in range(3):
-                    if i + 1 <= floor.star:
-                        star_bg = Image.open(TEXT_PATH / "star_full.png")
-                    else:
-                        star_bg = Image.open(TEXT_PATH / "star_empty.png")
-                    abyss_bg_temp.paste(star_bg, (10 + i * 70, 50), star_bg)
-
+                roles_data = []
                 if floor.roleList:
-                    for role_index, _role in enumerate(floor.roleList):
+                    for _role in floor.roleList:
+                        star_level = 5
+                        role_level = 1
+                        try:
+                            char_detail = get_char_detail(_role.roleId, 1)
+                            star_level = char_detail.starLevel
+                        except Exception:
+                            pass
+
                         role = next(
-                            (role for role in role_info.roleList if role.roleId == _role.roleId),
+                            (r for r in role_info_list if r.roleId == _role.roleId),
                             None,
                         )
-                        if not role:
-                            continue
+                        if role:
+                            role_level = role.level
 
-                        avatar = await draw_pic(role.roleId)
-                        char_bg = Image.open(TEXT_PATH / f"char_bg{role.starLevel}.png")
-                        char_bg_draw = ImageDraw.Draw(char_bg)
-                        char_bg_draw.text((90, 150), f"{role.roleName}", "white", waves_font_18, "mm")
-                        char_bg.paste(avatar, (0, 0), avatar)
-                        if role_detail_info_map and str(role.roleId) in role_detail_info_map:
-                            temp: RoleDetailData = role_detail_info_map[str(role.roleId)]
-                            info_block = Image.new("RGBA", (40, 20), color=(255, 255, 255, 0))
-                            info_block_draw = ImageDraw.Draw(info_block)
-                            info_block_draw.rectangle([0, 0, 40, 20], fill=(96, 12, 120, int(0.9 * 255)))
-                            info_block_draw.text(
-                                (2, 10),
-                                f"{temp.get_chain_name()}",
-                                "white",
-                                waves_font_18,
-                                "lm",
-                            )
-                            char_bg.paste(info_block, (110, 35), info_block)
+                        chain_name = ""
+                        chain_num = 0
+                        if role_detail_info_map and str(_role.roleId) in role_detail_info_map:
+                            temp: RoleDetailData = role_detail_info_map[str(_role.roleId)]
+                            chain_name = temp.get_chain_name()
+                            chain_num = temp.get_chain_num()
 
-                        abyss_bg_temp.alpha_composite(char_bg, (300 + role_index * 150, -20))
+                        role_avatar = await get_square_avatar(_role.roleId)
+                        role_icon_b64 = pil_to_b64(role_avatar) if role_avatar else ""
 
-                abyss_bg.paste(abyss_bg_temp, (0, 0), abyss_bg_temp)
-                frame.paste(abyss_bg, (80, yset), abyss_bg)
-                yset += 141
-            yset += 50
-        break
-    else:
-        if not is_self_ck:
-            return ABYSS_ERROR_MESSAGE_LOGIN
-        return ABYSS_ERROR_MESSAGE_NO_DATA
+                        roles_data.append({
+                            "id": _role.roleId,
+                            "level": role_level,
+                            "star": star_level,
+                            "chain_num": chain_num,
+                            "chain_name": chain_name,
+                            "icon_url": role_icon_b64,
+                        })
 
-    # 上传深塔记录
-    await upload_abyss_record(is_self_ck, uid, difficultyName, abyss_data)
+                floors_data.append({
+                    "floor": floor.floor,
+                    "floor_name": floor_name,
+                    "star": floor.star,
+                    "abyss_bg_url": abyss_bg_url,
+                    "roles": roles_data,
+                })
 
-    card_img.paste(frame, (0, 210), frame)
+            towers_data.append({
+                "name": tower.areaName,
+                "area_id": tower.areaId,
+                "star": tower.star if is_self_ck else None,
+                "max_star": tower.maxStar if is_self_ck else None,
+                "floors": floors_data,
+            })
 
-    card_img = add_footer(card_img, 600, 20)
-    card_img = await convert_img(card_img)
-    return card_img
+        bg_img = get_waves_bg(bg = "bg4", crop=False)
+        bg_url = pil_to_b64(bg_img)
 
+        tower_name_bg = Image.open(TEXT_PATH / "tower_name_bg.png")
+        tower_name_bg_url = pil_to_b64(tower_name_bg)
 
-async def upload_abyss_record(
-    is_self_ck: bool,
-    waves_id: str,
-    difficultyName: str,
-    abyss_data: AbyssChallenge,
-):
-    from ..wutheringwaves_config import WutheringWavesConfig
+        star_full = Image.open(TEXT_PATH / "star_full.png")
+        star_full_url = pil_to_b64(star_full)
 
-    WavesToken = WutheringWavesConfig.get_config("WavesToken").data
-    if not WavesToken:
-        return
+        star_empty = Image.open(TEXT_PATH / "star_empty.png")
+        star_empty_url = pil_to_b64(star_empty)
 
-    if difficultyName != "深境区":
-        return
-    if not abyss_data:
-        return
-    if not abyss_data.difficultyList:
-        return
-    if not is_self_ck:
-        return
-    abyss_record = []
-    for _abyss in abyss_data.difficultyList:
-        if _abyss.difficultyName != difficultyName:
-            continue
-        for tower_index, tower in enumerate(_abyss.towerAreaList):
-            if not tower.floorList:
-                continue
-            if len(tower.floorList) <= 1:
-                continue
-            floor = tower.floorList[-1]
-            if floor.star == 3 and floor.roleList:
-                abyss_record.append(
-                    AbyssDetail.model_validate(
-                        {
-                            "area_type": f"{ABYSS_TYPE_MAP[tower.areaName]}{floor.floor}",
-                            "area_name": tower.areaName,
-                            "floor": floor.floor,
-                            "char_ids": [role.roleId for role in floor.roleList],
-                        }
-                    )
-                )
+        current_date = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
 
-    if not abyss_record:
-        return
-    abyss_item = AbyssItem.model_validate(
-        {
-            "waves_id": waves_id,
-            "abyss_record": abyss_record,
-            "version": get_version(dynamic=True, waves_id=waves_id, char_info=abyss_record),
+        chain_colors = {i: f"rgba({r}, {g}, {b}, 0.8)" for i, (r, g, b) in CHAIN_COLOR.items()}
+
+        context = {
+            "user_name": account_info.name,
+            "user_id": account_info.id,
+            "level": account_info.level,
+            "world_level": account_info.worldLevel,
+            "show_stats": account_info.is_full,
+            "avatar_url": avatar_url,
+            "difficulty_name": difficultyName,
+            "period": get_tower_period_number(),
+            "current_date": current_date,
+            "towers": towers_data,
+            "is_self_ck": is_self_ck,
+            "tower_name_bg_url": tower_name_bg_url,
+            "star_full_url": star_full_url,
+            "star_empty_url": star_empty_url,
+            "footer_b64": get_footer_b64(footer_type="black") or "",
+            "bg_url": bg_url,
+            "chain_colors": chain_colors,
         }
-    )
-    # logger.info(f"上传深塔记录: {abyss_item.model_dump()}")
-    push_item(QUEUE_ABYSS_RECORD, abyss_item.model_dump())
+
+        logger.debug("[鸣潮] 准备通过HTML渲染深渊卡片")
+        img_bytes = await render_html(waves_templates, "abyss/abyss_card.html", context)
+        if img_bytes:
+            return img_bytes
+        else:
+            logger.warning("[鸣潮] Playwright 渲染返回空, 正在回退到 PIL 渲染")
+            return await draw_abyss_img_pil(ev, uid, user_id)
+
+    except Exception as e:
+        logger.exception(f"[鸣潮] HTML渲染失败: {e}")
+        return await draw_abyss_img_pil(ev, uid, user_id)

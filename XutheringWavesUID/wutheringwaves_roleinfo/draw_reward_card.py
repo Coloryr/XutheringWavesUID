@@ -4,6 +4,7 @@ from gsuid_core.models import Event
 from gsuid_core.logger import logger
 
 from ..utils.waves_api import waves_api
+from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.api.model import (
     RoleList,
     AccountBaseInfo,
@@ -171,6 +172,14 @@ async def calculate_score(uid: str, ck: str) -> Optional[Dict]:
 async def draw_reward_img(uid: str, ck: str, ev: Event):
     """绘制积分卡片"""
 
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not use_html_render:
+        # 计算积分并返回文本
+        score_data = await calculate_score(uid, ck)
+        if not score_data:
+            return "获取数据失败，请先登录！"
+        return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分"
+
     # 计算积分
     score_data = await calculate_score(uid, ck)
     if not score_data:
@@ -214,10 +223,10 @@ async def draw_reward_img(uid: str, ck: str, ev: Event):
     }
 
     logger.debug("[鸣潮] 准备通过HTML渲染积分卡片")
-    img_bytes = await render_html(waves_templates, "reward_card.html", context)
+    img_bytes = await render_html(waves_templates, "roleinfo/reward_card.html", context)
 
     if img_bytes:
         return img_bytes
     else:
         logger.warning("[鸣潮] 积分卡片渲染失败")
-        return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分。请按照依赖以渲染图片"
+        return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分"

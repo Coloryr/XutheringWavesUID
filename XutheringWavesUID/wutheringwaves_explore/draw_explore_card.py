@@ -3,6 +3,7 @@ from gsuid_core.logger import logger
 from gsuid_core.data_store import get_res_path
 
 from ..utils.waves_api import waves_api
+from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.error_reply import WAVES_CODE_102
 from ..utils.api.model import (
     ExploreList,
@@ -66,8 +67,9 @@ def get_progress_color_hex(progress: float) -> str:
 
 async def draw_explore_img(ev: Event, uid: str, user_id: str):
     if check_request_rate_limit():
-        return hint.error_reply(WAVES_CODE_108)
-    if not PLAYWRIGHT_AVAILABLE:
+        return error_reply(WAVES_CODE_108)
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
         return await draw_explore_img_pil(ev, uid, user_id)
 
     try:

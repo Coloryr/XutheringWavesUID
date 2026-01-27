@@ -1,5 +1,6 @@
 from typing import Optional
 
+from gsuid_core.logger import logger
 from .error_reply import ERROR_CODE
 from ..wutheringwaves_config import PREFIX
 
@@ -12,9 +13,10 @@ WAVES_ERROR_CODE.update(ERROR_CODE)
 def error_reply(code: Optional[int] = None, msg: str = "") -> str:
     msg_list = []
     if isinstance(code, int):
-        msg_list.append(f"❌ {code}")
+        logger.error(f"❌ 错误代码：{code}")
     if msg:
-        msg_list.append(f"📝 {msg}")
+        logger.error(f"📝 错误信息：{msg}")
+        msg_list.append(msg)
     elif code in WAVES_ERROR_CODE:
-        msg_list.append(f"📝 {WAVES_ERROR_CODE[code]}")
+        msg_list.append(WAVES_ERROR_CODE[code])
     return "\n".join(msg_list)

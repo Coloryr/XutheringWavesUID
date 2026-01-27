@@ -46,6 +46,7 @@ _repeated_card_lock = asyncio.Lock()
 
 TYPE_MAP = {
     "面板": "card",
+    "面版": "card",
     "面包": "card",
     "🍞": "card",
     "背景": "bg",
@@ -178,17 +179,20 @@ async def get_char_card_single(bot: Bot, ev: Event):
 @waves_new_get_char_info.on_fullmatch(
     (
         "刷新面板",
+        "刷新面版",
         "刷新面包",
         "刷新🍞",
         "更新面板",
-        "更新🍞",
+        "更新面版",
         "更新面包",
+        "更新🍞",
         "强制刷新",
         "面板刷新",
         "面包刷新",
         "🍞刷新",
         "面板更新",
         "面板",
+        "面版",
         "面包",
         "🍞",
         "upd🍞",
@@ -210,15 +214,15 @@ async def send_card_info(bot: Bot, ev: Event):
     msg, num_updated = await draw_refresh_char_detail_img(bot, ev, user_id, uid, buttons)
     if isinstance(msg, str) or isinstance(msg, bytes):
         await bot.send_option(msg, buttons)
-    if num_updated <= 1 and isinstance(msg, bytes):
-        asyncio.sleep(10) # 先发完吧
-        from ..wutheringwaves_config import PREFIX
-        single_refresh_notice = f"本次刷新<2\n如仅需单刷新，可用 {PREFIX}刷新[角色]面板"
-        await bot.send(f" {single_refresh_notice}" if ev.group_id else single_refresh_notice, at_sender=ev.group_id is not None)
+    # if num_updated <= 1 and isinstance(msg, bytes):
+    #     asyncio.sleep(10) # 先发完吧
+    #     from ..wutheringwaves_config import PREFIX
+    #     single_refresh_notice = f"本次刷新<2\n如仅需单刷新，可用 {PREFIX}刷新[角色]面板"
+    #     await bot.send(f" {single_refresh_notice}" if ev.group_id else single_refresh_notice, at_sender=ev.group_id is not None)
 
 
 @waves_new_get_one_char_info.on_regex(
-    rf"^(?P<is_refresh>刷新|更新|upd)(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb)$",
+    rf"^(?P<is_refresh>刷新|更新|upd)(?P<char>{PATTERN})(?P<query_type>面板|面版|面包|🍞|mb)$",
     block=True,
 )
 async def send_one_char_detail_msg(bot: Bot, ev: Event):
@@ -286,7 +290,7 @@ async def send_char_detail_msg(bot: Bot, ev: Event):
 
 
 @waves_new_char_detail.on_regex(
-    rf"(?P<waves_id>\d{{9}})?(?P<char>{PATTERN})(?P<query_type>面板|面包|🍞|mb|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
+    rf"(?P<waves_id>\d{{9}})?(?P<char>{PATTERN})(?P<query_type>面板|面版|面包|🍞|mb|伤害(?P<damage>(\d+)?))(?P<is_pk>pk|对比|PK|比|比较)?(\s*)?(?P<change_list>((换[^换]*)*)?)",
     block=True,
 )
 async def send_char_detail_msg2(bot: Bot, ev: Event):

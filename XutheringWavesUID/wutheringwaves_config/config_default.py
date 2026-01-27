@@ -5,22 +5,10 @@ from gsuid_core.utils.plugins_config.models import (
     GsIntConfig,
     GsStrConfig,
     GsBoolConfig,
-    GsDictConfig,
-    GsListConfig,
     GsListStrConfig,
 )
 
 CONFIG_DEFAULT: Dict[str, GSC] = {
-    "WavesAnnGroups": GsDictConfig(
-        "推送公告群组",
-        "鸣潮公告推送群组",
-        {},
-    ),
-    "WavesAnnNewIds": GsListConfig(
-        "推送公告ID",
-        "鸣潮公告推送ID列表",
-        [],
-    ),
     "WavesAnnOpen": GsBoolConfig(
         "公告推送总开关",
         "公告推送总开关",
@@ -252,5 +240,25 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "群排行仅活跃用户",
         "群排行（角色/练度/抽卡）是否仅统计活跃账号",
         True,
+    ),
+    "UseHtmlRender": GsBoolConfig(
+        "使用HTML渲染",
+        "开启后将使用HTML渲染公告卡片，关闭后将回退到PIL或纯文本",
+        True,
+    ),
+    "RemoteRenderEnable": GsBoolConfig(
+        "外置渲染开关",
+        "开启后将使用外置渲染服务进行HTML渲染，失败时自动回退到本地渲染",
+        False,
+    ),
+    "RemoteRenderUrl": GsStrConfig(
+        "外置渲染地址",
+        "外置渲染服务的API地址，例如：http://127.0.0.1:3000/render",
+        "http://127.0.0.1:3000/render",
+    ),
+    "FontCssUrl": GsStrConfig(
+        "外置渲染字体CSS地址",
+        "用于HTML渲染的字体CSS URL，外置渲染时传递，一般保留默认即可，如果在本地，可以填http://127.0.0.1:8765/waves/fonts/fonts.css，如果有自己的登录域名：可以使用 你的登录域名根/waves/fonts/fonts.css",
+        "https://fonts.loli.net/css2?family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Color+Emoji&display=swap",
     ),
 }

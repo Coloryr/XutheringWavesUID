@@ -41,6 +41,8 @@ git clone https://github.com/Loping151/XutheringWavesUID.git
 
 体力推送功能：[RoverReminder](https://github.com/Loping151/RoverReminder)
 
+自建外置渲染：[RemoteRender](https://github.com/Loping151/RemoteRender) （或者直接使用我的）
+
 谁AT我功能：[AT_Tracker](https://github.com/Loping151/AT_Tracker)
 
 ## 丨安装提醒

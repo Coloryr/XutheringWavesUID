@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from PIL import Image
 
+from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.resource.RESOURCE_PATH import (
     waves_templates,
 )
@@ -35,7 +36,8 @@ def pil_to_base64(img: Image.Image) -> str:
 
 async def draw_weapon_wiki_render(weapon_name: str) -> Optional[bytes]:
     """渲染武器图鉴 (HTML)"""
-    if not PLAYWRIGHT_AVAILABLE or render_html is None:
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or render_html is None or not use_html_render:
         return None
 
     weapon_name = alias_to_weapon_name(weapon_name)
@@ -48,7 +50,7 @@ async def draw_weapon_wiki_render(weapon_name: str) -> Optional[bytes]:
         return None
 
     context = await _prepare_weapon_context(weapon_id, weapon_model)
-    return await render_html(waves_templates, "item_wiki.html", context)
+    return await render_html(waves_templates, "wiki/item_wiki.html", context)
 
 
 async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> Dict[str, Any]:
@@ -101,7 +103,8 @@ async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> 
 
 async def draw_echo_wiki_render(echo_name: str) -> Optional[bytes]:
     """渲染声骸图鉴 (HTML)"""
-    if not PLAYWRIGHT_AVAILABLE or render_html is None:
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or render_html is None or not use_html_render:
         return None
 
     echo_name = alias_to_echo_name(echo_name)
@@ -114,7 +117,7 @@ async def draw_echo_wiki_render(echo_name: str) -> Optional[bytes]:
         return None
 
     context = await _prepare_echo_context(echo_id, echo_model)
-    return await render_html(waves_templates, "item_wiki.html", context)
+    return await render_html(waves_templates, "wiki/item_wiki.html", context)
 
 
 async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str, Any]:
@@ -157,7 +160,8 @@ async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str
 
 async def draw_weapon_list_render(weapon_type: str = "") -> Optional[bytes]:
     """渲染武器列表 (HTML)"""
-    if not PLAYWRIGHT_AVAILABLE or render_html is None:
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or render_html is None or not use_html_render:
         return None
 
     ensure_weapon_loaded()
@@ -223,12 +227,13 @@ async def draw_weapon_list_render(weapon_type: str = "") -> Optional[bytes]:
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
     }
 
-    return await render_html(waves_templates, "list_wiki.html", context)
+    return await render_html(waves_templates, "wiki/list_wiki.html", context)
 
 
 async def draw_sonata_list_render(version: str = "") -> Optional[bytes]:
     """渲染声骸套装列表 (HTML)"""
-    if not PLAYWRIGHT_AVAILABLE or render_html is None:
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or render_html is None or not use_html_render:
         return None
 
     ensure_sonata_loaded()
@@ -299,4 +304,4 @@ async def draw_sonata_list_render(version: str = "") -> Optional[bytes]:
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
     }
 
-    return await render_html(waves_templates, "list_wiki.html", context)
+    return await render_html(waves_templates, "wiki/list_wiki.html", context)

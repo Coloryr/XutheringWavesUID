@@ -1,13 +1,25 @@
 import json
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from gsuid_core.bot import msgjson
+from gsuid_core.logger import logger
 
 from ..utils.name_convert import (
     alias_to_char_name_list,
     alias_to_char_name_optional,
+    char_name_to_char_id,
 )
-from ..utils.resource.RESOURCE_PATH import CUSTOM_CHAR_ALIAS_PATH
+from ..utils.resource.RESOURCE_PATH import CUSTOM_CHAR_ALIAS_PATH, waves_templates
+from ..utils.render_utils import (
+    PLAYWRIGHT_AVAILABLE,
+    render_html,
+    get_footer_b64,
+)
+from ..utils.image import (
+    get_square_avatar,
+    pil_to_b64,
+    get_custom_waves_bg,
+)
 
 
 class CharAliasOps:
@@ -76,7 +88,7 @@ async def action_char_alias(action: str, char_name: str, new_alias: str) -> str:
         return "无效的操作，请检查操作"
 
 
-async def char_alias_list(char_name: str):
+async def char_alias_list(char_name: str) -> Union[str, bytes]:
     std_char_name = alias_to_char_name_optional(char_name)
     if not std_char_name:
         return "未找到指定角色，请检查输入！"
@@ -84,5 +96,44 @@ async def char_alias_list(char_name: str):
     alias_list = alias_to_char_name_list(char_name)
     if not alias_list:
         return f"角色【{char_name}】不存在，请检查输入"
+    
+    alias_list = [std_char_name] + [alias for alias in alias_list if alias != std_char_name]
 
+    # 尝试HTML渲染
+    if PLAYWRIGHT_AVAILABLE:
+        try:
+            logger.debug(f"[鸣潮] 正在渲染角色【{std_char_name}】的别名列表...")
+
+            # 准备图片
+            char_id = char_name_to_char_id(std_char_name)
+            if char_id:
+                avatar = await get_square_avatar(char_id)
+                avatar_url = pil_to_b64(avatar)
+            else:
+                avatar_url = ""
+
+            bg_img = get_custom_waves_bg(bg="bg12", crop=False)
+            bg_url = pil_to_b64(bg_img)
+
+            # 准备模板数据
+            footer_b64 = get_footer_b64(footer_type="white") or ""
+            context = {
+                "char_name": std_char_name,
+                "alias_list": alias_list,
+                "footer_b64": footer_b64,
+                "avatar_url": avatar_url,
+                "bg_url": bg_url,
+            }
+
+            # 渲染HTML
+            img_bytes = await render_html(waves_templates, "alias_card.html", context)
+            if img_bytes:
+                logger.info(f"[鸣潮] 角色【{std_char_name}】别名列表渲染成功")
+                return img_bytes
+            else:
+                logger.warning("[鸣潮] HTML渲染返回空，回退到文本模式")
+        except Exception as e:
+            logger.warning(f"[鸣潮] HTML渲染失败: {e}，回退到文本模式")
+
+    # 回退到文本发送
     return f"角色{std_char_name}别名列表：" + " ".join(alias_list)

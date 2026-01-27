@@ -1,14 +1,11 @@
-import json
-import time
 from typing import Union
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
-import aiofiles
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
-from gsuid_core.utils.image.convert import convert_img
 
 from ..utils.api.model import (
     AccountBaseInfo,
@@ -30,399 +27,241 @@ from ..utils.fonts.waves_fonts import (
 )
 from .period import get_slash_period_number
 from ..utils.hint import error_reply
-from ..utils.image import (
-    GOLD,
-    GREY,
-    SPECIAL_GOLD,
-    add_footer,
-    get_waves_bg,
-    pic_download_from_url,
-)
+from ..utils.waves_api import waves_api
+from ..utils.error_reply import WAVES_CODE_102
 from ..utils.api.model import (
-    RoleList,
     SlashDetail,
     RoleDetailData,
     AccountBaseInfo,
 )
-from ..utils.imagetool import draw_pic, draw_pic_with_ring
-from ..utils.waves_api import waves_api
-from ..utils.queues.const import QUEUE_SLASH_RECORD
-from ..utils.queues.queues import push_item
-from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, SLASH_PATH
+from ..wutheringwaves_config import WutheringWavesConfig
+from ..utils.render_utils import (
+    PLAYWRIGHT_AVAILABLE,
+    render_html,
+    get_image_b64_with_cache,
+    get_footer_b64,
+)
+from ..utils.resource.RESOURCE_PATH import waves_templates, SLASH_PATH, PLAYER_PATH
+from ..utils.image import (
+    pil_to_b64,
+    get_waves_bg,
+    get_event_avatar,
+    get_square_avatar,
+    CHAIN_COLOR,
+)
+from ..utils.ascension.char import get_char_model
+from ..utils.char_info_utils import get_all_roleid_detail_info
+from .draw_slash_card_pil import (
+    draw_slash_img as draw_slash_img_pil,
+    get_slash_data,
+    save_slash_record,
+    upload_slash_record,
+    SLASH_ERROR_MESSAGE_NO_DATA,
+    SLASH_ERROR_MESSAGE_NO_UNLOCK,
+    COLOR_QUALITY,
+)
+
+from ..utils.error_reply import WAVES_CODE_108
 from ..utils.limit_request import check_request_rate_limit
-
-TEXT_PATH = Path(__file__).parent / "texture2d"
-
-SLASH_ERROR = "数据获取失败，请稍后再试"
-SLASH_ERROR_MESSAGE_NO_DATA = "当前暂无冥歌海墟数据"
-SLASH_ERROR_MESSAGE_NO_UNLOCK = "无冥歌海墟暂未解锁"
-
-
-difficulty_name_map = {
-    "禁忌海域": [1, 2, 3, 4, 5, 6],
-    "再生海域-海隙": [7, 8, 9, 10, 11],
-    "再生海域-湍渊": [12],
-}
-
-challenge_name_map = {
-    "海妖葬地": 1,
-    "无光祸墟": 2,
-    "湮雾深巢": 3,
-    "哀潮雾廊": 4,
-    "陨星流海": 5,
-    "沉骨回湾": 6,
-    "险滩": 7,
-    "涡流": 8,
-    "急潮": 9,
-    "狂澜": 10,
-    "海魇": 11,
-    "无尽湍渊": 12,
-}
-
-
-COLOR_QUALITY = {
-    1: (188, 188, 188),  # 白色 - 更自然的白色
-    2: (76, 175, 80),  # 绿色 - 更柔和的绿色
-    3: (33, 150, 243),  # 蓝色 - 更柔和的蓝色
-    4: (171, 71, 188),  # 紫色 - 修正为紫色
-    5: (255, 193, 7),  # 金色 - 更接近实际的金色
-}
-
-
-async def get_slash_data(uid: str, ck: str, is_self_ck: bool) -> Union[SlashDetail, str]:
-    if is_self_ck:
-        slash_data = await waves_api.get_slash_detail(uid, ck)
-    else:
-        slash_data = await waves_api.get_slash_index(uid, ck)
-
-    if not slash_data.success:
-        return slash_data.throw_msg()
-
-    slash_data = slash_data.data
-    if not slash_data or (isinstance(slash_data, dict) and not slash_data.get("isUnlock", False)):
-        if not is_self_ck:
-            return SLASH_ERROR_MESSAGE_NO_UNLOCK
-        return SLASH_ERROR_MESSAGE_NO_DATA
-    else:
-        return SlashDetail.model_validate(slash_data)
-
 
 async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]:
     if check_request_rate_limit():
         return error_reply(WAVES_CODE_108)
-    is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-    if not ck:
-        return error_reply(WAVES_CODE_102)
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
+        return await draw_slash_img_pil(ev, uid, user_id)
 
-    command = ev.command
-    text = ev.text.strip()
-    challengeIds = [7, 8, 9, 10, 11, 12] if is_self_ck else [12]
-    if "无尽" in text or "无尽" in command or "wj" in command or "wj" in text:
-        challengeIds = [12]
-    elif "禁忌" in text or "禁忌" in command:
-        challengeIds = [1, 2, 3, 4, 5, 6]
-    elif text.isdigit() and 1 <= int(text) <= 12:
-        challengeIds = [int(text)]
-    else:
-        text = text.replace("层", "")
-        if text.isdigit() and 1 <= int(text) <= 12:
-            challengeIds = [int(text)]
+    TEXT_PATH = Path(__file__).parent / "texture2d"
 
-    if not is_self_ck:
-        challengeIds = [12]
-
-    # 冥海数据
-    slash_detail: Union[SlashDetail, str] = await get_slash_data(uid, ck, is_self_ck)
-    if isinstance(slash_detail, str):
-        return slash_detail
-
-    # check 冥海数据
-    if not is_self_ck and not slash_detail.isUnlock:
-        return SLASH_ERROR_MESSAGE_NO_UNLOCK
-
-    owned_challenge_ids = [
-        challenge.challengeId
-        for difficulty in slash_detail.difficultyList
-        for challenge in difficulty.challengeList
-        if len(challenge.halfList) > 0
-    ]
-    if len(owned_challenge_ids) == 0:
-        return SLASH_ERROR_MESSAGE_NO_DATA
-
-    query_challenge_ids = []
-    for challenge_id in challengeIds:
-        if challenge_id not in owned_challenge_ids:
-            continue
-        query_challenge_ids.append(challenge_id)
-
-    if len(query_challenge_ids) == 0:
-        return SLASH_ERROR_MESSAGE_NO_DATA
-
-    # 账户数据
-    account_info = await waves_api.get_base_info(uid, ck)
-    if not account_info.success:
-        return account_info.throw_msg()
-    if not account_info.data:
-        return "用户未展示数据"
-    account_info = AccountBaseInfo.model_validate(account_info.data)
-
-    # 共鸣者信息
-    role_info = await waves_api.get_role_info(uid, ck)
-    if not role_info.success:
-        return role_info.throw_msg()
-
-    role_info = RoleList.model_validate(role_info.data)
-
-    # 绘制图片
-    footer_h = 50
-    card_h = 300
-    title_h = 130
-    info_h = 300
-    CHALLENGE_SPACING = 30
-
-    h = footer_h + card_h + (info_h + title_h + CHALLENGE_SPACING) * len(query_challenge_ids) - CHALLENGE_SPACING
-    card_img = get_waves_bg(1100, h, "bg9")
-
-    # 绘制个人信息
-    base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-    base_info_draw = ImageDraw.Draw(base_info_bg)
-    base_info_draw.text((275, 120), f"{account_info.name[:7]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
-    card_img.paste(base_info_bg, (15, 20), base_info_bg)
-
-    # 头像 头像环
-    avatar, avatar_ring = await draw_pic_with_ring(ev)
-    card_img.paste(avatar, (25, 70), avatar)
-    card_img.paste(avatar_ring, (35, 80), avatar_ring)
-
-    # 账号基本信息，由于可能会没有，放在一起
-    if account_info.is_full:
-        title_bar = Image.open(TEXT_PATH / "title_bar.png")
-        title_bar_draw = ImageDraw.Draw(title_bar)
-        title_bar_draw.text((660, 125), "账号等级", GREY, waves_font_26, "mm")
-        title_bar_draw.text((660, 78), f"Lv.{account_info.level}", "white", waves_font_42, "mm")
-
-        title_bar_draw.text((810, 125), "世界等级", GREY, waves_font_26, "mm")
-        title_bar_draw.text((810, 78), f"Lv.{account_info.worldLevel}", "white", waves_font_42, "mm")
-        card_img.paste(title_bar, (-20, 70), title_bar)
-
-    # 根据面板数据获取详细信息
-    role_detail_info_map = await get_all_roleid_detail_info(uid)
-    role_detail_info_map = role_detail_info_map if role_detail_info_map else {}
-
-    # 绘制挑战信息
-    # 倒序
-    index = 0
-    slash_detail.difficultyList.reverse()
-    for difficulty in slash_detail.difficultyList:
-        for challenge in difficulty.challengeList:
-            if challenge.challengeId not in query_challenge_ids:
-                continue
-
-            if not challenge.halfList:
-                continue
-
-            # 获取title
-            title_bar = Image.open(TEXT_PATH / f"difficulty_{difficulty.difficulty}.png")
-
-            temp_bar_draw = ImageDraw.Draw(title_bar)
-            # 层数
-            if challenge.challengeId != 12:
-                temp_bar_draw.text(
-                    (70, 60),
-                    f"{challenge.challengeId}",
-                    "white",
-                    waves_font_40,
-                    "mm",
-                )
-            # 挑战名称
-            temp_bar_draw.text(
-                (140, 45),
-                f"{challenge.challengeName}"
-                + (f" 第{get_slash_period_number()}期" if challenge.challengeId == 12 else ""),
-                "white",
-                waves_font_40,
-            )
-            rank = challenge.get_rank()
-            if len(rank) != 0:
-                score_bar = Image.open(TEXT_PATH / f"score_{rank}.png")
-                title_bar.paste(score_bar, (600, 10), score_bar)
-
-            temp_bar_draw.text(
-                (700, 50),
-                f"挑战分数：{challenge.score}",
-                SPECIAL_GOLD,
-                waves_font_25,
-            )
-
-            role_bg = Image.open(TEXT_PATH / "role_hang_bg.png")
-            # 获取角色信息
-            for half_index, slash_half in enumerate(challenge.halfList):
-                role_hang_bg = Image.new("RGBA", (1100, info_h // 2), (255, 255, 255, 0))
-                role_hang_bg_draw = ImageDraw.Draw(role_hang_bg)
-                text_dui = "队伍一" if half_index == 0 else "队伍二"
-                role_hang_bg_draw.text(
-                    (150, 30),
-                    f"{text_dui}",
-                    "white",
-                    waves_font_30,
-                )
-                role_hang_bg_draw.text(
-                    (150, 75),
-                    f"{slash_half.score}",
-                    GOLD,
-                    waves_font_25,
-                )
-                team_pic = await pic_download_from_url(SLASH_PATH, difficulty.teamIcon)
-                role_hang_bg.alpha_composite(team_pic, (30, 35))
-
-                # buff
-                buff_bg = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
-                buff_bg_draw = ImageDraw.Draw(buff_bg)
-                buff_bg_draw.rounded_rectangle(
-                    [0, 0, 100, 100],
-                    radius=5,
-                    fill=(0, 0, 0, int(0.8 * 255)),
-                )
-                buff_color = COLOR_QUALITY[slash_half.buffQuality]
-                buff_bg_draw.rectangle(
-                    [0, 95, 100, 100],
-                    fill=buff_color,
-                )
-                buff_pic = await pic_download_from_url(SLASH_PATH, slash_half.buffIcon)
-                buff_pic = buff_pic.resize((100, 100))
-                buff_bg.paste(buff_pic, (0, 0), buff_pic)
-
-                role_hang_bg.alpha_composite(buff_bg, (870, 20))
-
-                for role_index, slash_role in enumerate(slash_half.roleList):
-                    char_model = get_char_model(slash_role.roleId)
-                    if char_model is None:
-                        continue
-                    avatar = await draw_pic(slash_role.roleId)
-                    char_bg = Image.open(TEXT_PATH / f"char_bg{char_model.starLevel}.png")
-                    char_bg_draw = ImageDraw.Draw(char_bg)
-                    char_bg_draw.text(
-                        (90, 150),
-                        f"{char_model.name}",
-                        "white",
-                        waves_font_18,
-                        "mm",
-                    )
-                    char_bg.paste(avatar, (0, 0), avatar)
-                    if role_detail_info_map and str(slash_role.roleId) in role_detail_info_map:
-                        temp: RoleDetailData = role_detail_info_map[str(slash_role.roleId)]
-                        info_block = Image.new("RGBA", (40, 20), color=(255, 255, 255, 0))
-                        info_block_draw = ImageDraw.Draw(info_block)
-                        info_block_draw.rectangle([0, 0, 40, 20], fill=(96, 12, 120, int(0.9 * 255)))
-                        info_block_draw.text(
-                            (2, 10),
-                            f"{temp.get_chain_name()}",
-                            "white",
-                            waves_font_18,
-                            "lm",
-                        )
-                        char_bg.paste(info_block, (110, 35), info_block)
-
-                    role_hang_bg.alpha_composite(char_bg, (350 + role_index * info_h // 2, -20))
-
-                role_bg.paste(role_hang_bg, (0, info_h // 2 * half_index), role_hang_bg)
-
-            temp_img = Image.new("RGBA", (1000, title_h + info_h), (255, 255, 255, 0))
-            temp_img.paste(title_bar, (0, 0), title_bar)
-            temp_img.paste(role_bg, (0, title_h), role_bg)
-            card_img.paste(
-                temp_img,
-                (50, card_h + index * (info_h + title_h + CHALLENGE_SPACING)),
-                temp_img,
-            )
-            index += 1
-
-    await save_slash_record(uid, slash_detail)
-    await upload_slash_record(is_self_ck, uid, slash_detail)
-
-    card_img = add_footer(card_img, 600, 20)
-    card_img = await convert_img(card_img)
-    return card_img
-
-
-async def save_slash_record(
-    uid: str,
-    slash_data: SlashDetail,
-):
-    """保存无尽记录到本地文件"""
     try:
-        _dir = PLAYER_PATH / uid
-        _dir.mkdir(parents=True, exist_ok=True)
-        path = _dir / "slashData.json"
+        is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+        if not ck:
+            return error_reply(WAVES_CODE_102)
 
-        slash_dict = slash_data.model_dump()
-        record_payload = {
-            "record_time": int(time.time()),
-            "slash_data": slash_dict,
+        command = ev.command
+        text = ev.text.strip()
+        challengeIds = [7, 8, 9, 10, 11, 12] if is_self_ck else [12]
+        if "无尽" in text or "无尽" in command or "wj" in command or "wj" in text:
+            challengeIds = [12]
+        elif "禁忌" in text or "禁忌" in command:
+            challengeIds = [1, 2, 3, 4, 5, 6]
+        elif text.isdigit() and 1 <= int(text) <= 12:
+            challengeIds = [int(text)]
+        else:
+            text = text.replace("层", "")
+            if text.isdigit() and 1 <= int(text) <= 12:
+                challengeIds = [int(text)]
+
+        if not is_self_ck:
+            challengeIds = [12]
+
+        # 冥海数据
+        slash_detail: Union[SlashDetail, str] = await get_slash_data(uid, ck, is_self_ck)
+        if isinstance(slash_detail, str):
+            return slash_detail
+
+        # check 冥海数据
+        if not is_self_ck and not slash_detail.isUnlock:
+            return SLASH_ERROR_MESSAGE_NO_UNLOCK
+
+        owned_challenge_ids = [
+            challenge.challengeId
+            for difficulty in slash_detail.difficultyList
+            for challenge in difficulty.challengeList
+            if len(challenge.halfList) > 0
+        ]
+        if len(owned_challenge_ids) == 0:
+            return SLASH_ERROR_MESSAGE_NO_DATA
+
+        query_challenge_ids = []
+        for challenge_id in challengeIds:
+            if challenge_id not in owned_challenge_ids:
+                continue
+            query_challenge_ids.append(challenge_id)
+
+        if len(query_challenge_ids) == 0:
+            return SLASH_ERROR_MESSAGE_NO_DATA
+
+        # 账户数据
+        account_info_res = await waves_api.get_base_info(uid, ck)
+        if not account_info_res.success:
+            return account_info_res.throw_msg()
+        if not account_info_res.data:
+            return "用户未展示数据"
+        account_info = AccountBaseInfo.model_validate(account_info_res.data)
+
+        # 准备渲染数据
+        avatar = await get_event_avatar(ev)
+        avatar_url = pil_to_b64(avatar)
+
+        # 根据面板数据获取详细信息
+        role_detail_info_map = await get_all_roleid_detail_info(uid)
+        role_detail_info_map = role_detail_info_map if role_detail_info_map else {}
+
+        # 构建挑战数据
+        challenges_data = []
+        for difficulty in reversed(slash_detail.difficultyList):
+            # 加载难度背景
+            difficulty_bg = Image.open(TEXT_PATH / f"difficulty_{difficulty.difficulty}.png")
+            difficulty_bg_url = pil_to_b64(difficulty_bg)
+
+            for challenge in difficulty.challengeList:
+                if challenge.challengeId not in query_challenge_ids:
+                    continue
+
+                if not challenge.halfList:
+                    continue
+
+                # 加载分数背景
+                rank = challenge.get_rank()
+                score_bg = Image.open(TEXT_PATH / f"score_{rank}.png")
+                score_bg_url = pil_to_b64(score_bg)
+
+                # 构建半场数据
+                half_list = []
+                for half_index, slash_half in enumerate(challenge.halfList):
+                    team_name = "队伍一" if half_index == 0 else "队伍二"
+
+                    # Buff 数据
+                    buff_icon_b64 = await get_image_b64_with_cache(slash_half.buffIcon, SLASH_PATH) if slash_half.buffIcon else ""
+                    buff_quality = slash_half.buffQuality
+                    buff_color_rgb = COLOR_QUALITY.get(buff_quality, (188, 188, 188))
+                    buff_color_hex = f"rgb({buff_color_rgb[0]}, {buff_color_rgb[1]}, {buff_color_rgb[2]})"
+
+                    # 角色数据
+                    roles_data = []
+                    for slash_role in slash_half.roleList:
+                        char_model = get_char_model(slash_role.roleId)
+                        if char_model is None:
+                            continue
+
+                        chain_num = 0
+                        chain_name = ""
+                        if role_detail_info_map and str(slash_role.roleId) in role_detail_info_map:
+                            temp: RoleDetailData = role_detail_info_map[str(slash_role.roleId)]
+                            chain_num = temp.get_chain_num()
+                            chain_name = temp.get_chain_name()
+
+                        # 使用本地头像（和PIL版本一致）
+                        role_avatar = await get_square_avatar(slash_role.roleId)
+                        role_icon_b64 = pil_to_b64(role_avatar) if role_avatar else ""
+
+                        roles_data.append({
+                            "id": slash_role.roleId,
+                            "name": char_model.name,
+                            "star": char_model.starLevel,
+                            "chain": chain_num,
+                            "chain_name": chain_name,
+                            "icon_url": role_icon_b64,
+                        })
+
+                    half_list.append({
+                        "team_name": team_name,
+                        "score": slash_half.score,
+                        "buff_icon_url": buff_icon_b64,
+                        "buff_quality": buff_quality,
+                        "buff_color": buff_color_hex,
+                        "roles": roles_data,
+                    })
+
+                # 队伍图标
+                team_icon_b64 = await get_image_b64_with_cache(difficulty.teamIcon, SLASH_PATH) if difficulty.teamIcon else ""
+
+                challenges_data.append({
+                    "challenge_id": challenge.challengeId,
+                    "challenge_name": challenge.challengeName,
+                    "period": get_slash_period_number() if challenge.challengeId == 12 else None,
+                    "score": challenge.score,
+                    "rank": rank,
+                    "difficulty": difficulty.difficulty,
+                    "difficulty_bg_url": difficulty_bg_url,
+                    "score_bg_url": score_bg_url,
+                    "team_icon_url": team_icon_b64,
+                    "half_list": half_list,
+                })
+
+        bg_img = get_waves_bg(bg = "bg9", crop=False)
+        bg_url = pil_to_b64(bg_img)
+
+        title_bar = Image.open(TEXT_PATH / "title_bar.png")
+        title_bar_url = pil_to_b64(title_bar)
+
+        role_hang_bg = Image.open(TEXT_PATH / "role_hang_bg.png")
+        role_hang_bg_url = pil_to_b64(role_hang_bg)
+
+        current_date = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
+
+        chain_colors = {i: f"rgba({r}, {g}, {b}, 0.8)" for i, (r, g, b) in CHAIN_COLOR.items()}
+
+        context = {
+            "user_name": account_info.name,
+            "user_id": account_info.id,
+            "level": account_info.level,
+            "world_level": account_info.worldLevel,
+            "show_stats": account_info.is_full,
+            "avatar_url": avatar_url,
+            "current_date": current_date,
+            "title_bar_url": title_bar_url,
+            "role_hang_bg_url": role_hang_bg_url,
+            "challenges": challenges_data,
+            "footer_b64": get_footer_b64(footer_type="white") or "",
+            "bg_url": bg_url,
+            "chain_colors": chain_colors,
         }
-        async with aiofiles.open(path, "w", encoding="utf-8") as file:
-            await file.write(json.dumps(record_payload, ensure_ascii=False))
+
+        # 保存和上传记录
+        await save_slash_record(uid, slash_detail)
+        await upload_slash_record(is_self_ck, uid, slash_detail)
+
+        logger.debug("[鸣潮] 准备通过HTML渲染冥海卡片")
+        img_bytes = await render_html(waves_templates, "abyss/slash_card.html", context)
+        if img_bytes:
+            return img_bytes
+        else:
+            logger.warning("[鸣潮] Playwright 渲染返回空, 正在回退到 PIL 渲染")
+            return await draw_slash_img_pil(ev, uid, user_id)
+
     except Exception as e:
-        logger.warning(f"[保存无尽数据失败] uid={uid}, error={e}")
+        logger.exception(f"[鸣潮] HTML渲染失败: {e}")
+        return await draw_slash_img_pil(ev, uid, user_id)
 
-
-async def upload_slash_record(
-    is_self_ck: bool,
-    waves_id: str,
-    slash_data: SlashDetail,
-):
-    from ..wutheringwaves_config import WutheringWavesConfig
-
-    WavesToken = WutheringWavesConfig.get_config("WavesToken").data
-    if not WavesToken:
-        return
-
-    if not slash_data:
-        return
-    if not slash_data.difficultyList:
-        return
-    if not is_self_ck:
-        return
-
-    # 只要难度12
-    difficulty = next(
-        (k for k in slash_data.difficultyList if k.difficulty == 2),
-        None,
-    )
-    if not difficulty:
-        return
-
-    if not difficulty.challengeList:
-        return
-
-    challenge = difficulty.challengeList[0]
-    if not challenge.halfList:
-        return
-
-    if not challenge.get_rank():
-        return
-
-    half_list = []
-    for half in challenge.halfList:
-        half_list.append(
-            {
-                "buffIcon": half.buffIcon,
-                "buffName": half.buffName,
-                "buffQuality": half.buffQuality,
-                "charIds": [role.roleId for role in half.roleList],
-                "score": half.score,
-            }
-        )
-    slash_item = SlashDetailRequest.model_validate(
-        {
-            "wavesId": waves_id,
-            "challengeId": challenge.challengeId,
-            "challengeName": challenge.challengeName,
-            "halfList": half_list,
-            "rank": challenge.get_rank(),
-            "score": challenge.score,
-        }
-    )
-    # logger.info(f"上传冥海记录: {slash_item.model_dump()}")
-    push_item(QUEUE_SLASH_RECORD, slash_item.model_dump())
