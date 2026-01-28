@@ -15,6 +15,7 @@ from ..utils.api.model import (
     SlashDetail,
     RoleDetailData,
     AccountBaseInfo,
+    RoleList,
 )
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.render_utils import (
@@ -116,6 +117,16 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         role_detail_info_map = await get_all_roleid_detail_info(uid)
         role_detail_info_map = role_detail_info_map if role_detail_info_map else {}
 
+        # 获取角色信息列表（用于获取角色等级）
+        role_info_res = await waves_api.get_role_info(uid, ck)
+        role_info_list = []
+        if role_info_res.success and role_info_res.data:
+            try:
+                role_info = RoleList.model_validate(role_info_res.data)
+                role_info_list = role_info.roleList
+            except Exception:
+                pass
+
         # 构建挑战数据
         challenges_data = []
         for difficulty in reversed(slash_detail.difficultyList):
@@ -153,6 +164,15 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                         if char_model is None:
                             continue
 
+                        # 获取角色等级
+                        role_level = 90
+                        role = next(
+                            (r for r in role_info_list if r.roleId == slash_role.roleId),
+                            None,
+                        )
+                        if role:
+                            role_level = role.level
+
                         chain_num = 0
                         chain_name = ""
                         if role_detail_info_map and str(slash_role.roleId) in role_detail_info_map:
@@ -168,6 +188,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             "id": slash_role.roleId,
                             "name": char_model.name,
                             "star": char_model.starLevel,
+                            "level": role_level,
                             "chain": chain_num,
                             "chain_name": chain_name,
                             "icon_url": role_icon_b64,
