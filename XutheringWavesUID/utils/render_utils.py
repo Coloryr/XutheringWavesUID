@@ -230,7 +230,7 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
             try:
                 page = await context_obj.new_page()
                 logger.debug("[鸣潮] 加载HTML内容...")
-                await page.set_content(html_content)
+                await page.set_content(html_content, wait_until='networkidle')
 
                 logger.debug("[鸣潮] 正在计算容器尺寸...")
                 container = page.locator(".container")
@@ -251,7 +251,6 @@ async def render_html(waves_templates, template_name: str, context: dict) -> Opt
                             "height": max(1, int(size["height"])),
                         }
                     )
-                    await page.wait_for_timeout(50)
 
                 logger.debug("[鸣潮] 正在截图...")
                 screenshot = await container.screenshot(type='jpeg', quality=90)
