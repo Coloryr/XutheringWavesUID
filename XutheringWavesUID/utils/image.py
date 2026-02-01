@@ -16,7 +16,6 @@ from PIL import (
 
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
-from gsuid_core.pool import run_in_process_pool
 from gsuid_core.utils.image.utils import sget
 from gsuid_core.utils.image.image_tools import crop_center_img
 
@@ -446,7 +445,7 @@ def add_footer(
     return img
 
 
-def _change_color_sync(
+async def change_color(
     chain,
     color: tuple = (255, 255, 255),
     w: Optional[int] = None,
@@ -473,9 +472,6 @@ def _change_color_sync(
             pixels[x, y] = color + (a,)
 
     return chain
-
-
-change_color = run_in_process_pool(_change_color_sync)
 
 
 def draw_text_with_shadow(
