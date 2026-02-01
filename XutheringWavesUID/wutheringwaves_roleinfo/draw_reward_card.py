@@ -12,6 +12,7 @@ from ..utils.api.model import (
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
 from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL
 from ..utils.render_utils import (
+    PLAYWRIGHT_AVAILABLE,
     render_html,
     get_image_b64_with_cache,
     get_footer_b64,
@@ -173,17 +174,17 @@ async def draw_reward_img(uid: str, ck: str, ev: Event):
     """绘制积分卡片"""
 
     use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
-    if not use_html_render:
+    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
         # 计算积分并返回文本
         score_data = await calculate_score(uid, ck)
         if not score_data:
-            return "获取数据失败，请先登录！"
+            return "获取数据失败，请先登录，或尝试刷新面板！"
         return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分"
 
     # 计算积分
     score_data = await calculate_score(uid, ck)
     if not score_data:
-        return "获取数据失败，请先登录！"
+        return "获取数据失败，请先登录，或尝试刷新面板！"
 
     account_info = score_data["account_info"]
 

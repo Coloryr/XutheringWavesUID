@@ -131,7 +131,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                 if floor.roleList:
                     for _role in floor.roleList:
                         star_level = 5
-                        role_level = 1
+                        role_level = 90
                         try:
                             char_detail = get_char_detail(_role.roleId, 1)
                             star_level = char_detail.starLevel

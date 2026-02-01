@@ -23,8 +23,8 @@ async def kuro_coin_(bot: Bot, ev: Event):
         await bot.send(error_reply(WAVES_CODE_102))
         return
 
-    is_self, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-    if not ck or not is_self:
+    is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+    if not ck or not is_self_ck:
         await bot.send(error_reply(WAVES_CODE_102))
         return
 
