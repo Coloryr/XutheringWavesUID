@@ -44,6 +44,12 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
             "巡游天国FM",
         ],
     ),
+    "WavesGuideMaxSize": GsIntConfig(
+        "攻略图片最大大小(M)",
+        "发送攻略图片前会自动转为webp格式，若超过此大小则自动压缩，单位MB",
+        5,
+        50,
+    ),
     "WavesLoginUrl": GsStrConfig(
         "鸣潮登录url",
         "用于设置XutheringWavesUID登录界面的配置",

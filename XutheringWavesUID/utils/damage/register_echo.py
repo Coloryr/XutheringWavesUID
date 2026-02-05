@@ -1050,6 +1050,7 @@ class Echo_6000191(EchoAbstract):
         """首位装备"""
         if role_id == 1210:
             return {'自身共鸣解放伤害加成': '25%'}
+        return {}
 
 
 class Echo_6000192(EchoAbstract):
