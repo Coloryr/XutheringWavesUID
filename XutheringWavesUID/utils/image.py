@@ -21,6 +21,7 @@ from gsuid_core.utils.image.image_tools import crop_center_img
 
 from ..utils.resource.RESOURCE_PATH import (
     AVATAR_PATH,
+    CACHE_PATH,
     WEAPON_PATH,
     ROLE_BG_PATH,
     SHARE_BG_PATH,
@@ -295,10 +296,13 @@ async def get_attribute_prop(name: str = "") -> Image.Image:
         return Image.open(TEXT_PATH / "attribute_prop" / "attr_prop_攻击.png").convert("RGBA")
 
 async def get_attribute_skill(name: str = "") -> Image.Image:
-    if (TEXT_PATH / "attribute_skill" / f"attribute_skill_{name}.png").exists():
-        return Image.open(TEXT_PATH / "attribute_skill" / f"attribute_skill_{name}.png").convert("RGBA")
-    else:
-        return Image.open(TEXT_PATH / "attribute_skill" / "attribute_skill_共鸣模态·集谐.png").convert("RGBA")
+    if not name:
+        return Image.new("RGBA", (100, 100), (0, 0, 0, 0))
+    cache_dir = CACHE_PATH / "attribute_skill"
+    cache_path = cache_dir / f"{name}.png"
+    if cache_path.exists():
+        return Image.open(cache_path).convert("RGBA")
+    return Image.new("RGBA", (100, 100), (0, 0, 0, 0))
 
 async def get_attribute_effect(name: str = "") -> Image.Image:
     if (TEXT_PATH / "attribute_effect" / f"attr_{name}.png").exists():

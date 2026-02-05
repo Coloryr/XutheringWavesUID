@@ -27,6 +27,9 @@ SONATA_SCISSOR = "命理崩毁之弦"
 SONATA_NEONLIGHT = "逆光跃彩之约"
 SONATA_HALO = "星构寻辉之环"
 SONATA_GILDED = "流金溯真之式"
+SONATA_STARBOUND = "长路启航之星"
+SONATA_MOTTLED = "斑驳粉饰之沫"
+SONATA_WHISPER = "听唤语义之愿"
 
 CHAR_ATTR_FREEZING = "冷凝"
 CHAR_ATTR_CELESTIAL = "衍射"
@@ -45,6 +48,8 @@ skill_damage = "skill_damage"
 liberation_damage = "liberation_damage"
 # 声骸技能伤害加成
 phantom_damage = "phantom_damage"
+# 谐度破坏伤害加成
+tunebreak_damage = "tunebreak_damage"
 # 治疗效果加成
 heal_bonus = "heal_bonus"
 # 护盾量加成
@@ -72,9 +77,11 @@ cast_tunebreak = "cast_tunebreak"
 skill_create_healing = "skill_create_healing"
 # 造成治疗
 cast_healing = "cast_healing"
+# 释放谐度破坏
+cast_tunebreak = "cast_tunebreak"
 
 # 定义一个类型别名
-SkillType = Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路"]
+SkillType = Literal["常态攻击", "共鸣技能", "共鸣解放", "变奏技能", "共鸣回路", "谐度破坏"]
 
 # 攻击模版
 temp_atk = "temp_atk"
@@ -82,6 +89,8 @@ temp_atk = "temp_atk"
 temp_life = "temp_life"
 # 防御模版
 temp_def = "temp_def"
+# 谐度破坏模板
+temp_tunebreak = "temp_tunebreak"
 
 SkillTreeMap = {
     "常态攻击": "1",
@@ -93,16 +102,22 @@ SkillTreeMap = {
 }
 
 # 光噪效应
-Spectro_Frazzle_Role_Ids = [1501, 1502, 1506, 1507]
+Spectro_Frazzle_Role_Ids = [1407, 1501, 1502, 1506, 1507]
 
 # 虚湮效应
 Havoc_Bane_Role_Ids = [1508]
+
+# 聚爆效应
+Fusion_Burst_Role_Ids = [1210]
 
 # 失序彼岸之梦 套装
 Ancient_Role_Ids = [1608]
 
 # 偏谐值累积效率 角色
 Offtune_Buildup_Role_Ids = [1209]
+
+# 震谐·偏移 角色
+Tune_Rupture_Role_Ids = [1509, 1210]
 
 # 异常
 AbnormalType = Literal[

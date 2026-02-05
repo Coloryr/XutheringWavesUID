@@ -19,7 +19,7 @@ from ..utils.queues.const import QUEUE_SCORE_RANK
 from ..utils.queues.queues import push_item
 from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import WutheringWavesConfig
-from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
+from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, CACHE_PATH
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
 
 
@@ -360,6 +360,23 @@ async def refresh_char(
                         i["fetterDetail"]["name"] = "荣斗铸锋之冠"  # type: ignore
         except Exception as e:
             logger.exception(f"{uid} 合鸣效果修正失败", e)
+
+        # 下载共鸣模态图片
+        try:
+            skill_branch_list = role_detail_info.get("skillBranchList")
+            if skill_branch_list:
+                cache_dir = CACHE_PATH / "attribute_skill"
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                for branch in skill_branch_list:
+                    branch_name = branch.get("branchName", "")
+                    pic_url = branch.get("pic", "")
+                    if pic_url and branch_name:
+                        save_name = f"{branch_name}.png"
+                        if not (cache_dir / save_name).exists():
+                            from gsuid_core.utils.download_resource.download_file import download
+                            await download(pic_url, cache_dir, save_name, tag="[鸣潮]")
+        except Exception as e:
+            logger.exception(f"{uid} 共鸣模态图片下载失败", e)
 
         waves_datas.append(role_detail_info)
 

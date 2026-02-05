@@ -41,23 +41,89 @@ def _get_git_logs() -> List[str]:
         return []
 
 
+def _is_regional_indicator(ch: str) -> bool:
+    return 0x1F1E6 <= ord(ch) <= 0x1F1FF
+
+
+def _is_skin_tone(ch: str) -> bool:
+    return 0x1F3FB <= ord(ch) <= 0x1F3FF
+
+
+def _try_consume_emoji(message: str, i: int) -> Tuple[str, int]:
+    """从位置 i 开始尝试消费一个完整的 emoji 序列。
+
+    返回 (emoji_string, new_index)，如果不是 emoji 则返回 ("", i)。
+    """
+    n = len(message)
+    ch = message[i]
+
+    # 旗帜: 两个连续的 regional indicator
+    if _is_regional_indicator(ch) and i + 1 < n and _is_regional_indicator(message[i + 1]):
+        return message[i : i + 2], i + 2
+
+    # keycap 序列: [0-9#*] + VS16? + U+20E3
+    if ch in "0123456789#*":
+        j = i + 1
+        if j < n and message[j] == "\ufe0f":
+            j += 1
+        if j < n and message[j] == "\u20e3":
+            j += 1
+            return message[i:j], j
+        # 单独的数字/符号不算 emoji
+        return "", i
+
+    # 标准 emoji (So/Sk)
+    cat = unicodedata.category(ch)
+    if cat not in ("So", "Sk"):
+        return "", i
+
+    j = i + 1
+    # 消费 VS16
+    if j < n and message[j] == "\ufe0f":
+        j += 1
+    # 消费肤色修饰符
+    if j < n and _is_skin_tone(message[j]):
+        j += 1
+    # 消费 ZWJ 序列 (如 👨‍💻)
+    while j < n and message[j] == "\u200d":
+        if j + 1 >= n:
+            break
+        nxt = message[j + 1]
+        nxt_cat = unicodedata.category(nxt)
+        if nxt_cat not in ("So", "Sk"):
+            break
+        j += 2  # 跳过 ZWJ + emoji
+        # ZWJ 后的组件也可能带 VS16 / 肤色
+        if j < n and message[j] == "\ufe0f":
+            j += 1
+        if j < n and _is_skin_tone(message[j]):
+            j += 1
+
+    return message[i:j], j
+
+
 def _extract_leading_emojis(message: str) -> Tuple[List[str], str]:
-    """提取消息开头连续的 emoji，并返回剩余文本。"""
+    """提取消息开头连续的 emoji，并返回剩余文本。
+
+    支持复合 emoji 序列:
+    - ZWJ 序列 (👨‍💻)
+    - 肤色修饰 (👍🏽)
+    - keycap 序列 (#️⃣, 1️⃣)
+    - 旗帜 (🇨🇳)
+    - VS16 变体 (🕊️)
+    """
     emojis = []
     i = 0
     while i < len(message):
-        ch = message[i]
-        if ch == "\ufe0f":  # VS16
+        # 跳过 emoji 之间可能出现的 VS16
+        if message[i] == "\ufe0f":
             i += 1
             continue
-        if unicodedata.category(ch) in ("So", "Sk"):
-            emojis.append(ch)
-            if i + 1 < len(message) and message[i + 1] == "\ufe0f":
-                i += 2
-            else:
-                i += 1
-        else:
+        emoji_str, new_i = _try_consume_emoji(message, i)
+        if not emoji_str:
             break
+        emojis.append(emoji_str)
+        i = new_i
     return emojis, message[i:].lstrip()
 
 

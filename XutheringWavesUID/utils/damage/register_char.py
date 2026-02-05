@@ -280,6 +280,12 @@ class Char_1209(CharAbstract):
             w.do_action("cast_healing", attr, isGroup)
 
 
+class Char_1210(CharAbstract):
+    id = 1210
+    name = "爱弥斯"
+    starLevel = 5
+
+
 class Char_1301(CharAbstract):
     id = 1301
     name = "卡卡罗"
@@ -708,7 +714,7 @@ class Char_1509(CharAbstract):
         msg = "施放共鸣解放时，所有角色伤害加成提升24%"
         attr.add_dmg_bonus(0.24, title, msg)
 
-        title = "琳奈-视觉冲击"
+        title = "琳奈-视觉冲击-本色"
         msg = "附近队伍中所有角色谐度破坏增幅提升40点"
         attr.add_tune_break_boost(40, title, msg)
 
@@ -733,6 +739,12 @@ class Char_1509(CharAbstract):
             w.do_action("env_tune_rupture", attr, isGroup) # 反正buff是一样的数值
 
 
+class Char_1510(CharAbstract):
+    id = 1510
+    name = "陆·赫斯"
+    starLevel = 5
+    
+    
 class Char_1601(CharAbstract):
     id = 1601
     name = "桃祈"

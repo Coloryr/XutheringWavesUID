@@ -153,7 +153,11 @@ class WeaponAbstract(object):
     def env_aero_erosion(self, attr: DamageAttribute, isGroup: bool = False):
         """风蚀效应"""
         pass
-    
+
+    def env_fusion_burst(self, attr: DamageAttribute, isGroup: bool = False):
+        """聚爆效应"""
+        pass
+
     def env_tune_shifting(self, attr: DamageAttribute, isGroup: bool = False):
         """具有偏移"""
         pass

@@ -777,6 +777,33 @@ class Weapon_21020104(WeaponAbstract):
             attr.add_atk_percent(calc_percent_expression(dmg), title, msg)
 
 
+class Weapon_21020076(WeaponAbstract):
+    id = 21020076
+    type = 2
+    name = "永远的启明星"
+
+    # 全属性伤害加成提升{0}。附加震谐·偏移或聚爆效应时，共鸣解放伤害无视目标{1}防御，共鸣解放伤害无视目标{2}热熔抗性，持续{3}秒。
+    def do_action(
+        self,
+        func_list: Union[List[str], str],
+        attr: DamageAttribute,
+        isGroup: bool = False,
+    ):
+
+        # 附加震谐·偏移或聚爆效应时
+        if attr.env_tune_rupture or attr.env_fusion_burst:
+            if attr.char_damage == liberation_damage:
+                dmg = f"{self.param(1)}"
+                title = self.get_title()
+                msg = f"共鸣解放伤害无视目标{dmg}防御"
+                attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+
+                dmg = f"{self.param(2)}"
+                title = self.get_title()
+                msg = f"共鸣解放伤害无视目标{dmg}热熔抗性"
+                attr.add_enemy_resistance(-calc_percent_expression(dmg), title, msg)
+
+
 class Weapon_21030011(WeaponAbstract):
     id = 21030011
     type = 3
@@ -1325,6 +1352,41 @@ class Weapon_21040053(WeaponAbstract):
     id = 21040053
     type = 4
     name = "戍关臂铠·拔山"
+
+
+class Weapon_21040056(WeaponAbstract):
+    id = 21040056
+    type = 4
+    name = "白昼之脊"
+
+    # 攻击提升{0}。造成普攻伤害后，衍射伤害加成提升{1}，持续{2}秒。每次为敌方怪物附加【集谐·偏移】后，普攻伤害加深{3}，且普攻伤害能无视目标{4}防御，持续{5}秒。
+    def do_action(
+        self,
+        func_list: Union[List[str], str],
+        attr: DamageAttribute,
+        isGroup: bool = False,
+    ):
+        if isinstance(func_list, str):
+            func_list = [func_list]
+
+        # 造成普攻伤害后，衍射伤害加成提升
+        if "cast_attack" in func_list and attr.char_attr == CHAR_ATTR_CELESTIAL:
+            dmg = f"{self.param(1)}"
+            title = self.get_title()
+            msg = f"造成普攻伤害后，衍射伤害加成提升{dmg}"
+            attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
+
+        # 每次为敌方怪物附加【集谐·偏移】后，普攻伤害加深，且普攻伤害无视目标防御
+        if attr.env_tune_strain and attr.char_damage == attack_damage:
+            dmg = f"{self.param(3)}"
+            title = self.get_title()
+            msg = f"附加【集谐·偏移】后，普攻伤害加深{dmg}"
+            attr.add_dmg_deepen(calc_percent_expression(dmg), title, msg)
+
+            dmg = f"{self.param(4)}"
+            title = self.get_title()
+            msg = f"附加【集谐·偏移】后，普攻伤害无视目标{dmg}防御"
+            attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
 
 
 class Weapon_21040064(WeaponAbstract):

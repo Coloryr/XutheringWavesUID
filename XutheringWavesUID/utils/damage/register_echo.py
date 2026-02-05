@@ -1041,6 +1041,52 @@ class Echo_6000190(EchoAbstract):
         return {"共鸣效率": "10%"}
 
 
+class Echo_6000191(EchoAbstract):
+    id = 6000191
+    name = "辛吉勒姆"
+    
+    # 首位装配该声骸技能时，若装配角色为爱弥斯，则自身共鸣解放伤害加成提升25.00%
+    def do_equipment_first(self, role_id: int):
+        """首位装备"""
+        if role_id == 1210:
+            return {'自身共鸣解放伤害加成': '25%'}
+
+
+class Echo_6000192(EchoAbstract):
+    id = 6000192
+    name = "无铭探索者"
+    
+    # 首位装配该声骸技能时，自身气动伤害加成提升12.00%，声骸技能伤害加成提升20.00%
+    def do_equipment_first(self, role_id: int):
+        """首位装备"""
+        return {'气动伤害加成': '12%', '声骸技能伤害加成': '20%'}
+
+
+class Echo_6000193(EchoAbstract):
+    id = 6000193
+    name = "冠顶械隼"
+    
+
+class Echo_6000194(EchoAbstract):
+    id = 6000194
+    name = "共鸣回响·冠顶苍隼"
+    
+
+class Echo_6000195(EchoAbstract):
+    id = 6000195
+    name = "格洛犸图"
+    
+
+class Echo_6000196(EchoAbstract):
+    id = 6000196
+    name = "冰盈舞者"
+    
+
+class Echo_6000197(EchoAbstract):
+    id = 6000197
+    name = "影烁者"
+    
+
 def register_echo():
     # 自动注册所有以 Echo_ 开头的类
     for name, obj in globals().items():
