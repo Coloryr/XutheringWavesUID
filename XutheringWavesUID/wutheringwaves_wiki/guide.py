@@ -111,45 +111,45 @@ async def get_guide_pic(guide_path: Path, pattern: re.Pattern, guide_author: str
     return imgs
 
 
-WEBP_MAX_DIMENSION = 16383
+JPG_MAX_DIMENSION = 65535
 
 
-def resize_for_webp(img: Image.Image) -> Image.Image:
+def resize_for_jpg(img: Image.Image) -> Image.Image:
     """
-    如果图片尺寸超过WebP限制(16383像素)，按比例缩放
+    如果图片尺寸超过JPG限制(65535像素)，按比例缩放
     """
     width, height = img.size
-    if width <= WEBP_MAX_DIMENSION and height <= WEBP_MAX_DIMENSION:
+    if width <= JPG_MAX_DIMENSION and height <= JPG_MAX_DIMENSION:
         return img
 
-    scale = min(WEBP_MAX_DIMENSION / width, WEBP_MAX_DIMENSION / height)
+    scale = min(JPG_MAX_DIMENSION / width, JPG_MAX_DIMENSION / height)
     new_width = int(width * scale)
     new_height = int(height * scale)
-    logger.info(f"[鸣潮] 攻略图尺寸{width}x{height}超过WebP限制，缩放至{new_width}x{new_height}")
+    logger.info(f"[鸣潮] 攻略图尺寸{width}x{height}超过JPG限制，缩放至{new_width}x{new_height}")
     return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 
-def compress_image_to_webp(img: Image.Image, max_size_mb: int) -> bytes:
+def compress_image_to_jpg(img: Image.Image, max_size_mb: int) -> bytes:
     """
-    将图片转为webp格式，若超过max_size_mb则逐步降低质量压缩
+    将图片转为JPG格式，若超过max_size_mb则逐步降低质量压缩
     """
     max_size_bytes = max_size_mb * 1024 * 1024
 
     # 检查并缩放超大图片
-    img = resize_for_webp(img)
+    img = resize_for_jpg(img)
 
-    # 先尝试100%质量
+    # 先尝试95%质量
     buffer = BytesIO()
-    img.save(buffer, format="WEBP", quality=100)
+    img.save(buffer, format="JPEG", quality=95)
     result = buffer.getvalue()
 
     if len(result) <= max_size_bytes:
         return result
 
     # 超过大小限制，逐步降低质量
-    for quality in range(95, 10, -5):
+    for quality in range(90, 10, -5):
         buffer = BytesIO()
-        img.save(buffer, format="WEBP", quality=quality)
+        img.save(buffer, format="JPEG", quality=quality)
         result = buffer.getvalue()
         if len(result) <= max_size_bytes:
             logger.info(f"[鸣潮] 攻略图压缩至quality={quality}, 大小={len(result)/1024/1024:.2f}MB")
@@ -170,8 +170,8 @@ async def process_images_new(_dir: Path):
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
 
-        # 转为webp并根据大小限制压缩
-        img_bytes = compress_image_to_webp(img, max_size_mb)
+        # 转为JPG并根据大小限制压缩
+        img_bytes = compress_image_to_jpg(img, max_size_mb)
         img_base64 = f"base64://{b64encode(img_bytes).decode()}"
         imgs.append(img_base64)
     except Exception as e:
