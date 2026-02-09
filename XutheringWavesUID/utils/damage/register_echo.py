@@ -1049,7 +1049,7 @@ class Echo_6000191(EchoAbstract):
     def do_equipment_first(self, role_id: int):
         """首位装备"""
         if role_id == 1210:
-            return {'自身共鸣解放伤害加成': '25%'}
+            return {'共鸣解放伤害加成': '25%'}
         return {}
 
 
