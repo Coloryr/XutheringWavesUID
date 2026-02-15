@@ -20,6 +20,33 @@ from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, CACHE_PATH
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
+from ..utils.api.model import AccountBaseInfo as _AccountBaseInfo
+
+
+async def save_base_info_cache(uid: str, account_info: _AccountBaseInfo):
+    """将账户基本信息（世界等级等）缓存到文件"""
+    _dir = PLAYER_PATH / uid
+    _dir.mkdir(parents=True, exist_ok=True)
+    path = _dir / "baseInfo.json"
+    try:
+        async with aiofiles.open(path, "w", encoding="utf-8") as f:
+            await f.write(account_info.model_dump_json())
+    except Exception as e:
+        logger.exception(f"save_base_info_cache failed {path}:", e)
+
+
+async def load_base_info_cache(uid: str) -> Optional[_AccountBaseInfo]:
+    """从缓存文件读取账户基本信息"""
+    path = PLAYER_PATH / uid / "baseInfo.json"
+    if not path.exists():
+        return None
+    try:
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            data = json.loads(await f.read())
+        return _AccountBaseInfo.model_validate(data)
+    except Exception as e:
+        logger.exception(f"load_base_info_cache failed {path}:", e)
+        return None
 
 
 def is_use_global_semaphore() -> bool:

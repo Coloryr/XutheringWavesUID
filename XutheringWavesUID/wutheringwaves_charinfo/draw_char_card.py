@@ -21,6 +21,7 @@ from ..utils.api.model_other import EnemyDetailData
 from ..utils.damage.utils import comma_separated_number
 from ..utils.ascension.template import get_template_data
 from ..utils.char_info_utils import get_all_roleid_detail_info
+from ..utils.refresh_char_detail import load_base_info_cache, save_base_info_cache
 from ..utils.name_convert import alias_to_char_name, char_name_to_char_id
 from ..utils.api.wwapi import ONE_RANK_URL, OneRankRequest, OneRankResponse
 from ..utils.damage.abstract import DamageRankRegister, DamageDetailRegister
@@ -629,12 +630,18 @@ async def draw_char_detail_img(
         uid = waves_id
 
     if not is_limit_query:
-        account_info = await waves_api.get_base_info(uid, ck)
-        if not account_info.success:
-            return account_info.throw_msg()
-        if not account_info.data:
-            return "用户未展示数据"
-        account_info = AccountBaseInfo.model_validate(account_info.data)
+        # 优先读取缓存，避免不必要的API请求
+        account_info = await load_base_info_cache(uid)
+        if not account_info:
+            # 缓存不存在，fallback到API请求
+            api_result = await waves_api.get_base_info(uid, ck)
+            if not api_result.success:
+                return api_result.throw_msg()
+            if not api_result.data:
+                return "用户未展示数据"
+            account_info = AccountBaseInfo.model_validate(api_result.data)
+            # 缓存结果供下次使用
+            await save_base_info_cache(uid, account_info)
         force_resource_id = None
     else:
         account_info = AccountBaseInfo.model_validate(
@@ -1030,12 +1037,16 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
         uid = waves_id
 
     if not is_limit_query:
-        account_info = await waves_api.get_base_info(uid, ck)
-        if not account_info.success:
-            return account_info.throw_msg()
-        if not account_info.data:
-            return "用户未展示数据"
-        account_info = AccountBaseInfo.model_validate(account_info.data)
+        # 优先读取缓存，避免不必要的API请求
+        account_info = await load_base_info_cache(uid)
+        if not account_info:
+            api_result = await waves_api.get_base_info(uid, ck)
+            if not api_result.success:
+                return api_result.throw_msg()
+            if not api_result.data:
+                return "用户未展示数据"
+            account_info = AccountBaseInfo.model_validate(api_result.data)
+            await save_base_info_cache(uid, account_info)
         force_resource_id = None
     else:
         account_info = AccountBaseInfo.model_validate(
@@ -1234,8 +1245,7 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
                 ph_bg_draw = ImageDraw.Draw(ph_bg)
 
                 ph_bg_draw.text((70, 50), f"{name[:6]}", name_color, waves_font_24, "lm")
-                display_value = f"{float(value[:-1]):.1f}%" if isinstance(value, str) and value.endswith("%") else value
-                ph_bg_draw.text((350, 50), f"{display_value}", name_color, waves_font_24, "rm")
+                ph_bg_draw.text((350, 50), f"{value}", name_color, waves_font_24, "rm")
 
                 right_image_temp.alpha_composite(ph_bg.resize((500, 125)), (0, (ni + mi * 4) * 70))
 
