@@ -211,6 +211,7 @@ async def ph_card_draw(
     is_draw=True,
     change_command="",
     enemy_detail: Optional[EnemyDetailData] = None,
+    is_limit_query=False,
 ):
     from ..utils.calc import WuWaCalc
     char_name = role_detail.role.roleName
@@ -222,7 +223,7 @@ async def ph_card_draw(
     ph_0 = Image.open(TEXT_PATH / "ph_0.png")
     ph_1 = Image.open(TEXT_PATH / "ph_1.png")
     #  phantom_sum_value = {}
-    calc = WuWaCalc(role_detail, enemy_detail)
+    calc = WuWaCalc(role_detail, enemy_detail, is_limit=is_limit_query)
     phantom_score = 0  # 初始化声骸评分
     if role_detail.phantomData and role_detail.phantomData.equipPhantomList:
         equipPhantomList = role_detail.phantomData.equipPhantomList
@@ -686,7 +687,7 @@ async def draw_char_detail_img(
 
     # 声骸
     calc, phantom_temp, phantom_score = await ph_card_draw(
-        ph_sum_value, role_detail, isDraw, change_command, enemy_detail
+        ph_sum_value, role_detail, isDraw, change_command, enemy_detail, is_limit_query
     )
     calc.role_card = calc.enhance_summation_card_value(calc.phantom_card)
 
@@ -1091,7 +1092,7 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     ph_0 = Image.open(TEXT_PATH / "ph_0.png")
     ph_1 = Image.open(TEXT_PATH / "ph_1.png")
     # phantom_sum_value = {}
-    calc: WuWaCalc = WuWaCalc(role_detail)
+    calc: WuWaCalc = WuWaCalc(role_detail, is_limit=is_limit_query)
     if role_detail.phantomData and role_detail.phantomData.equipPhantomList:
         equipPhantomList = role_detail.phantomData.equipPhantomList
         phantom_score = 0

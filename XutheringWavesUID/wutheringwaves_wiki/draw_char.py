@@ -126,7 +126,7 @@ async def draw_char_forte_pil(char_id: str):
     card_img.paste(char_bg, (0, -5), char_bg)
     card_img.alpha_composite(forte_img, (0, 600))
 
-    card_img = add_footer(card_img, 800, 20, color="hakush")
+    card_img = add_footer(card_img, 800, 20, color="white")
     card_img = await convert_img(card_img)
     return card_img
 
@@ -185,6 +185,8 @@ async def parse_char_forte_data(data: Dict, char_id: str):
         draw_title.text((x_padding + shadow_radius, y_padding), group_name, font=title_font, fill=title_color)
         group_images.append(title_img)
         
+        group_image_paths_seen = set()
+        group_image_blocks = []
         for desc_key in sorted_desc_keys:
             item = desc_map[desc_key]
             desc_text = item.get("Desc", "")
@@ -197,32 +199,30 @@ async def parse_char_forte_data(data: Dict, char_id: str):
             )
             group_images.append(text_block)
 
-            # Draw Images from ImageList
+            # Collect images at group level (deduplicated)
             for img_path_str in image_list:
+                if img_path_str in group_image_paths_seen:
+                    continue
+                group_image_paths_seen.add(img_path_str)
                 img_name = os.path.basename(img_path_str)
-                # If it doesn't end with .png, append it, or check existing files
                 if not img_name.lower().endswith((".png", ".webp", ".jpg")):
                      img_name += ".png"
-                
                 local_img_path = MAP_FORTE_PATH / char_id / img_name
-                
                 if local_img_path.exists():
                     try:
                         fg_img = Image.open(local_img_path).convert("RGBA")
-                        # Resize to fit width (minus padding)
                         content_width = image_width - 2 * (x_padding + shadow_radius)
-                        
-                        # Calculate new height to maintain aspect ratio
                         ratio = content_width / fg_img.width
                         new_height = int(fg_img.height * ratio)
-                        
                         fg_img = fg_img.resize((content_width, new_height))
-                        
                         img_block = Image.new("RGBA", (image_width, new_height + 10), (0,0,0,0))
                         img_block.paste(fg_img, (x_padding + shadow_radius, 5))
-                        group_images.append(img_block)
+                        group_image_blocks.append(img_block)
                     except Exception:
                         pass
+
+        # Add images once at the end of the group
+        group_images.extend(group_image_blocks)
         
         # Combine group images into one block with background
         if group_images:
@@ -392,7 +392,7 @@ async def draw_char_skill_pil(char_id: str):
     card_img.paste(char_bg, (0, -5), char_bg)
     card_img.alpha_composite(char_skill, (0, 600))
 
-    card_img = add_footer(card_img, 800, 20, color="hakush")
+    card_img = add_footer(card_img, 800, 20, color="white")
     card_img = await convert_img(card_img)
     return card_img
 
@@ -430,7 +430,7 @@ async def draw_char_chain_pil(char_id: str):
     card_img.paste(char_bg, (0, -5), char_bg)
     card_img.alpha_composite(char_chain, (0, 600))
 
-    card_img = add_footer(card_img, 800, 20, color="hakush")
+    card_img = add_footer(card_img, 800, 20, color="white")
     card_img = await convert_img(card_img)
     return card_img
 

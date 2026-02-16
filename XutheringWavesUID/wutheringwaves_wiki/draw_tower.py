@@ -28,11 +28,13 @@ from ..utils.fonts.waves_fonts import (
 from ..wutheringwaves_abyss.period import (
     get_slash_period_number,
     get_tower_period_number,
+    get_matrix_season_number,
 )
 from ..utils.resource.RESOURCE_PATH import MAP_CHALLENGE_PATH
 from .tower_wiki_render import (
     draw_tower_wiki_render,
     draw_slash_wiki_render,
+    draw_matrix_wiki_render,
     PLAYWRIGHT_AVAILABLE,
 )
 
@@ -161,7 +163,7 @@ async def draw_tower_challenge_img(ev: Event, period: Optional[int] = None) -> U
             _draw_floor_section(card_img, (40, current_y), area_name, floor_data, width - 80, section_h)
             current_y += section_h + 20
 
-        card_img = add_footer(card_img, color="hakush")
+        card_img = add_footer(card_img, color="white")
         card_img = await convert_img(card_img)
         return card_img
 
@@ -387,7 +389,7 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
 
             current_y += 30
 
-        card_img = add_footer(card_img, color="hakush")
+        card_img = add_footer(card_img, color="white")
         card_img = await convert_img(card_img)
         return card_img
 
@@ -509,4 +511,27 @@ def _draw_floor_section(
                 curr_x = x_start
             else:
                 curr_x += card_w + 20
+
+
+async def draw_matrix_challenge_img(ev: Event, season: Optional[int] = None) -> Union[bytes, str]:
+    """绘制矩阵信息"""
+    try:
+        if season is None:
+            text = ev.text.strip()
+            match = re.search(r"(\d+)", text)
+            season = int(match.group(1)) if match else get_matrix_season_number()
+
+        if PLAYWRIGHT_AVAILABLE:
+            try:
+                res = await draw_matrix_wiki_render(season)
+                if res:
+                    return res
+            except Exception:
+                logger.warning("Failed to render matrix wiki with playwright")
+
+        return f"矩阵第{season}期渲染失败，请确认Playwright可用"
+
+    except Exception as e:
+        logger.error(f"Error drawing matrix challenge: {e}")
+        return f"绘制矩阵信息失败: {str(e)}"
 

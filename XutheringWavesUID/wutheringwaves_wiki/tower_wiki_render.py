@@ -23,6 +23,7 @@ from ..utils.render_utils import (
 from ..wutheringwaves_abyss.period import (
     get_slash_period_number,
     get_tower_period_number,
+    get_matrix_season_number,
 )
 
 TEXTURE2D_PATH = Path(__file__).parents[1] / "utils" / "texture2d"
@@ -179,7 +180,7 @@ async def draw_tower_wiki_render(period: Optional[int] = None) -> Optional[bytes
     bg_img = Image.open(bg_path).transpose(Image.ROTATE_270)
 
     context = {
-        "title": f"深塔 第{period}期",
+        "title": f"逆境深塔 第{period}期",
         "duration": duration,
         "bg_url": pil_to_base64(bg_img),
         "theme_color": "#4e7cff", # Blue-ish for Tower
@@ -192,13 +193,135 @@ async def draw_tower_wiki_render(period: Optional[int] = None) -> Optional[bytes
             "floors": right_tower_floors
         },
         "deep_tower": {
-            "name": "深境之塔",
+            "name": "深境之塔（中塔）",
             "floors": deep_tower_floors
         },
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png")
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png")
     }
 
     return await render_html(waves_templates, "wiki/challenge_card.html", context)
+
+
+async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[bytes]:
+    """渲染矩阵信息 (HTML)"""
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or render_html is None or not use_html_render:
+        return None
+
+    if season is None:
+        season = get_matrix_season_number()
+
+    # 加载数据
+    json_path = MAP_CHALLENGE_PATH / "matrix" / f"{season}.json"
+    matrix_data = _load_json(json_path)
+    if not matrix_data:
+        return None
+
+    levels = matrix_data.get("Levels", [])
+    if not levels:
+        return None
+
+    # 找到 "奇点扩张" 关卡
+    target_level = None
+    for level in levels:
+        if level.get("Name") == "奇点扩张":
+            target_level = level
+            break
+
+    # 如果没有奇点扩张，取最后一个关卡
+    if not target_level:
+        target_level = levels[-1]
+
+    level_name = target_level.get("Name", "奇点扩张")
+
+    # 处理Buff
+    buffs = []
+    for buff in target_level.get("NewTowerBuffs", []):
+        desc = _clean_text(buff.get("Desc", ""))
+        desc = desc.replace("<br>", "\n").replace("<br/>", "\n")
+        desc = re.sub(r"<[^>]+>", "", desc)
+        buffs.append({
+            "icon": buff.get("Icon", ""),
+            "name": buff.get("Name", ""),
+            "desc": desc,
+        })
+
+    # 处理Boss（前4个，去重）
+    bosses = []
+    seen_names = set()
+    for wave in target_level.get("Waves", [])[:4]:
+        name = wave.get("Name", "未知")
+        if name in seen_names:
+            continue
+        seen_names.add(name)
+
+        # 提取Tags
+        tags = []
+        for tag in wave.get("Tags", []):
+            color = tag.get("Color", "ffffffff")
+            if len(color) == 8:
+                color = color[:6]
+            tags.append({
+                "name": tag.get("Name", ""),
+                "color": color,
+            })
+
+        # 解析完整描述，按<br>分段
+        desc_raw = wave.get("Desc", "")
+        # 先去掉第一段（boss名字的span）
+        parts = re.split(r"<br\s*/?>", desc_raw)
+        desc_lines = []
+        for p in parts:
+            cleaned = re.sub(r"<[^>]+>", "", p).strip()
+            if not cleaned:
+                continue
+            # 跳过第一行（只有boss名字的行）
+            if cleaned == name:
+                continue
+            desc_lines.append(cleaned)
+
+        bosses.append({
+            "name": name,
+            "icon": wave.get("SmallIcon", ""),
+            "tags": tags,
+            "desc_lines": desc_lines,
+        })
+
+    # 处理角色增益
+    roles = []
+    for role_data in matrix_data.get("Roles", []):
+        role_info = role_data.get("RoleInfo", {})
+        name = role_info.get("Name", "未知")
+        icon = role_info.get("RoleHeadIconCircle", "")
+
+        # 获取增益描述
+        enhance_descs = role_data.get("EnhanceSkillDesc", [])
+        desc = ""
+        if enhance_descs:
+            desc = enhance_descs[0].get("Value", "")
+
+        roles.append({
+            "name": name,
+            "icon": icon,
+            "desc": desc,
+        })
+
+    # 加载背景
+    bg_path = TEXTURE2D_PATH / "bg6.jpg"
+    bg_img = Image.open(bg_path).transpose(Image.ROTATE_270)
+
+    context = {
+        "title": f"矩阵叠兵 第{season}期",
+        "subtitle": level_name,
+        "bg_url": pil_to_base64(bg_img),
+        "theme_color": "#ff6b6b",
+        "buffs": buffs,
+        "bosses": bosses,
+        "roles": roles,
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
+    }
+
+    return await render_html(waves_templates, "wiki/matrix_card.html", context)
 
 
 async def draw_slash_wiki_render(period: Optional[int] = None) -> Optional[bytes]:
@@ -304,14 +427,14 @@ async def draw_slash_wiki_render(period: Optional[int] = None) -> Optional[bytes
     bg_img = Image.open(bg_path).transpose(Image.ROTATE_270)
 
     context = {
-        "title": f"海墟 第{period}期",
+        "title": f"冥歌海墟 第{period}期",
         "duration": duration,
         "bg_url": pil_to_base64(bg_img),
         "theme_color": "#ffca28", # Gold-ish for Slash
         "desc": desc_lines,
         "global_buffs": global_buffs,
         "floors": floors_render_data,
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png")
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png")
     }
 
-    return await render_html(waves_templates, "wiki/challenge_card.html", context)
+    return await render_html(waves_templates, "wiki/slash_card.html", context)

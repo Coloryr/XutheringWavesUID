@@ -901,8 +901,69 @@ class PhantomBattle(BaseModel):
     title: str  # 标题
 
 
-class MoreActivity(BaseModel):
-    """浸梦海床+激斗！向着荣耀之丘"""
+class CountData(BaseModel):
+    count: int
+    total: int
 
-    permanentRouge: PermanentRouge  # 浸梦海床
-    phantomBattle: PhantomBattle  # 激斗！向着荣耀之丘
+
+class FloroRanch(BaseModel):
+    """幻梦游园"""
+
+    animalCount: CountData  # 动物数量
+    mapCount: CountData  # 地图数量
+    reward: CountData  # 奖励
+    sort: int  # 排序
+    title: str  # 标题
+    toyCount: CountData  # 玩具数量
+
+
+class HonamiStoryItem(BaseModel):
+    icon: str  # 图标
+    itemId: int  # 物品ID
+    quality: int  # 品质
+    title: str  # 标题
+    unlock: bool  # 是否解锁
+
+
+class HonamiStory(BaseModel):
+    """穗波怪异物语"""
+
+    itemNum: int  # 已解锁物品数量
+    items: List[HonamiStoryItem] = Field(default_factory=list)  # 物品列表
+    level: int  # 等级
+    maxItemNum: int  # 最大物品数量
+    sort: int  # 排序
+    title: str  # 标题
+
+
+class PhantomBattleRecord(BaseModel):
+    """荣耀之丘：激斗重燃"""
+
+    cardNum: int  # 卡片数量
+    cardTotalNum: int  # 卡片总数
+    exp: int  # 经验
+    level: int  # 等级
+    levelName: str  # 等级名称
+    nextExp: int  # 下一级经验
+    sort: int  # 排序
+    title: str  # 标题
+
+
+class TrapDefense(BaseModel):
+    """潮蚀模拟"""
+
+    high: CountData  # 高难度
+    low: CountData  # 低难度
+    sort: int  # 排序
+    title: str  # 标题
+
+
+class MoreActivity(BaseModel):
+    """更多活动"""
+
+    permanentRouge: Optional[PermanentRouge] = None  # 浸梦海床
+    phantomBattle: Optional[PhantomBattle] = None  # 激斗！向着荣耀之丘
+    floroRanch: Optional[FloroRanch] = None  # 幻梦游园
+    honamiStory: Optional[HonamiStory] = None  # 穗波怪异物语
+    phantomBattleRecord: Optional[PhantomBattleRecord] = None  # 荣耀之丘：激斗重燃
+    trapDefense: Optional[TrapDefense] = None  # 潮蚀模拟

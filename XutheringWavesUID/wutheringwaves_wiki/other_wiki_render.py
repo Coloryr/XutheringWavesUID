@@ -97,7 +97,7 @@ async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> 
         "effect_desc": weapon_model.get_effect_detail(),
         "materials": materials,
         "bg_url": pil_to_base64(bg_img),
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
 
@@ -154,7 +154,7 @@ async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str
         "stats": stats,
         "skill_desc": echo_model.get_skill_detail(),
         "bg_url": pil_to_base64(bg_img),
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
 
@@ -224,7 +224,7 @@ async def draw_weapon_list_render(weapon_type: str = "") -> Optional[bytes]:
         "title": "武器一览",
         "groups": groups_data,
         "bg_url": pil_to_base64(bg_img),
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
     return await render_html(waves_templates, "wiki/list_wiki.html", context)
@@ -301,7 +301,7 @@ async def draw_sonata_list_render(version: str = "") -> Optional[bytes]:
         "title": title,
         "groups": groups_data,
         "bg_url": pil_to_base64(bg_img),
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
     return await render_html(waves_templates, "wiki/list_wiki.html", context)

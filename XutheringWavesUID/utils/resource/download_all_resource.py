@@ -150,6 +150,7 @@ _download_lock = asyncio.Lock()
 
 
 async def download_all_resource(force: bool = False):
+    return
     async with _download_lock:
         if force:
             import shutil

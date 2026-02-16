@@ -145,7 +145,10 @@ def get_char_detail(char_id: Union[str, int], level: int, breach: Union[int, Non
             if name not in result.fixed_skill:
                 result.fixed_skill[name] = "0%"
 
-            result.fixed_skill[name] = sum_percentages(skill_info["param"][0], result.fixed_skill[name])
+            try:
+                result.fixed_skill[name] = sum_percentages(skill_info["param"][0], result.fixed_skill[name])
+            except (IndexError, KeyError, TypeError) as e:
+                logger.warning(f"get_char_detail param[0] failed for char_id {char_id}, skill {name}: {e}")
 
         if skill_info.get("type") == "固有技能":
             for i, name in enumerate(fixed_name):

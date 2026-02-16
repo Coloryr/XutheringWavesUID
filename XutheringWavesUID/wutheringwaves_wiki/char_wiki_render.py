@@ -127,7 +127,7 @@ def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[str, Any
         "bg_url": pil_to_base64(bg_img),
         "portrait_url": image_to_base64(role_pile_path),
         "hakushin_logo": hakushin_logo,
-        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_hakush.png"),
+        "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
 async def draw_char_skill_render(char_id: str):
@@ -146,7 +146,13 @@ async def draw_char_skill_render(char_id: str):
     context = _get_base_context(char_model, char_id)
     context["section"] = "skill"
     context["skills"] = await prepare_char_skill_data(char_model.skillTree)
-    
+
+    if char_model.skillBranches:
+        context["skill_branches"] = [
+            {"name": b.name, "desc": b.desc, "isDefault": b.isDefault}
+            for b in char_model.skillBranches
+        ]
+
     res = await render_html(waves_templates, "wiki/char_wiki.html", context)
     if res:
         save_wiki_cache(char_id, "skill", res)
@@ -283,12 +289,14 @@ async def prepare_char_forte_data_render(data: Dict, char_id: str) -> Dict[str, 
         sorted_desc_keys = sorted(desc_map.keys())
         
         items = []
+        group_images_seen = set()
+        group_imgs_b64 = []
         for desc_key in sorted_desc_keys:
             item = desc_map[desc_key]
             desc_text = item.get("Desc", "")
             input_list = item.get("InputList", [])
             image_list = item.get("ImageList", [])
-            
+
             parts = re.split(r"{(\d+)}", desc_text)
             final_desc = ""
             for i, part in enumerate(parts):
@@ -301,30 +309,32 @@ async def prepare_char_forte_data_render(data: Dict, char_id: str) -> Dict[str, 
                         icon_path = MAP_FORTE_PATH / f"{input_name}.webp"
                         if icon_path.exists():
                              b64 = image_to_base64(icon_path)
-                             final_desc += f'<img src="{b64}" class="inline-icon" alt="{input_name}">' 
+                             final_desc += f'<img src="{b64}" class="inline-icon" alt="{input_name}">'
                         else:
                             final_desc += f"<span class='key-input'>{input_name}</span>"
                     else:
                         final_desc += f"{{{part}}}"
-            
-            # Images
-            imgs_b64 = []
+
+            # Collect images at group level (deduplicated)
             for img_path_str in image_list:
+                if img_path_str in group_images_seen:
+                    continue
+                group_images_seen.add(img_path_str)
                 img_name = os.path.basename(img_path_str)
                 if not img_name.lower().endswith((".png", ".webp", ".jpg")):
                      img_name += ".png"
                 local_img_path = MAP_FORTE_PATH / char_id / img_name
                 if local_img_path.exists():
-                    imgs_b64.append(image_to_base64(local_img_path))
-            
+                    group_imgs_b64.append(image_to_base64(local_img_path))
+
             items.append({
                 "desc": final_desc,
-                "images": imgs_b64
             })
-            
+
         groups.append({
             "name": group_name,
-            "forte_items": items
+            "forte_items": items,
+            "images": group_imgs_b64,
         })
         
     return {
