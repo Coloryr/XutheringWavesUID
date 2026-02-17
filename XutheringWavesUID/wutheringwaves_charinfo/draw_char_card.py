@@ -441,7 +441,14 @@ async def get_role_need(
                 )
 
             # rawData中未找到角色，再请求listRole确认用户是否拥有该角色
-            if not change_list_regex and ck:
+            if not change_list_regex:
+                if not ck:
+                    _, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
+                if not ck:
+                    return (
+                        None,
+                        f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
+                    )
                 online_list = await waves_api.get_online_list_role(ck)
                 if online_list.success and online_list.data:
                     online_list_role_model = OnlineRoleList.model_validate(online_list.data)

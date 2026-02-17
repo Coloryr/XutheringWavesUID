@@ -242,7 +242,7 @@ class Weapon_21010046(WeaponAbstract):
         dmg = f"{self.param(3)}*{self.param(4)}"
         title = self.get_title()
         msg = f"自身获得护盾时，重击伤害无视目标{dmg}防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
 
 class Weapon_21010053(WeaponAbstract):
@@ -263,7 +263,6 @@ class Weapon_21010056(WeaponAbstract):
         isGroup: bool = False,
     ):
         # 施放变奏技能或附加【异常效应】时才生效
-
         if attr.char_damage != liberation_damage:
             return
 
@@ -657,7 +656,7 @@ class Weapon_21020056(WeaponAbstract):
         dmg = f"{self.param(1)}"
         title = self.get_title()
         msg = f"施放变奏技能或普攻后15秒内，自身造成伤害无视目标{dmg}防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
 
 class Weapon_21020064(WeaponAbstract):
@@ -796,7 +795,7 @@ class Weapon_21020076(WeaponAbstract):
                 dmg = f"{self.param(1)}"
                 title = self.get_title()
                 msg = f"共鸣解放伤害无视目标{dmg}防御"
-                attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+                attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
                 dmg = f"{self.param(2)}"
                 title = self.get_title()
@@ -932,7 +931,7 @@ class Weapon_21030036(WeaponAbstract):
             dmg = f"{self.param(6)}"
             title = self.get_title()
             msg = f"无视目标{dmg}防御"
-            attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+            attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
         return True
 
@@ -950,7 +949,7 @@ class Weapon_21030036(WeaponAbstract):
             dmg = f"{self.param(6)}"
             title = self.get_title()
             msg = f"无视目标{dmg}防御"
-            attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+            attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
         return True
 
@@ -1259,7 +1258,7 @@ class Weapon_21040036(WeaponAbstract):
         dmg = f"{self.param(1)}"
         title = self.get_title()
         msg = f"施放普攻技能时，自身造成伤害无视目标{dmg}防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
         if attr.env_spectro_deepen:
             dmg = f"{self.param(2)}"
@@ -1325,7 +1324,7 @@ class Weapon_21040046(WeaponAbstract):
         dmg = f"{self.param(3)}*{self.param(5)}"
         title = self.get_title()
         msg = f"自身获得护盾时，共鸣解放伤害无视目标{dmg}防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
         return True
 
@@ -1343,7 +1342,7 @@ class Weapon_21040046(WeaponAbstract):
         dmg = f"{self.param(3)}*{self.param(5)}"
         title = self.get_title()
         msg = f"自身获得护盾时，共鸣解放伤害无视目标{dmg}防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
         return True
 
@@ -1386,7 +1385,7 @@ class Weapon_21040056(WeaponAbstract):
             dmg = f"{self.param(4)}"
             title = self.get_title()
             msg = f"附加【集谐·偏移】后，普攻伤害无视目标{dmg}防御"
-            attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+            attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
 
 class Weapon_21040064(WeaponAbstract):
@@ -1816,7 +1815,7 @@ class Weapon_21050066(WeaponAbstract):
         dmg = f"{self.param(4)}"
         title = self.get_title()
         msg = f"造成声骸技能伤害后，无视目标{dmg}%防御"
-        attr.add_defense_reduction(calc_percent_expression(dmg), title, msg)
+        attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
         if attr.char_damage == phantom_damage:
             dmg = f"{self.param(3)}"
             title = self.get_title()
