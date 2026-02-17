@@ -65,7 +65,7 @@ async def get_draw_list(ev: Event, uid: str, user_id: str, page: int = 1) -> Uni
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     all_role_detail: Optional[Dict[str, RoleDetailData]] = await get_all_role_detail_info(uid)

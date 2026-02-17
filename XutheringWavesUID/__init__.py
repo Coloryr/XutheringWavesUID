@@ -39,23 +39,36 @@ async def _flush_activity_buffer():
             logger.warning(f"[XutheringWavesUID] 批量活跃度写入失败: {e}")
 
 
+_shutdown_event = asyncio.Event()
+
+
 async def _activity_flush_loop():
     """后台定时刷写循环"""
-    while True:
-        await asyncio.sleep(_FLUSH_INTERVAL)
+    while not _shutdown_event.is_set():
+        try:
+            await asyncio.wait_for(_shutdown_event.wait(), timeout=_FLUSH_INTERVAL)
+            break
+        except asyncio.TimeoutError:
+            pass
         try:
             await _flush_activity_buffer()
         except Exception as e:
             logger.warning(f"[XutheringWavesUID] 活跃度刷写循环异常: {e}")
 
 # 启动后台刷写任务
-asyncio.get_event_loop().create_task(_activity_flush_loop())
+_flush_task = asyncio.get_event_loop().create_task(_activity_flush_loop())
 
 
 @on_core_shutdown
 async def _flush_on_shutdown():
     """退出前刷写缓冲区，防止数据丢失"""
-    logger.info("[XutheringWavesUID] 退出前刷写活跃度缓冲区...")
+    logger.info("[XutheringWavesUID] 退出前停止活跃度刷写循环...")
+    _shutdown_event.set()
+    try:
+        await asyncio.wait_for(_flush_task, timeout=5)
+    except asyncio.TimeoutError:
+        _flush_task.cancel()
+    logger.info("[XutheringWavesUID] 刷写活跃度缓冲区...")
     await _flush_activity_buffer()
     logger.info("[XutheringWavesUID] 活跃度缓冲区刷写完成")
 

@@ -1,3 +1,4 @@
+from ..wutheringwaves_config import PREFIX
 from typing import Union
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -62,7 +63,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     # 共鸣者信息

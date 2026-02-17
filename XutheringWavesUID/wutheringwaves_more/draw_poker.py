@@ -1,3 +1,4 @@
+from ..wutheringwaves_config import PREFIX
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -92,7 +93,7 @@ async def draw_poker_img(ev: Event, uid: str, user_id: str):
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     # 计算徽章行数来调整总高度

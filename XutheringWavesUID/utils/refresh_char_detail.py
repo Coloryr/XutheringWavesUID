@@ -17,7 +17,7 @@ from ..utils.error_reply import WAVES_CODE_101, WAVES_CODE_102
 from ..utils.queues.const import QUEUE_SCORE_RANK
 from ..utils.queues.queues import push_item
 from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, CACHE_PATH
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
 from ..utils.api.model import AccountBaseInfo as _AccountBaseInfo
@@ -130,7 +130,7 @@ async def send_card(
         if not account_info.success:
             return account_info.throw_msg()
         if not account_info.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info.data)
         if len(waves_data) != 1 and account_info.roleNum != len(save_data):
             logger.warning(
@@ -281,6 +281,9 @@ async def refresh_char(
     role_info = await waves_api.get_role_info(uid, ck)
     if not role_info.success:
         return role_info.throw_msg()
+
+    if isinstance(role_info.data, dict) and "roleList" not in role_info.data:
+        return f"鸣潮特征码[{uid}]的角色数据未公开展示，请【{PREFIX}登录】或在库街区展示角色"
 
     try:
         role_info = RoleList.model_validate(role_info.data)

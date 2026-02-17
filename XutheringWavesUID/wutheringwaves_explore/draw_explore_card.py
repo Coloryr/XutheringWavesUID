@@ -3,7 +3,7 @@ from gsuid_core.logger import logger
 from gsuid_core.data_store import get_res_path
 
 from ..utils.waves_api import waves_api
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.error_reply import WAVES_CODE_102
 from ..utils.api.model import (
     ExploreList,
@@ -76,7 +76,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
         if not account_info_res.success:
             return account_info_res.throw_msg()
         if not account_info_res.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info_res.data)
 
         explore_data_res = await waves_api.get_explore_data(uid, ck)

@@ -158,7 +158,7 @@ async def process_uid(uid, ev, period_param: Optional[Union[int, str]]) -> Optio
     if not account_info.success or not account_info.data:
         return None
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     return {

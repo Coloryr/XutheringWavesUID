@@ -28,7 +28,7 @@ from ..utils.error_reply import WAVES_CODE_102
 from ..utils.ascension.char import char_id_data, ensure_data_loaded
 from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.ascension.weapon import get_breach
 from ..utils.fonts.waves_fonts import (
     waves_font_16,
@@ -103,7 +103,7 @@ async def draw_char_list_img(
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     all_role_detail = await get_all_roleid_detail_info(

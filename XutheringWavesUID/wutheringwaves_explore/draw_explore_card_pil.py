@@ -1,3 +1,4 @@
+from ..wutheringwaves_config import PREFIX
 import math
 from io import BytesIO
 from pathlib import Path
@@ -89,7 +90,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     explore_data = await waves_api.get_explore_data(uid, ck)
