@@ -619,10 +619,7 @@ async def draw_char_detail_img(
             return f"[鸣潮] 角色【{char_name}】暂不支持伤害计算！\n"
 
     ck = ""
-    if not is_limit_query:
-        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-        if not ck:
-            return hint.error_reply(WAVES_CODE_102)
+    need_ck = bool(waves_id)  # 查看他人面板时一定需要ck
 
     # 账户数据
     if waves_id:
@@ -632,7 +629,12 @@ async def draw_char_detail_img(
         # 优先读取缓存，避免不必要的API请求
         account_info = await load_base_info_cache(uid)
         if not account_info:
-            # 缓存不存在，fallback到API请求
+            need_ck = True
+        if need_ck and not ck:
+            _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+            if not ck:
+                return hint.error_reply(WAVES_CODE_102)
+        if not account_info:
             api_result = await waves_api.get_base_info(uid, ck)
             if not api_result.success:
                 return api_result.throw_msg()
@@ -1025,10 +1027,7 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     char_name = alias_to_char_name(char)
 
     ck = ""
-    if not is_limit_query:
-        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-        if not ck:
-            return hint.error_reply(WAVES_CODE_102)
+    need_ck = bool(waves_id)  # 查看他人面板时一定需要ck
 
     # 账户数据
     if waves_id:
@@ -1037,6 +1036,12 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     if not is_limit_query:
         # 优先读取缓存，避免不必要的API请求
         account_info = await load_base_info_cache(uid)
+        if not account_info:
+            need_ck = True
+        if need_ck and not ck:
+            _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+            if not ck:
+                return hint.error_reply(WAVES_CODE_102)
         if not account_info:
             api_result = await waves_api.get_base_info(uid, ck)
             if not api_result.success:
