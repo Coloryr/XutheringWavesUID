@@ -1,3 +1,4 @@
+from ..wutheringwaves_config import PREFIX
 import math
 from io import BytesIO
 from pathlib import Path
@@ -22,7 +23,7 @@ from ..utils.image import (
     WAVES_LINGERING,
     add_footer,
     change_color,
-    get_custom_waves_bg,
+    get_waves_bg,
 )
 from ..utils.api.model import (
     AreaInfo,
@@ -89,7 +90,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     explore_data = await waves_api.get_explore_data(uid, ck)
@@ -114,7 +115,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
         if _explore.areaInfoList:
             h += math.ceil(len(_explore.areaInfoList) / 3) * explore_frame_h
 
-    img = get_custom_waves_bg(2000, h, "bg3")
+    img = get_waves_bg(2000, h, "bg3")
 
     # 头像部分
     avatar, avatar_ring = await draw_pic_with_ring(ev)

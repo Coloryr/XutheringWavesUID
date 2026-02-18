@@ -6,18 +6,20 @@ from .guide import get_guide
 from .draw_char import draw_char_wiki
 from .draw_echo import draw_wiki_echo
 from .draw_list import draw_sonata_list, draw_weapon_list
-from .draw_tower import draw_slash_challenge_img, draw_tower_challenge_img
+from .draw_tower import draw_slash_challenge_img, draw_tower_challenge_img, draw_matrix_challenge_img
 from .draw_weapon import draw_wiki_weapon
 from ..utils.name_convert import char_name_to_char_id
 from ..utils.char_info_utils import PATTERN
 from ..wutheringwaves_abyss.period import (
     get_tower_period_number,
     get_slash_period_number,
+    get_matrix_season_number,
 )
 
 sv_waves_guide = SV("鸣潮攻略", priority=10)
 sv_waves_tower = SV("waves查询深塔信息", priority=4)
 sv_waves_slash_info = SV("waves查询海墟信息", priority=4)
+sv_waves_matrix = SV("waves查询矩阵信息", priority=4)
 
 
 @sv_waves_guide.on_regex(
@@ -144,6 +146,41 @@ async def send_slash_challenge_info(bot: Bot, ev: Event):
             target_period = current_period - 2
 
     im = await draw_slash_challenge_img(ev, target_period)
+    if isinstance(im, str):
+        at_sender = True if ev.group_id else False
+        await bot.send(im, at_sender)
+    else:
+        await bot.send(im)
+
+
+@sv_waves_matrix.on_regex(
+    r"^(?:矩阵|jz信息|matrix)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
+    block=True,
+)
+@sv_waves_matrix.on_regex(
+    r"^矩阵$", # 重定向
+    block=True,
+)
+async def send_matrix_challenge_info(bot: Bot, ev: Event):
+    """查询矩阵挑战信息"""
+    period_val = ev.regex_dict.get("period", "") or ev.regex_dict.get("period_force", "")
+
+    current_period = get_matrix_season_number()
+    target_period = current_period
+
+    if period_val:
+        if period_val.isdigit():
+            target_period = int(period_val)
+        elif period_val in ("下一期", "下期"):
+            target_period = current_period + 1
+        elif period_val == "下下期":
+            target_period = current_period + 2
+        elif period_val in ("上一期", "上期"):
+            target_period = current_period - 1
+        elif period_val == "上上期":
+            target_period = current_period - 2
+
+    im = await draw_matrix_challenge_img(ev, target_period)
     if isinstance(im, str):
         at_sender = True if ev.group_id else False
         await bot.send(im, at_sender)

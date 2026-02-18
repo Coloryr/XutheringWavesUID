@@ -145,25 +145,35 @@ def get_char_detail(char_id: Union[str, int], level: int, breach: Union[int, Non
             if name not in result.fixed_skill:
                 result.fixed_skill[name] = "0%"
 
-            result.fixed_skill[name] = sum_percentages(skill_info["param"][0], result.fixed_skill[name])
+            try:
+                result.fixed_skill[name] = sum_percentages(skill_info["param"][0], result.fixed_skill[name])
+            except (IndexError, KeyError, TypeError) as e:
+                logger.warning(f"get_char_detail param[0] failed for char_id {char_id}, skill {name}: {e}")
 
         if skill_info.get("type") == "固有技能":
-            for i, name in enumerate(fixed_name):
-                if skill_info["desc"].startswith(name) or skill_info["desc"].startswith(f"{char_data['name']}的{name}"):
-                    name = name.replace("提升", "").replace("全", "")
+            for i, orig_name in enumerate(fixed_name):
+                if skill_info["desc"].startswith(orig_name) or skill_info["desc"].startswith(f"{char_data['name']}的{orig_name}"):
+                    name = orig_name.replace("提升", "").replace("全", "")
                     if name not in result.fixed_skill:
                         result.fixed_skill[name] = "0%"
 
-                    # 从描述中提取参数索引
-                    search_pattern = name if skill_info["desc"].startswith(name) else f"{char_data['name']}的{name}"
+                    # Use original name (with 提升) for pattern matching in desc
+                    search_pattern = orig_name if skill_info["desc"].startswith(orig_name) else f"{char_data['name']}的{orig_name}"
                     param_index = extract_param_index(skill_info["desc"], search_pattern)
 
                     # 尝试获取参数值
                     try:
                         param_value = skill_info["param"][param_index]
                         result.fixed_skill[name] = sum_percentages(param_value, result.fixed_skill[name])
-                    except (IndexError, KeyError, TypeError) as e:
-                        logger.warning(f"get_char_detail extract_param_index failed for char_id {char_id}, skill {name}: {e}")
+                    except (IndexError, KeyError, TypeError):
+                        # New API embeds values directly in desc (e.g. "提升20%")
+                        # instead of using {0} placeholders with param array
+                        desc_text = re.sub(r'<[^>]+>', '', skill_info.get("desc", ""))
+                        match = re.search(re.escape(search_pattern) + r'(\d+(?:\.\d+)?%?)', desc_text)
+                        if match:
+                            result.fixed_skill[name] = sum_percentages(match.group(1), result.fixed_skill[name])
+                        else:
+                            logger.warning(f"get_char_detail extract_param failed for char_id {char_id}, skill {name}")
 
     return result
 

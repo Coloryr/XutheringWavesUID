@@ -6,7 +6,7 @@ from gsuid_core.logger import logger
 from gsuid_core.data_store import get_res_path
 
 from ..utils.waves_api import waves_api
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.api.model import (
     Role,
     RoleList,
@@ -56,7 +56,7 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
         try:
             role_info = RoleList.model_validate(role_info.data)
         except Exception:
-            return "用户未展示角色数据"
+            return f"用户未展示角色数据, 请尝试【{PREFIX}登录】"
 
         role_info.roleList.sort(key=lambda i: (i.level, i.starLevel, i.roleId), reverse=True)
 
@@ -65,7 +65,7 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
         if not account_info.success:
             return account_info.throw_msg()
         if not account_info.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info.data)
 
         # 数据坞

@@ -8,7 +8,7 @@ from ..utils.hint import error_reply
 from ..utils.waves_api import waves_api
 from ..utils.error_reply import WAVES_CODE_102
 from ..utils.api.model import ChallengeArea, AccountBaseInfo, RoleDetailData
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.name_convert import char_name_to_char_id
 from ..utils.ascension.char import get_char_detail
 from ..utils.render_utils import (
@@ -64,7 +64,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
         if not account_info_res.success:
             return account_info_res.throw_msg()
         if not account_info_res.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info_res.data)
 
         # 准备渲染数据

@@ -620,7 +620,7 @@ async def draw_uid_avatar(uid, ev, card_img):
         if not account_info.success:
             return account_info.throw_msg()
         if not account_info.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info.data)
 
         base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")

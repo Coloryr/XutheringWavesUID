@@ -154,7 +154,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
     if not account_info.success:
         return account_info.throw_msg()
     if not account_info.data:
-        return "用户未展示数据"
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】"
     account_info = AccountBaseInfo.model_validate(account_info.data)
 
     # 共鸣者信息
@@ -363,7 +363,7 @@ async def upload_slash_record(
     waves_id: str,
     slash_data: SlashDetail,
 ):
-    from ..wutheringwaves_config import WutheringWavesConfig
+    from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 
     WavesToken = WutheringWavesConfig.get_config("WavesToken").data
     if not WavesToken:

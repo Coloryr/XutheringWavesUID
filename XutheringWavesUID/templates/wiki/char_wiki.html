@@ -510,6 +510,23 @@
                 </div>
                 {% endfor %}
             </div>
+
+            {% if skill_branches %}
+            <div class="section-title">共鸣模态</div>
+            <div class="card-list">
+                {% for branch in skill_branches %}
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">{{ branch.name }}</div>
+                        {% if branch.isDefault %}
+                        <div class="card-subtitle" style="color: var(--main-color);">默认</div>
+                        {% endif %}
+                    </div>
+                    <div class="card-desc">{{ branch.desc }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
             {% endif %}
 
             {% if section == 'chain' %}
@@ -553,10 +570,10 @@
                     {% for item in group.forte_items %}
                     <div class="forte-group">
                         <div class="card-desc">{{ item.desc | safe }}</div>
-                        {% for img in item.images %}
-                        <img src="{{ img }}" class="forte-img">
-                        {% endfor %}
                     </div>
+                    {% endfor %}
+                    {% for img in group.images %}
+                    <img src="{{ img }}" class="forte-img">
                     {% endfor %}
                 </div>
                 {% endfor %}

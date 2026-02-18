@@ -21,6 +21,7 @@ from ..utils.api.model_other import EnemyDetailData
 from ..utils.damage.utils import comma_separated_number
 from ..utils.ascension.template import get_template_data
 from ..utils.char_info_utils import get_all_roleid_detail_info
+from ..utils.refresh_char_detail import load_base_info_cache, save_base_info_cache
 from ..utils.name_convert import alias_to_char_name, char_name_to_char_id
 from ..utils.api.wwapi import ONE_RANK_URL, OneRankRequest, OneRankResponse
 from ..utils.damage.abstract import DamageRankRegister, DamageDetailRegister
@@ -212,6 +213,7 @@ async def ph_card_draw(
     is_draw=True,
     change_command="",
     enemy_detail: Optional[EnemyDetailData] = None,
+    is_limit_query=False,
 ):
     from ..utils.calc import WuWaCalc
     char_name = role_detail.role.roleName
@@ -223,7 +225,7 @@ async def ph_card_draw(
     ph_0 = Image.open(TEXT_PATH / "ph_0.png")
     ph_1 = Image.open(TEXT_PATH / "ph_1.png")
     #  phantom_sum_value = {}
-    calc = WuWaCalc(role_detail, enemy_detail)
+    calc = WuWaCalc(role_detail, enemy_detail, is_limit=is_limit_query)
     phantom_score = 0  # 初始化声骸评分
     if role_detail.phantomData and role_detail.phantomData.equipPhantomList:
         equipPhantomList = role_detail.phantomData.equipPhantomList
@@ -387,7 +389,6 @@ async def get_role_need(
     waves_id=None,
     is_force_avatar=False,
     force_resource_id=None,
-    is_online_user=True,
     is_limit_query=False,
     change_list_regex: Optional[str] = None,
 ):
@@ -440,20 +441,34 @@ async def get_role_need(
                     None,
                     f"[鸣潮] 未找到【{char_name}】角色极限面板信息，请等待适配!",
                 )
-            elif is_online_user and not change_list_regex:
-                return (
-                    None,
-                    f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
-                )
-            else:
-                # 未上线的角色，构造一个数据
-                gen_role_detail = await generate_online_role_detail(char_id)
-                if not gen_role_detail:
+
+            # rawData中未找到角色，再请求listRole确认用户是否拥有该角色
+            if not change_list_regex:
+                if not ck:
+                    _, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
+                if not ck:
                     return (
                         None,
-                        f"[鸣潮] 未找到【{char_name}】角色信息!",
+                        f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
                     )
-                role_detail = gen_role_detail
+                online_list = await waves_api.get_online_list_role(ck)
+                if online_list.success and online_list.data:
+                    online_list_role_model = OnlineRoleList.model_validate(online_list.data)
+                    online_role_map = {str(i.roleId): i for i in online_list_role_model}
+                    if char_id in online_role_map:
+                        return (
+                            None,
+                            f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
+                        )
+
+            # 未上线的角色，构造一个数据
+            gen_role_detail = await generate_online_role_detail(char_id)
+            if not gen_role_detail:
+                return (
+                    None,
+                    f"[鸣潮] 未找到【{char_name}】角色信息!",
+                )
+            role_detail = gen_role_detail
 
     return avatar, role_detail
 
@@ -583,6 +598,9 @@ async def draw_char_detail_img(
     change_list_regex=None,
     is_limit_query=False,
 ):
+    if check_request_rate_limit():
+        return hint.error_reply(WAVES_CODE_108)
+
     char, damageId = parse_text_and_number(char)
 
     char_id = char_name_to_char_id(char)
@@ -612,33 +630,31 @@ async def draw_char_detail_img(
         if damageId and not damageDetail:
             return f"[鸣潮] 角色【{char_name}】暂不支持伤害计算！\n"
 
-    is_online_user = False
     ck = ""
-    if not is_limit_query:
-        if check_request_rate_limit():
-            return hint.error_reply(WAVES_CODE_108)
-        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-        if not ck:
-            return hint.error_reply(WAVES_CODE_102)
-
-        online_list = await waves_api.get_online_list_role(ck)
-        if online_list.success and online_list.data:
-            online_list_role_model = OnlineRoleList.model_validate(online_list.data)
-            online_role_map = {str(i.roleId): i for i in online_list_role_model}
-            if char_id in online_role_map:
-                is_online_user = True
+    need_ck = bool(waves_id)  # 查看他人面板时一定需要ck
 
     # 账户数据
     if waves_id:
         uid = waves_id
 
     if not is_limit_query:
-        account_info = await waves_api.get_base_info(uid, ck)
-        if not account_info.success:
-            return account_info.throw_msg()
-        if not account_info.data:
-            return "用户未展示数据"
-        account_info = AccountBaseInfo.model_validate(account_info.data)
+        # 优先读取缓存，避免不必要的API请求
+        account_info = await load_base_info_cache(uid)
+        if not account_info:
+            need_ck = True
+        if need_ck and not ck:
+            _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+            if not ck:
+                return hint.error_reply(WAVES_CODE_102)
+        if not account_info:
+            api_result = await waves_api.get_base_info(uid, ck)
+            if not api_result.success:
+                return api_result.throw_msg()
+            if not api_result.data:
+                return f"用户未展示数据, 请尝试【{PREFIX}登录】"
+            account_info = AccountBaseInfo.model_validate(api_result.data)
+            # 缓存结果供下次使用
+            await save_base_info_cache(uid, account_info)
         force_resource_id = None
     else:
         account_info = AccountBaseInfo.model_validate(
@@ -661,7 +677,6 @@ async def draw_char_detail_img(
         waves_id,
         is_force_avatar,
         force_resource_id,
-        is_online_user,
         is_limit_query,
         change_list_regex,
     )
@@ -683,7 +698,7 @@ async def draw_char_detail_img(
 
     # 声骸
     calc, phantom_temp, phantom_score = await ph_card_draw(
-        ph_sum_value, role_detail, isDraw, change_command, enemy_detail
+        ph_sum_value, role_detail, isDraw, change_command, enemy_detail, is_limit_query
     )
     calc.role_card = calc.enhance_summation_card_value(calc.phantom_card)
 
@@ -1024,22 +1039,29 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     char_name = alias_to_char_name(char)
 
     ck = ""
-    if not is_limit_query:
-        _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-        if not ck:
-            return hint.error_reply(WAVES_CODE_102)
+    need_ck = bool(waves_id)  # 查看他人面板时一定需要ck
 
     # 账户数据
     if waves_id:
         uid = waves_id
 
     if not is_limit_query:
-        account_info = await waves_api.get_base_info(uid, ck)
-        if not account_info.success:
-            return account_info.throw_msg()
-        if not account_info.data:
-            return "用户未展示数据"
-        account_info = AccountBaseInfo.model_validate(account_info.data)
+        # 优先读取缓存，避免不必要的API请求
+        account_info = await load_base_info_cache(uid)
+        if not account_info:
+            need_ck = True
+        if need_ck and not ck:
+            _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
+            if not ck:
+                return hint.error_reply(WAVES_CODE_102)
+        if not account_info:
+            api_result = await waves_api.get_base_info(uid, ck)
+            if not api_result.success:
+                return api_result.throw_msg()
+            if not api_result.data:
+                return f"用户未展示数据, 请尝试【{PREFIX}登录】"
+            account_info = AccountBaseInfo.model_validate(api_result.data)
+            await save_base_info_cache(uid, account_info)
         force_resource_id = None
     else:
         account_info = AccountBaseInfo.model_validate(
@@ -1062,7 +1084,6 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
         waves_id,
         is_force_avatar=False,
         force_resource_id=force_resource_id,
-        is_online_user=False,
         is_limit_query=is_limit_query,
     )
     if isinstance(role_detail, str):
@@ -1084,7 +1105,7 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     ph_0 = Image.open(TEXT_PATH / "ph_0.png")
     ph_1 = Image.open(TEXT_PATH / "ph_1.png")
     # phantom_sum_value = {}
-    calc: WuWaCalc = WuWaCalc(role_detail)
+    calc: WuWaCalc = WuWaCalc(role_detail, is_limit=is_limit_query)
     if role_detail.phantomData and role_detail.phantomData.equipPhantomList:
         equipPhantomList = role_detail.phantomData.equipPhantomList
         phantom_score = 0

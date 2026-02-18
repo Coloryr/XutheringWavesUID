@@ -35,7 +35,7 @@ from ..utils.api.model import (
     AccountBaseInfo,
     RoleList,
 )
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.render_utils import (
     PLAYWRIGHT_AVAILABLE,
     render_html,
@@ -128,7 +128,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         if not account_info_res.success:
             return account_info_res.throw_msg()
         if not account_info_res.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info_res.data)
 
         # 准备渲染数据

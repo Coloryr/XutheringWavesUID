@@ -18,7 +18,7 @@ from ..utils.api.model import (
 )
 from ..utils.ascension.char import get_char_detail
 from ..utils.waves_api import waves_api
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.render_utils import (
     PLAYWRIGHT_AVAILABLE,
     render_html,
@@ -72,7 +72,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         if not account_info_res.success:
             return account_info_res.throw_msg()
         if not account_info_res.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info_res.data)
 
         abyss_data = await get_abyss_data(uid, ck, is_self_ck)

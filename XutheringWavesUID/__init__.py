@@ -1,11 +1,14 @@
 """init"""
 
 import re
+import time
+import asyncio
 import shutil
 from pathlib import Path
 
 from gsuid_core.sv import Plugins
 from gsuid_core.logger import logger
+from gsuid_core.server import on_core_shutdown
 from gsuid_core.data_store import get_res_path
 
 Plugins(name="XutheringWavesUID", force_prefix=["ww"], allow_empty_prefix=False)
@@ -15,6 +18,60 @@ from .utils.bot_send_hook import install_bot_hooks
 from .utils.database.waves_subscribe import WavesSubscribe
 from .utils.database.waves_user_activity import WavesUserActivity
 from .utils.plugin_checker import is_from_waves_plugin
+
+# ===== 活跃度批量写入缓冲 =====
+# 内存中暂存活跃度记录，定时批量写入，避免高并发写入损坏数据库
+_activity_buffer: dict[str, tuple[str, str, str]] = {}  # key -> (user_id, bot_id, bot_self_id)
+_FLUSH_INTERVAL = 60  # 秒
+
+
+async def _flush_activity_buffer():
+    """将缓冲区中的活跃度记录批量写入数据库"""
+    if not _activity_buffer:
+        return
+    pending = dict(_activity_buffer)
+    _activity_buffer.clear()
+
+    for key, (user_id, bot_id, bot_self_id) in pending.items():
+        try:
+            await WavesUserActivity.update_user_activity(user_id, bot_id, bot_self_id)
+        except Exception as e:
+            logger.warning(f"[XutheringWavesUID] 批量活跃度写入失败: {e}")
+
+
+_shutdown_event = asyncio.Event()
+
+
+async def _activity_flush_loop():
+    """后台定时刷写循环"""
+    while not _shutdown_event.is_set():
+        try:
+            await asyncio.wait_for(_shutdown_event.wait(), timeout=_FLUSH_INTERVAL)
+            break
+        except asyncio.TimeoutError:
+            pass
+        try:
+            await _flush_activity_buffer()
+        except Exception as e:
+            logger.warning(f"[XutheringWavesUID] 活跃度刷写循环异常: {e}")
+
+# 启动后台刷写任务
+_flush_task = asyncio.get_event_loop().create_task(_activity_flush_loop())
+
+
+@on_core_shutdown
+async def _flush_on_shutdown():
+    """退出前刷写缓冲区，防止数据丢失"""
+    logger.info("[XutheringWavesUID] 退出前停止活跃度刷写循环...")
+    _shutdown_event.set()
+    try:
+        await asyncio.wait_for(_flush_task, timeout=5)
+    except asyncio.TimeoutError:
+        _flush_task.cancel()
+    logger.info("[XutheringWavesUID] 刷写活跃度缓冲区...")
+    await _flush_activity_buffer()
+    logger.info("[XutheringWavesUID] 活跃度缓冲区刷写完成")
+
 
 # 注册 WavesSubscribe 的 hook
 async def waves_bot_check_hook(group_id: str, bot_self_id: str):
@@ -32,21 +89,16 @@ async def waves_user_activity_hook(user_id: str, bot_id: str, bot_self_id: str):
     """XutheringWavesUID 的用户活跃度 hook
 
     只记录由本插件触发的消息的用户活跃度
+    写入内存缓冲区，由后台任务定时批量写入数据库
     """
-    # 检查调用是否来自本插件
     if not is_from_waves_plugin():
-        logger.debug(f"[XutheringWavesUID Hook] 消息不是来自本插件，跳过活跃度更新: user_id={user_id}")
         return
 
-    logger.debug(
-        f"[XutheringWavesUID Hook] user_activity_hook 被调用: user_id={user_id}, bot_id={bot_id}, bot_self_id={bot_self_id}"
-    )
+    if not user_id:
+        return
 
-    if user_id:
-        try:
-            await WavesUserActivity.update_user_activity(user_id, bot_id, bot_self_id)
-        except Exception as e:
-            logger.warning(f"[XutheringWavesUID] 用户活跃度更新失败: {e}")
+    # 写入缓冲区（同一用户只保留最新一条，自动去重）
+    _activity_buffer[f"{user_id}:{bot_id}:{bot_self_id}"] = (user_id, bot_id, bot_self_id)
 
 # 安装 hooks 并注册
 install_bot_hooks()

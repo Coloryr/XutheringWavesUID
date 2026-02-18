@@ -17,10 +17,38 @@ from ..utils.waves_api import waves_api
 from .resource.constant import SPECIAL_CHAR_INT_ALL
 from ..utils.queues.const import QUEUE_SCORE_RANK
 from ..utils.queues.queues import push_item
-from ..utils.limit_request import check_request_rate_limit
-from ..wutheringwaves_config import WutheringWavesConfig
+from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
+from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, CACHE_PATH
 from ..utils.char_info_utils import get_all_roleid_detail_info_int
+from ..utils.api.model import AccountBaseInfo as _AccountBaseInfo
+
+from ..utils.limit_request import check_request_rate_limit
+
+async def save_base_info_cache(uid: str, account_info: _AccountBaseInfo):
+    """将账户基本信息（世界等级等）缓存到文件"""
+    _dir = PLAYER_PATH / uid
+    _dir.mkdir(parents=True, exist_ok=True)
+    path = _dir / "baseInfo.json"
+    try:
+        async with aiofiles.open(path, "w", encoding="utf-8") as f:
+            await f.write(account_info.model_dump_json())
+    except Exception as e:
+        logger.exception(f"save_base_info_cache failed {path}:", e)
+
+
+async def load_base_info_cache(uid: str) -> Optional[_AccountBaseInfo]:
+    """从缓存文件读取账户基本信息"""
+    path = PLAYER_PATH / uid / "baseInfo.json"
+    if not path.exists():
+        return None
+    try:
+        async with aiofiles.open(path, "r", encoding="utf-8") as f:
+            data = json.loads(await f.read())
+        return _AccountBaseInfo.model_validate(data)
+    except Exception as e:
+        logger.exception(f"load_base_info_cache failed {path}:", e)
+        return None
 
 
 def is_use_global_semaphore() -> bool:
@@ -106,7 +134,7 @@ async def send_card(
         if not account_info.success:
             return account_info.throw_msg()
         if not account_info.data:
-            return "用户未展示数据"
+            return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info.data)
         if len(waves_data) != 1 and account_info.roleNum != len(save_data):
             logger.warning(
@@ -259,6 +287,9 @@ async def refresh_char(
     role_info = await waves_api.get_role_info(uid, ck)
     if not role_info.success:
         return role_info.throw_msg()
+
+    if isinstance(role_info.data, dict) and "roleList" not in role_info.data:
+        return f"鸣潮特征码[{uid}]的角色数据未公开展示，请【{PREFIX}登录】或在库街区展示角色"
 
     try:
         role_info = RoleList.model_validate(role_info.data)

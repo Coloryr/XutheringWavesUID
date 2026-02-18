@@ -41,7 +41,7 @@ from ..utils.fonts.waves_fonts import (
     waves_font_60,
 )
 from ..utils.resource.constant import NAME_ALIAS, SPECIAL_CHAR_NAME
-from ..utils.refresh_char_detail import refresh_char
+from ..utils.refresh_char_detail import refresh_char, save_base_info_cache
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
@@ -217,8 +217,10 @@ async def draw_refresh_char_detail_img(
     if not account_info.success:
         return account_info.throw_msg(), 0
     if not account_info.data:
-        return "用户未展示数据", 0
+        return f"用户未展示数据, 请尝试【{PREFIX}登录】", 0
     account_info = AccountBaseInfo.model_validate(account_info.data)
+    # 缓存账户基本信息
+    await save_base_info_cache(uid, account_info)
     # 更新group id
     await WavesBind.insert_waves_uid(user_id, ev.bot_id, uid, ev.group_id, lenth_limit=9)
 

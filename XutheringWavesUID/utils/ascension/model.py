@@ -41,6 +41,12 @@ class Skill(BaseModel):
         return format_with_defaults(self.desc, self.param)
 
 
+class SkillBranchItem(BaseModel):
+    name: str
+    desc: str
+    isDefault: bool = False
+
+
 class Chain(BaseModel):
     name: str
     desc: str
@@ -72,6 +78,7 @@ class CharacterModel(BaseModel):
     skillTree: Dict[str, Dict[str, Skill]]
     chains: Dict[int, Chain]
     ascensions: Dict[str, List[AscensionMaterial]]
+    skillBranches: Optional[List[SkillBranchItem]] = None
     statsWeakness: Optional[StatsWeakness] = None
 
     class Config:
