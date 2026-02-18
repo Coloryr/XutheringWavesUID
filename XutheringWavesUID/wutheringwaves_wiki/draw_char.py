@@ -599,6 +599,8 @@ async def parse_char_skill(data: Dict[str, Dict[str, Skill]]):
         # 拼接文本
         title = skill_type
         desc = clean_tags(item.get_desc_detail())
+        if skill_type == "谐度破坏" and not desc.strip():
+            desc = "目标【偏谐值】满时，可对其造成【谐度破坏】伤害。"
 
         # 分行显示标题
         wrapped_title = textwrap.fill(title, width=10)
