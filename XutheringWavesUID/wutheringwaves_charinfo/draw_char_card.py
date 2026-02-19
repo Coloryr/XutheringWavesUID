@@ -440,24 +440,21 @@ async def get_role_need(
                     f"[鸣潮] 未找到【{char_name}】角色极限面板信息，请等待适配!",
                 )
 
-            # rawData中未找到角色，再请求listRole确认用户是否拥有该角色
+            # rawData中未找到角色，请求listRole判断角色是否已上线
             if not change_list_regex:
                 if not ck:
                     _, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
-                if not ck:
-                    return (
-                        None,
-                        f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
-                    )
-                online_list = await waves_api.get_online_list_role(ck)
-                if online_list.success and online_list.data:
-                    online_list_role_model = OnlineRoleList.model_validate(online_list.data)
-                    online_role_map = {str(i.roleId): i for i in online_list_role_model}
-                    if char_id in online_role_map:
-                        return (
-                            None,
-                            f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
-                        )
+                if ck:
+                    online_list = await waves_api.get_online_list_role(ck)
+                    if online_list.success and online_list.data:
+                        online_list_role_model = OnlineRoleList.model_validate(online_list.data)
+                        online_role_map = {str(i.roleId): i for i in online_list_role_model}
+                        if char_id in online_role_map:
+                            # 角色已上线但rawData中没有，提示刷新
+                            return (
+                                None,
+                                f"[鸣潮] 未找到【{char_name}】角色信息, 请先使用[{PREFIX}刷新{char_name}面板]进行刷新!",
+                            )
 
             # 未上线的角色，构造一个数据
             gen_role_detail = await generate_online_role_detail(char_id)
