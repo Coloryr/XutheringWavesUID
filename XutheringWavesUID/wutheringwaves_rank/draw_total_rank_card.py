@@ -141,12 +141,12 @@ async def draw_total_rank(bot: Bot, ev: Event, pages: int) -> Union[str, bytes]:
     text_bar_draw.text((40, 60), "排行说明", GREY, waves_font_28, "lm")
     text_bar_draw.text(
         (185, 50),
-        "1. 综合所有角色的声骸分数。具备声骸套装的角色，全量刷新面板后生效。",
+        "1. 综合所有角色的声骸分数。具备声骸套装的角色，全量刷新面板后更新排行位置。",
         SPECIAL_GOLD,
         waves_font_20,
         "lm",
     )
-    text_bar_draw.text((185, 85), "2. 显示前10个最强角色", SPECIAL_GOLD, waves_font_20, "lm")
+    text_bar_draw.text((185, 85), "2. 显示前10个最强角色，刷新单角色影响此处显示但不计入总分。", SPECIAL_GOLD, waves_font_20, "lm")
 
     # 备注
     temp_notes = "排行标准：以所有角色声骸分数总和（角色分数>=175）为排序的综合排名"

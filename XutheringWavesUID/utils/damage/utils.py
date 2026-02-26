@@ -145,7 +145,7 @@ def skill_damage_calc(skillTree: Optional[Dict], skillTreeId: str, skillParamId:
     :return: 技能伤害
     """
     if skillTree is None:
-        return "0"
+        raise ValueError("技能树数据不能为空")
     return skillTree[skillTreeId]["skill"]["level"][skillParamId]["param"][0][skillLevel]
 
 

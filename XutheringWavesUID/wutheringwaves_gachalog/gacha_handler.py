@@ -112,7 +112,6 @@ async def fetch_mcgf_data(uid: str):
                     logger.warning(f"[GachaHandler] 获取工坊数据失败 Status: {response.status}")
     except Exception as e:
         logger.error(f"[GachaHandler] 获取工坊数据发生异常: {e}")
-        logger.error(traceback.format_exc())
     return None
 
 
