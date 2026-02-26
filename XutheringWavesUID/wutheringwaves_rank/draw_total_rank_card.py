@@ -149,7 +149,7 @@ async def draw_total_rank(bot: Bot, ev: Event, pages: int) -> Union[str, bytes]:
     text_bar_draw.text((185, 85), "2. 显示前10个最强角色，刷新单角色影响此处显示但不计入总分。", SPECIAL_GOLD, waves_font_20, "lm")
 
     # 备注
-    temp_notes = "排行标准：以所有角色声骸分数总和（角色分数>=175）为排序的综合排名"
+    temp_notes = "排行标准：以所有角色评分（分数>=175）总和为排序的综合排名"
     text_bar_draw.text((1260, 100), temp_notes, SPECIAL_GOLD, waves_font_16, "rm")
 
     card_img.alpha_composite(text_bar_img, (0, header_height))
