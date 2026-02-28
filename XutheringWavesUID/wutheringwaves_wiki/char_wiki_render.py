@@ -229,7 +229,9 @@ async def prepare_char_skill_data(data: Dict[str, Dict[str, Skill]]) -> List[Dic
             
         item = data[skill_tree_id]["skill"]
         desc = item.get_desc_detail().replace("\n", "<br>")
-        
+        if skill_type == "谐度破坏" and not desc.strip():
+            desc = '目标<span style="color:#ffd12f;font-weight:bold">【偏谐值】</span>满时，可对其造成<span style="color:#ffd12f;font-weight:bold">【谐度破坏】</span>伤害。'
+
         for relate_id in relate_skill_tree_ids:
             if relate_id in data:
                 relate_item = data[relate_id]["skill"]
