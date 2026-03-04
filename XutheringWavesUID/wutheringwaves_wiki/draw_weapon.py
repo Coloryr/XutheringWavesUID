@@ -84,12 +84,16 @@ async def parse_weapon_statistic_content(weapon_model: WeaponModel, weapon_image
 
 
 async def parse_weapon_material_content(weapon_model: WeaponModel, card_img):
-    material_img = Image.new("RGBA", (300, 150))
+    material_list = weapon_model.get_ascensions_max_list()
+    mat_count = len(material_list) if material_list else 0
+    # 根据材料数量动态计算容器宽度
+    container_w = max(30 + mat_count * 80 + 10, 120)
+    material_img = Image.new("RGBA", (container_w, 150))
     material_img_draw = ImageDraw.Draw(material_img)
-    material_img_draw.rounded_rectangle([20, 20, 280, 130], radius=20, fill=(0, 0, 0, int(0.3 * 255)))
+    material_img_draw.rounded_rectangle([20, 20, container_w - 20, 130], radius=20, fill=(0, 0, 0, int(0.3 * 255)))
     material_img_draw.text((40, 20), "突破材料", SPECIAL_GOLD, waves_font_origin(24), "lm")
     index = 0
-    for material_id in weapon_model.get_ascensions_max_list():
+    for material_id in material_list:
         material = await get_material_img(material_id)
         if not material:
             continue
@@ -97,7 +101,7 @@ async def parse_weapon_material_content(weapon_model: WeaponModel, card_img):
         material_img.alpha_composite(material, (30 + index * 80, 50))
         index += 1
 
-    card_img.alpha_composite(material_img, (680, 15))
+    card_img.alpha_composite(material_img, (1000 - container_w - 20, 15))
 
 
 async def parse_weapon_detail_content(weapon_model: WeaponModel, card_img):

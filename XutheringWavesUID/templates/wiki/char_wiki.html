@@ -108,7 +108,7 @@
         }
 
         .rarity-icon {
-            height: 32px;
+            height: 48px;
             object-fit: contain;
             filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
         }
@@ -423,11 +423,19 @@
                             <img src="{{ element_icon }}" class="element-icon">
                             <span>{{ char_data.element }}</span>
                         </div>
-                        
+
                         <div class="info-tag">
                             <img src="{{ weapon_icon }}" class="weapon-icon">
                             <span>{{ char_data.weapon }}</span>
                         </div>
+
+                        {% if materials %}
+                        <div class="info-tag">
+                            {% for mat in materials %}
+                            <img src="{{ mat }}" style="width:32px;height:32px;object-fit:cover;border-radius:6px;">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
                 

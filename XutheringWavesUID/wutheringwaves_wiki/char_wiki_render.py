@@ -28,6 +28,7 @@ from ..utils.render_utils import (
     render_html,
 )
 from ..utils.image import ELEMENT_COLOR_MAP
+from ..utils.resource.download_file import get_material_img
 
 
 TEXTURE2D_PATH = Path(__file__).parents[1] / "utils" / "texture2d"
@@ -65,7 +66,7 @@ def pil_to_base64(img: Image.Image) -> str:
     img.save(buffered, format="PNG")
     return "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[str, Any]:
+async def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[str, Any]:
     max_stats: Stats = char_model.get_max_level_stat()
     
     stats = {
@@ -118,6 +119,16 @@ def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[str, Any
             data = f.read()
         hakushin_logo = f"data:image/svg+xml;base64,{base64.b64encode(data).decode('utf-8')}"
 
+    # 突破材料
+    materials = []
+    for material_id in char_model.get_ascensions_max_list():
+        try:
+            material_img = await get_material_img(material_id)
+            if material_img:
+                materials.append(pil_to_base64(material_img))
+        except Exception:
+            pass
+
     return {
         "char_data": char_data,
         "theme_color": theme_color,
@@ -127,6 +138,7 @@ def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[str, Any
         "bg_url": pil_to_base64(bg_img),
         "portrait_url": image_to_base64(role_pile_path),
         "hakushin_logo": hakushin_logo,
+        "materials": materials,
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
@@ -143,7 +155,7 @@ async def draw_char_skill_render(char_id: str):
     if char_model is None:
         return None
 
-    context = _get_base_context(char_model, char_id)
+    context = await _get_base_context(char_model, char_id)
     context["section"] = "skill"
     context["skills"] = await prepare_char_skill_data(char_model.skillTree)
 
@@ -171,7 +183,7 @@ async def draw_char_chain_render(char_id: str):
     if char_model is None:
         return None
 
-    context = _get_base_context(char_model, char_id)
+    context = await _get_base_context(char_model, char_id)
     context["section"] = "chain"
     context["chains"] = await prepare_char_chain_data(char_model.chains)
 
@@ -200,7 +212,7 @@ async def draw_char_forte_render(char_id: str):
     with open(forte_path, "rb") as f:
         data = msgjson.decode(f.read())
 
-    context = _get_base_context(char_model, char_id)
+    context = await _get_base_context(char_model, char_id)
     context["section"] = "forte"
     context["forte"] = await prepare_char_forte_data_render(data, str(char_id))
 
@@ -248,7 +260,7 @@ async def prepare_char_skill_data(data: Dict[str, Dict[str, Skill]]) -> List[Dic
                 row_values = []
                 param_values = skillLevel.param[0][5:10]
                 if skillLevel.format:
-                    row_values = [skillLevel.format.format(v) for v in param_values]
+                    row_values = [f"{v}{skillLevel.format}" for v in param_values]
                 else:
                     row_values = param_values
                 

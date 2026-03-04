@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Tuple, Union, Optional
 
 from pydantic import Field, BaseModel
 
-from ...utils.util import format_with_defaults
+from ...utils.util import format_with_defaults, _collapse_repeated_slash_values
 from ...utils.resource.constant import ATTRIBUTE_ID_MAP
 
 
@@ -93,6 +93,17 @@ class CharacterModel(BaseModel):
     def get_attribute_name(self) -> str:
         return ATTRIBUTE_ID_MAP[self.attributeId]
 
+    def get_ascensions_max_list(self) -> list:
+        """获取最高等级突破材料ID列表（排除贝币 ID=2）"""
+        for i in ["6", "5", "4", "3", "2"]:
+            try:
+                value = [j.key for j in self.ascensions[i] if j.key != 2]
+                if value:
+                    return value
+            except Exception:
+                continue
+        return []
+
 
 class WeaponModel(BaseModel):
     name: str
@@ -126,12 +137,16 @@ class WeaponModel(BaseModel):
         return rets
 
     def get_effect_detail(self):
-        return self.effect.format(*["(" + "/".join(i) + ")" if len(set(i)) > 1 else i[0] for i in self.param])
+        result = self.effect.format(*["(" + "/".join(i) + ")" if len(set(i)) > 1 else i[0] for i in self.param])
+        return _collapse_repeated_slash_values(result)
 
     def get_ascensions_max_list(self):
         for i in ["5", "4", "3", "2"]:
             try:
                 value = [j.key for j in self.ascensions[i]]
+                # 加入贝币(ID=2)凑齐3件
+                if 2 not in value:
+                    value.append(2)
                 return value
             except Exception:
                 continue

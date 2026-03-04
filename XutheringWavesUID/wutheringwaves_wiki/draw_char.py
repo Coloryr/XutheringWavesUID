@@ -40,8 +40,27 @@ from .char_wiki_render import (
 )
 
 from ..utils.util import clean_tags
+from ..utils.resource.download_file import get_material_img
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
+
+
+async def draw_char_materials(char_model: CharacterModel, char_bg: Image.Image, x: int, y: int):
+    """在角色头部绘制突破材料图标"""
+    material_list = char_model.get_ascensions_max_list()
+    if not material_list:
+        return
+    index = 0
+    for material_id in material_list:
+        try:
+            material = await get_material_img(material_id)
+            if not material:
+                continue
+            material = material.resize((50, 50))
+            char_bg.alpha_composite(material, (x + index * 55, y))
+            index += 1
+        except Exception:
+            pass
 
 
 async def draw_char_wiki(char_id: str, query_role_type: str):
@@ -125,6 +144,7 @@ async def draw_char_forte_pil(char_id: str):
     char_bg.alpha_composite(char_pic, (0, -100))
     char_bg.alpha_composite(char_stats, (580, 340))
     char_bg.alpha_composite(rarity_pic, (560, 160))
+    await draw_char_materials(char_model, char_bg, 580, 210)
     card_img.paste(char_bg, (0, -5), char_bg)
     card_img.alpha_composite(forte_img, (0, 600))
 
@@ -391,6 +411,7 @@ async def draw_char_skill_pil(char_id: str):
     char_bg.alpha_composite(char_pic, (0, -100))
     char_bg.alpha_composite(char_stats, (580, 340))
     char_bg.alpha_composite(rarity_pic, (560, 160))
+    await draw_char_materials(char_model, char_bg, 580, 210)
     card_img.paste(char_bg, (0, -5), char_bg)
     card_img.alpha_composite(char_skill, (0, 600))
 
@@ -704,7 +725,7 @@ async def parse_char_skill_rate(skillLevels: Optional[Dict[str, SkillLevel]]):
         param_values = skillLevel.param[0][5:10]
         if skillLevel.format:
             # 使用 format 字符串格式化每个值
-            formatted_values = [skillLevel.format.format(v) for v in param_values]
+            formatted_values = [f"{v}{skillLevel.format}" for v in param_values]
             row.extend(formatted_values)
         else:
             row.extend(param_values)

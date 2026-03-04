@@ -187,12 +187,23 @@ def clean_tags(text: str) -> str:
     return text
 
 
+def _collapse_repeated_slash_values(text: str) -> str:
+    """将 '10/10/10/10/10' 这样全部相同的重复值折叠为 '10'"""
+    def _replace(m):
+        parts = m.group(0).split('/')
+        if len(set(parts)) == 1:
+            return parts[0]
+        return m.group(0)
+    return re.sub(r'[\d.]+(?:/[\d.]+)+', _replace, text)
+
+
 def format_with_defaults(desc: str, params: List[Any], default_value: str = "N/A"):
     num_placeholders = desc.count("{")  # 简单估计位置参数数量
     params_list = list(params)
     while len(params_list) < num_placeholders:
         params_list.append(default_value)
-    return desc.format(*params_list)
+    result = desc.format(*params_list)
+    return _collapse_repeated_slash_values(result)
 
 
 def get_version(dynamic: bool = False, **kwargs):
