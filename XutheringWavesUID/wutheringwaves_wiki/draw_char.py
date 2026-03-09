@@ -227,10 +227,14 @@ async def parse_char_forte_data(data: Dict, char_id: str):
                     continue
                 group_image_paths_seen.add(img_path_str)
                 img_name = os.path.basename(img_path_str)
-                if not img_name.lower().endswith((".png", ".webp", ".jpg")):
-                     img_name += ".png"
-                local_img_path = MAP_FORTE_PATH / char_id / img_name
-                if local_img_path.exists():
+                stem = os.path.splitext(img_name)[0]
+                local_img_path = None
+                for ext in (".png", ".webp", ".jpg"):
+                    candidate = MAP_FORTE_PATH / char_id / (stem + ext)
+                    if candidate.exists():
+                        local_img_path = candidate
+                        break
+                if local_img_path:
                     try:
                         fg_img = Image.open(local_img_path).convert("RGBA")
                         content_width = image_width - 2 * (x_padding + shadow_radius)
