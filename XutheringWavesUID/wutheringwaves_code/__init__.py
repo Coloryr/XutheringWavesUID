@@ -17,7 +17,7 @@ invalid_code_list = ("MINGCHAO",)
 url = "https://newsimg.5054399.com/comm/mlcxqcommon/static/wap/js/data_102.js?{}&callback=?&_={}"
 
 
-@sv_waves_code.on_fullmatch(("code", "兑换码"))
+@sv_waves_code.on_fullmatch(("code", "兑换码", "兌換碼"))
 async def get_sign_func(bot: Bot, ev: Event):
     code_list = await get_code_list()
     if not code_list:

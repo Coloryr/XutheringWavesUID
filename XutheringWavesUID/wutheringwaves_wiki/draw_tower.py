@@ -29,7 +29,7 @@ from ..utils.fonts.waves_fonts import (
 from ..wutheringwaves_abyss.period import (
     get_slash_period_number,
     get_tower_period_number,
-    get_matrix_season_number,
+    get_matrix_period_number,
 )
 from ..utils.resource.RESOURCE_PATH import MAP_CHALLENGE_PATH
 from .tower_wiki_render import (
@@ -86,6 +86,11 @@ async def draw_tower_challenge_img(ev: Event, period: Optional[int] = None) -> U
             match = re.search(r"(\d+)", text)
             period = int(match.group(1)) if match else get_tower_period_number()
 
+        # 先检查数据是否存在
+        json_path = MAP_CHALLENGE_PATH / "tower" / f"{period}.json"
+        if not json_path.exists():
+            return f"暂无深塔第{period}期的数据"
+
         if PLAYWRIGHT_AVAILABLE:
             try:
                 res = await draw_tower_wiki_render(period)
@@ -95,7 +100,6 @@ async def draw_tower_challenge_img(ev: Event, period: Optional[int] = None) -> U
                 logger.warning("Failed to render tower wiki with playwright, fallback to PIL")
 
         # 加载数据
-        json_path = MAP_CHALLENGE_PATH / "tower" / f"{period}.json"
         tower_data = _load_json(json_path)
         if not tower_data:
             return f"无法找到深塔第{period}期的数据"
@@ -176,6 +180,11 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
             match = re.search(r"(\d+)", text)
             period = int(match.group(1)) if match else get_slash_period_number()
 
+        # 先检查数据是否存在
+        json_path = MAP_CHALLENGE_PATH / "slash" / f"{period}.json"
+        if not json_path.exists():
+            return f"暂无海墟第{period}期的数据"
+
         if PLAYWRIGHT_AVAILABLE:
             try:
                 res = await draw_slash_wiki_render(period)
@@ -185,7 +194,6 @@ async def draw_slash_challenge_img(ev: Event, period: Optional[int] = None) -> U
                 logger.warning("Failed to render slash wiki with playwright, fallback to PIL")
 
         # 加载数据
-        json_path = MAP_CHALLENGE_PATH / "slash" / f"{period}.json"
         slash_data = _load_json(json_path)
         if not slash_data:
             return f"无法找到海墟第{period}期的数据"
@@ -514,7 +522,12 @@ async def draw_matrix_challenge_img(ev: Event, season: Optional[int] = None) -> 
         if season is None:
             text = ev.text.strip()
             match = re.search(r"(\d+)", text)
-            season = int(match.group(1)) if match else get_matrix_season_number()
+            season = int(match.group(1)) if match else get_matrix_period_number()
+
+        # 先检查数据是否存在
+        json_path = MAP_CHALLENGE_PATH / "matrix" / f"{season}.json"
+        if not json_path.exists():
+            return f"暂无矩阵第{season}期的数据"
 
         if PLAYWRIGHT_AVAILABLE:
             try:

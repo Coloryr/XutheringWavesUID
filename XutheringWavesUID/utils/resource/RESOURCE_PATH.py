@@ -62,6 +62,7 @@ MAP_FORTE_PATH = RESOURCE_PATH / "map" / "detail_json" / "forte"
 MAP_BUILD_PATH = BUILD_ROOT / "map" / "waves_build"
 MAP_BUILD_TEMP = MAIN_PATH / "build" / "map" / "waves_build"
 MAP_ALIAS_PATH = MAP_PATH / "alias"
+LOCALIZATION_PATH = MAP_PATH / "i18n"
 
 # 自定义背景图
 CUSTOM_CARD_PATH = MAIN_PATH / "custom_role_pile"

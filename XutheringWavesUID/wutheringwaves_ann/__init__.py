@@ -61,7 +61,7 @@ async def ann_(bot: Bot, ev: Event):
     return await bot.send(img)  # type: ignore
 
 
-@sv_ann_sub.on_fullmatch("订阅公告")
+@sv_ann_sub.on_fullmatch(("订阅公告", "訂閱公告"))
 async def sub_ann_(bot: Bot, ev: Event):
     if ev.bot_id != "onebot" and ev.bot_id != "feishu" and ev.bot_id != "lark":
         logger.debug(f"非onebot/feishu/lark禁止订阅鸣潮公告 【{ev.bot_id}】")
@@ -100,7 +100,7 @@ async def sub_ann_(bot: Bot, ev: Event):
         await bot.send("成功订阅鸣潮公告!")
 
 
-@sv_ann_sub.on_fullmatch(("取消订阅公告", "取消公告", "退订公告"))
+@sv_ann_sub.on_fullmatch(("取消订阅公告", "取消公告", "退订公告", "取消訂閱公告", "退訂公告"))
 async def unsub_ann_(bot: Bot, ev: Event):
     if ev.bot_id != "onebot":
         logger.debug(f"非onebot禁止订阅鸣潮公告 【{ev.bot_id}】")
@@ -268,7 +268,7 @@ async def clean_cache_directories(days: int) -> str:
     return result_msg
 
 
-@sv_ann_clear_cache.on_fullmatch(("清理缓存", "删除缓存"), block=True)
+@sv_ann_clear_cache.on_fullmatch(("清理缓存", "删除缓存", "清理緩存", "刪除緩存"), block=True)
 async def clean_cache_(bot: Bot, ev: Event):
     """手动清理缓存指令"""
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data

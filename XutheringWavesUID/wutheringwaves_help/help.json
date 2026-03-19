@@ -266,8 +266,8 @@
         "need_admin": false
       },
       {
-        "name": "深塔出场率",
-        "desc": "深塔出场率",
+        "name": "深塔出場率",
+        "desc": "深塔出場率",
         "eg": "深塔出场率",
         "need_ck": false,
         "need_sk": false,
@@ -282,8 +282,8 @@
         "need_admin": false
       },
       {
-        "name": "冥歌海墟出场率",
-        "desc": "冥歌海墟出场率",
+        "name": "冥歌海墟出場率",
+        "desc": "冥歌海墟出場率",
         "eg": "冥海出场率",
         "need_ck": false,
         "need_sk": false,
@@ -574,6 +574,14 @@
         "name": "设置体力背景",
         "desc": "设置体力背景",
         "eg": "设置体力背景长离",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "设置语言",
+        "desc": "设置面板/体力等图片的显示语言",
+        "eg": "设置语言en",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false

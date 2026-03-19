@@ -24,7 +24,7 @@ from ..utils.render_utils import (
 from ..wutheringwaves_abyss.period import (
     get_slash_period_number,
     get_tower_period_number,
-    get_matrix_season_number,
+    get_matrix_period_number,
 )
 
 TEXTURE2D_PATH = Path(__file__).parents[1] / "utils" / "texture2d"
@@ -210,7 +210,7 @@ async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[byte
         return None
 
     if season is None:
-        season = get_matrix_season_number()
+        season = get_matrix_period_number()
 
     # 加载数据
     json_path = MAP_CHALLENGE_PATH / "matrix" / f"{season}.json"

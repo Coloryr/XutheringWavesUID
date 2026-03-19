@@ -1,8 +1,4 @@
-# ...我就说仇远是我自己吧
-
-import json
 from typing import Optional
-from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
 CHINA_TZ = timezone(timedelta(hours=8))
@@ -117,16 +113,8 @@ def get_tower_period_number(reference_time: Optional[datetime] = None) -> int:
     return TOWER_BASE_PERIOD + cycles
 
 
-def get_matrix_season_number() -> int:
-    """获取最新矩阵赛季编号，TODO"""
-    from ..utils.resource.RESOURCE_PATH import MAP_CHALLENGE_PATH
+def get_matrix_period_number(reference_time: Optional[datetime] = None) -> int:
+    """获取当前矩阵的期数，TODO: 等确定周期规律后改为自动计算"""
+    return 3
 
-    seasons_path = MAP_CHALLENGE_PATH / "matrix" / "seasons.json"
-    try:
-        with open(seasons_path, "r", encoding="utf-8") as f:
-            seasons = json.load(f)
-        if seasons:
-            return max(s["Season"] for s in seasons)
-    except Exception:
-        pass
-    return 1
+

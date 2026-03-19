@@ -11,6 +11,7 @@ from gsuid_core.utils.database.startup import exec_list
 from gsuid_core.utils.database.base_models import (
     Bind,
     User,
+    BaseIDModel,
     BaseModel,
     with_session,
 )
@@ -619,6 +620,51 @@ class WavesStaminaRecord(BaseModel, table=True):
         )
         result = await session.execute(sql)
         return result.rowcount
+
+
+T_WavesLangSettings = TypeVar("T_WavesLangSettings", bound="WavesLangSettings")
+
+
+class WavesLangSettings(BaseIDModel, table=True):
+    """用户语言设置表"""
+
+    __tablename__ = "WavesLangSettings"
+    __table_args__: Dict[str, Any] = {"extend_existing": True}
+
+    user_id: str = Field(default="", title="账号", unique=True)
+    lang: str = Field(default="", title="语言设置")
+
+    @classmethod
+    @with_session
+    async def get_lang(
+        cls: Type[T_WavesLangSettings],
+        session: AsyncSession,
+        user_id: str,
+    ) -> str:
+        """获取用户语言设置，默认返回空字符串（即 chs）"""
+        result = await session.execute(
+            select(cls).where(cls.user_id == user_id)
+        )
+        record = result.scalars().first()
+        return record.lang if record else ""
+
+    @classmethod
+    @with_session
+    async def set_lang(
+        cls: Type[T_WavesLangSettings],
+        session: AsyncSession,
+        user_id: str,
+        lang: str,
+    ) -> None:
+        """设置用户语言"""
+        result = await session.execute(
+            select(cls).where(cls.user_id == user_id)
+        )
+        record = result.scalars().first()
+        if record:
+            record.lang = lang
+        else:
+            session.add(cls(user_id=user_id, lang=lang))
 
 
 @site.register_admin

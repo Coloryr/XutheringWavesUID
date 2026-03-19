@@ -35,6 +35,7 @@ from ..utils.image import (
     get_qq_avatar,
     get_square_avatar,
     pic_download_from_url,
+    parse_bot_color_config,
 )
 from ..utils.api.model import SlashDetail
 from ..utils.api.wwapi import (
@@ -273,7 +274,9 @@ async def draw_all_slash_rank_card(bot: Bot, ev: Event):
     results = await asyncio.gather(*tasks)
 
     # 获取角色信息
-    bot_color_map = {}
+    bot_color_map = parse_bot_color_config(
+        WutheringWavesConfig.get_config("BotColorMap").data
+    )
     bot_color = copy.deepcopy(BOT_COLOR)
 
     # for rank_temp_index, rank_temp in enumerate(rank_list):

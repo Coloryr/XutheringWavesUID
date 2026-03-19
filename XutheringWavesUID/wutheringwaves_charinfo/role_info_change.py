@@ -215,6 +215,7 @@ def parse_skills(content: str) -> list[int] | None:
 
 
 def parse_sonatas(content: str) -> list[Any] | None:
+    content = content.replace("，", " ").replace(",", " ")
     pattern = r"([^\d]+)(\d*)"
     match = re.findall(pattern, content)
 
@@ -548,6 +549,8 @@ async def change_role_detail(
     role_detail: RoleDetailData,
     enemy_detail: EnemyDetailData,
     change_list_regex: str,
+    user_id: str = "",
+    bot_id: str = "",
 ) -> tuple[RoleDetailData, str]:
     parser: ChangeParser = ChangeParser(change_list_regex)
     parserResult: ReplaceResult = parser.rr
@@ -598,7 +601,9 @@ async def change_role_detail(
     if parserResult.phantom.phantomList:
         for ph_info in parserResult.phantom.phantomList:
             logger.debug(f"[GsCore] 声骸替换：{ph_info}")
-            await change_role_phantom(waves_id, ck, role_detail, ph_info)
+            err = await change_role_phantom(waves_id, ck, role_detail, ph_info, user_id, bot_id)
+            if err:
+                return role_detail, err
 
     logger.debug(
         f"声骸主词条: c4-{parserResult.phantom.mainc4}， c3-{parserResult.phantom.mainc3}, c1-{parserResult.phantom.mainc1}"
@@ -685,7 +690,14 @@ async def change_role_detail(
     return role_detail, parser.get_matched_content()
 
 
-async def change_role_phantom(waves_id: str, ck: str, role_detail: RoleDetailData, phantom: PhantomInfo):
+async def change_role_phantom(
+    waves_id: str,
+    ck: str,
+    role_detail: RoleDetailData,
+    phantom: PhantomInfo,
+    user_id: str = "",
+    bot_id: str = "",
+) -> Optional[str]:
     parserCharName = phantom.charName
     parserWavesUid = phantom.uid
     parserPositions = phantom.positions
@@ -703,14 +715,20 @@ async def change_role_phantom(waves_id: str, ck: str, role_detail: RoleDetailDat
         waves_id = parserWavesUid
 
     if not find_char_id:
-        return
+        return f"[鸣潮] 未找到替换目标角色【{parserCharName}】"
+
+    # 使用与查看他人面板一致的ck获取逻辑
+    if parserWavesUid and user_id and bot_id:
+        _, ck = await waves_api.get_ck_result(waves_id, user_id, bot_id)
+        if not ck:
+            return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】数据查询失败"
 
     remote_role_detail_info = await get_remote_role_detail_info(find_char_id, waves_id, ck)
     if not remote_role_detail_info:
-        return
+        return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】数据查询失败"
 
     if not remote_role_detail_info.phantomData or not remote_role_detail_info.phantomData.equipPhantomList:
-        return
+        return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】没有声骸数据"
 
     if not parserPositions or not parserToPositions:
         role_detail.phantomData = remote_role_detail_info.phantomData

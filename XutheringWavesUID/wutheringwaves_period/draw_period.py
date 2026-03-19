@@ -11,6 +11,7 @@ from gsuid_core.sv import get_plugin_available_prefix
 from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.image_tools import crop_center_img
 
+from ..utils.at_help import ruser_id
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import PREFIX
 from ..utils.database.models import WavesBind
@@ -106,7 +107,7 @@ def _get_relative_period_node(
 
 
 async def process_uid(uid, ev, period_param: Optional[Union[int, str]]) -> Optional[Union[Dict[str, Any], str]]:
-    ck = await waves_api.get_self_waves_ck(uid, ev.user_id, ev.bot_id)
+    ck = await waves_api.get_self_waves_ck(uid, ruser_id(ev), ev.bot_id)
     if not ck:
         return None
 
@@ -172,7 +173,7 @@ async def draw_period_img(bot: Bot, ev: Event):
     period_param = ev.text.strip() if ev.text else None
     logger.info(f"[鸣潮][资源简报]绘图开始: {period_param}")
     try:
-        uid_list = await WavesBind.get_uid_list_by_game(ev.user_id, ev.bot_id)
+        uid_list = await WavesBind.get_uid_list_by_game(ruser_id(ev), ev.bot_id)
 
         if uid_list is None:
             return MSG_TOKEN.format(PREFIX)
@@ -446,7 +447,7 @@ def wrap_text(text: str, font, max_width: int, draw: ImageDraw.ImageDraw) -> lis
 
 
 async def draw_pic_with_ring(ev: Event):
-    pic = await get_event_avatar(ev, is_valid_at_param=False)
+    pic = await get_event_avatar(ev)
 
     mask_pic = Image.open(TEXT_PATH / "avatar_mask.png")
     img = Image.new("RGBA", (200, 200))

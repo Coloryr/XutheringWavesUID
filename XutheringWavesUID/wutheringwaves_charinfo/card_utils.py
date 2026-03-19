@@ -197,54 +197,64 @@ async def match_hash_id_from_event(
             continue
 
         if image.width > image.height:
-            left, top, right, bottom = CROP_LANDSCAPE
+            crop_boxes = [CROP_LANDSCAPE]
         else:
-            left, top, right, bottom = CROP_PORTRAIT
+            crop_boxes = [CROP_PORTRAIT]
+            if image.height > 4000:
+                left0, top0, right0, bottom0 = CROP_PORTRAIT
+                crop_boxes.append((left0, top0 + 875, right0, bottom0 + 875))
 
-        if left >= image.width or top >= image.height:
-            crop = image
-        else:
-            left = max(0, left)
-            top = max(0, top)
-            right = min(right, image.width)
-            bottom = min(bottom, image.height)
-            if right <= left or bottom <= top:
+        for crop_box in crop_boxes:
+            left, top, right, bottom = crop_box
+
+            if left >= image.width or top >= image.height:
                 crop = image
             else:
-                crop = image.crop((left, top, right, bottom))
-        crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
-        feat_new = _compute_orb_features_from_image(crop)
-        if feat_new is None:
-            continue
+                left = max(0, left)
+                top = max(0, top)
+                right = min(right, image.width)
+                bottom = min(bottom, image.height)
+                if right <= left or bottom <= top:
+                    crop = image
+                else:
+                    crop = image.crop((left, top, right, bottom))
+            crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
+            feat_new = _compute_orb_features_from_image(crop)
+            if feat_new is None:
+                continue
 
-        # 按照类型顺序搜索
-        for current_type in search_types:
-            if char_id:
-                char_dirs = [CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH) / f"{char_id}"]
-            else:
-                char_dirs = []
-                base = CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH)
-                if base.exists():
-                    for d in base.iterdir():
-                        if d.is_dir():
-                            char_dirs.append(d)
+            # 按照类型顺序搜索
+            for current_type in search_types:
+                if char_id:
+                    char_dirs = [CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH) / f"{char_id}"]
+                else:
+                    char_dirs = []
+                    base = CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH)
+                    if base.exists():
+                        for d in base.iterdir():
+                            if d.is_dir():
+                                char_dirs.append(d)
 
-            for dir_path in char_dirs:
-                if not dir_path.exists():
-                    continue
-                for img_path in _iter_images(dir_path):
-                    feat_old = get_orb_features(img_path)
-                    if feat_old is None:
+                for dir_path in char_dirs:
+                    if not dir_path.exists():
                         continue
-                    sim = _orb_similarity(feat_new, feat_old)
-                    if sim is None:
-                        continue
-                    if sim > best_sim:
-                        best_sim = sim
-                        best_path = img_path
-                        best_char_id = dir_path.name
+                    for img_path in _iter_images(dir_path):
+                        feat_old = get_orb_features(img_path)
+                        if feat_old is None:
+                            continue
+                        sim = _orb_similarity(feat_new, feat_old)
+                        if sim is None:
+                            continue
+                        if sim > best_sim:
+                            best_sim = sim
+                            best_path = img_path
+                            best_char_id = dir_path.name
 
-            # 如果在当前类型找到了足够相似的结果，停止搜索其他类型
+                # 如果在当前类型找到了足够相似的结果，停止搜索其他类型
+                if best_sim >= ORB_THRESHOLD:
+                    break
+
+            # 如果已找到匹配，不再尝试其他裁剪区域
             if best_sim >= ORB_THRESHOLD:
                 break
 

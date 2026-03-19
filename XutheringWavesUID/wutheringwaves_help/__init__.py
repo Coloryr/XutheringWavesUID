@@ -16,7 +16,7 @@ sv_waves_help = SV("waves帮助")
 sv_waves_change_help = SV("waves替换帮助")
 
 
-@sv_waves_help.on_fullmatch(("帮助", "help", "bz"), block=True)
+@sv_waves_help.on_fullmatch(("帮助", "幫助", "help", "bz"), block=True)
 async def send_help_img(bot: Bot, ev: Event):
     buttons: List[Any] = [
         WavesButton("登录", "登录"),
@@ -29,7 +29,7 @@ async def send_help_img(bot: Bot, ev: Event):
     await bot.send_option(await get_help(ev.user_pm), buttons)
 
 
-@sv_waves_change_help.on_fullmatch(("替换帮助", "面板替换帮助"))
+@sv_waves_change_help.on_fullmatch(("替换帮助", "面板替换帮助", "替換幫助", "面板替換幫助"))
 async def send_change_help_img(bot: Bot, ev: Event):
     await bot.send(await get_change_help(ev.user_pm))
 

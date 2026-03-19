@@ -30,6 +30,7 @@ from ..utils.image import (
     add_footer,
     get_square_avatar,
     get_custom_waves_bg,
+    parse_bot_color_config,
 )
 from ..utils.api.wwapi import (
     GET_TOTAL_RANK_URL,
@@ -163,7 +164,9 @@ async def draw_total_rank(bot: Bot, ev: Event, pages: int) -> Union[str, bytes]:
     results = await asyncio.gather(*tasks)
 
     # 获取角色信息
-    bot_color_map = {}
+    bot_color_map = parse_bot_color_config(
+        WutheringWavesConfig.get_config("BotColorMap").data
+    )
     bot_color = copy.deepcopy(BOT_COLOR)
 
     # 绘制排行条目

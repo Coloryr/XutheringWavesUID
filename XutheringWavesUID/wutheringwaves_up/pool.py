@@ -22,7 +22,7 @@ from ..utils.image import (
     get_random_share_bg,
 )
 from ..utils.api.wwapi import GET_POOL_LIST
-from ..utils.name_convert import easy_id_to_name
+from ..utils.name_convert import char_name_to_char_id, easy_id_to_name, weapon_name_to_weapon_id
 from ..utils.fonts.waves_fonts import waves_font_30, waves_font_58
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
@@ -210,9 +210,11 @@ async def draw_pool_char(
         bar_star_draw = ImageDraw.Draw(bar_bg)
 
         if query_type == "角色":
-            pic = await get_square_avatar(resource_id)
+            _id = char_name_to_char_id(resource_id) or resource_id
+            pic = await get_square_avatar(_id)
         else:
-            pic = await get_square_weapon(resource_id)
+            _id = weapon_name_to_weapon_id(resource_id) or resource_id
+            pic = await get_square_weapon(_id)
 
         pic_temp = Image.new("RGBA", pic.size)
         pic_temp.paste(pic.resize((160, 160)), (10, 10))

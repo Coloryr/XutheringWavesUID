@@ -4,7 +4,7 @@ from gsuid_core.models import Event
 
 from .set_config import set_waves_user_value
 from .wutheringwaves_config import WutheringWavesConfig, ShowConfig
-from ..utils.database.models import WavesBind
+from ..utils.database.models import WavesBind, WavesLangSettings
 
 sv_self_config = SV("鸣潮配置")
 
@@ -15,6 +15,18 @@ PREFIX = get_plugin_available_prefix("XutheringWavesUID")
 @sv_self_config.on_prefix("设置", block=True)
 async def send_config_ev(bot: Bot, ev: Event):
     at_sender = True if ev.group_id else False
+
+    # 语言设置不需要绑定uid
+    if "语言" in ev.text or "語言" in ev.text:
+        VALID_LANGS = {"chs", "cht", "en", "jp", "kr"}
+        lang = ev.text.replace("语言", "").replace("語言", "").strip().lower()
+        if lang not in VALID_LANGS:
+            msg = f"[鸣潮] 语言设置参数无效\n可选: {', '.join(sorted(VALID_LANGS))}"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
+        db_value = "" if lang == "chs" else lang
+        await WavesLangSettings.set_lang(ev.user_id, db_value)
+        msg = f"[鸣潮] 语言已设置为 {lang}"
+        return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
     if uid is None:

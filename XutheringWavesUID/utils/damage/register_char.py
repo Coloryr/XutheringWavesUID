@@ -10,6 +10,7 @@ from .utils import (
     hit_damage,
     skill_damage,
     attack_damage,
+    phantom_damage,
     cast_variation,
     cast_attack,
     liberation_damage,
@@ -526,6 +527,56 @@ class Char_1504(CharAbstract):
             title = f"{self.name}-延奏技能"
             msg = "下一位登场角色共鸣技能伤害加深38%"
             attr.add_dmg_deepen(0.38, title, msg)
+
+
+class Char_1411(CharAbstract):
+    id = 1411
+    name = "仇远"
+    starLevel = 5
+
+    def _do_buff(
+        self,
+        attr: DamageAttribute,
+        chain: int = 0,
+        resonLevel: int = 1,
+        isGroup: bool = True,
+    ):
+        """获得buff"""
+        # 暴击>50%时，暴击伤害+30% (假设满层)
+        title = "仇远-共鸣解放"
+        msg = "暴击伤害提升30%"
+        attr.add_crit_dmg(0.3, title, msg)
+
+        if attr.char_damage == phantom_damage:
+            # 竹照: 声骸技能伤害加成+30%
+            title = "仇远-竹照"
+            msg = "声骸技能伤害加成提升30%"
+            attr.add_dmg_bonus(0.3, title, msg)
+
+            # 延奏技能: 下一个登场角色声骸技能伤害加深50%
+            title = "仇远-延奏技能"
+            msg = "下一个登场角色声骸技能伤害加深50%"
+            attr.add_dmg_deepen(0.5, title, msg)
+
+            # 武器-裁竹
+            weapon_clz = WavesWeaponRegister.find_class(21020066)
+            if weapon_clz:
+                w = weapon_clz(21020066, 90, 6, resonLevel)
+                w.do_action("cast_variation", attr, isGroup)
+
+        # 套装-轻云出月: 延奏后下一个登场角色攻击+22.5%
+        if attr.char_template == temp_atk:
+            title = "仇远-轻云出月"
+            msg = "延奏后下一个登场角色攻击提升22.5%"
+            attr.add_atk_percent(0.225, title, msg)
+
+        if attr.char_damage == phantom_damage:
+
+            # 二链: 竹照额外效果，声骸技能伤害加深30%
+            if chain >= 2:
+                title = "仇远-二链"
+                msg = "竹照额外: 声骸技能伤害加深30%"
+                attr.add_dmg_deepen(0.3, title, msg)
 
 
 class Char_1505(CharAbstract):

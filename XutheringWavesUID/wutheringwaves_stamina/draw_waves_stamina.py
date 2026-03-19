@@ -26,12 +26,15 @@ from ..utils.image import (
 )
 from ..utils.api.model import DailyData, AccountBaseInfo
 from ..utils.constants import WAVES_GAME_ID
+from ..utils.at_help import ruser_id
 from ..utils.waves_api import waves_api
 from ..utils.error_reply import ERROR_CODE, WAVES_CODE_102, WAVES_CODE_103
 from ..utils.name_convert import char_name_to_char_id
-from ..utils.database.models import WavesBind, WavesUser, WavesStaminaRecord
+from ..utils.database.models import WavesBind, WavesUser, WavesStaminaRecord, WavesLangSettings
+from ..utils.localization import t
 from ..utils.api.request_util import KuroApiResp
 from ..utils.fonts.waves_fonts import (
+    waves_font_18,
     waves_font_24,
     waves_font_25,
     waves_font_26,
@@ -66,11 +69,11 @@ async def seconds2hours(seconds: int) -> str:
 
 
 async def process_uid(uid, ev):
-    ck = await waves_api.get_self_waves_ck(uid, ev.user_id, ev.bot_id)
+    ck = await waves_api.get_self_waves_ck(uid, ruser_id(ev), ev.bot_id)
     if not ck:
         try:
             await WavesStaminaRecord.update_ck_valid(
-                user_id=ev.user_id,
+                user_id=ruser_id(ev),
                 bot_id=ev.bot_id,
                 bot_self_id=ev.bot_self_id or "",
                 uid=uid,
@@ -100,7 +103,7 @@ async def process_uid(uid, ev):
     try:
         mr_value = daily_info.energyData.cur if daily_info.energyData else None
         await WavesStaminaRecord.upsert_stamina_query(
-            user_id=ev.user_id,
+            user_id=ruser_id(ev),
             bot_id=ev.bot_id,
             bot_self_id=ev.bot_self_id or "",
             uid=uid,
@@ -119,10 +122,14 @@ async def process_uid(uid, ev):
 
 async def draw_stamina_img(bot: Bot, ev: Event):
     try:
-        uid_list = await WavesBind.get_uid_list_by_game(ev.user_id, ev.bot_id)
+        uid_list = await WavesBind.get_uid_list_by_game(ruser_id(ev), ev.bot_id)
         logger.info(f"[鸣潮][每日信息]UID: {uid_list}")
         if uid_list is None:
             return ERROR_CODE[WAVES_CODE_103]
+
+        # 获取用户语言设置
+        locale = await WavesLangSettings.get_lang(ruser_id(ev))
+
         # 进行校验UID是否绑定CK
         tasks = [process_uid(uid, ev) for uid in uid_list]
         results = await asyncio.gather(*tasks)
@@ -137,7 +144,7 @@ async def draw_stamina_img(bot: Bot, ev: Event):
         task = []
         img = Image.new("RGBA", (based_w, based_h * len(valid_daily_list)), (0, 0, 0, 0))
         for uid_index, valid in enumerate(valid_daily_list):
-            task.append(_draw_all_stamina_img(ev, img, valid, uid_index))
+            task.append(_draw_all_stamina_img(ev, img, valid, uid_index, locale))
         await asyncio.gather(*task)
         res = await convert_img(img)
         logger.info("[鸣潮][每日信息]绘图已完成,等待发送!")
@@ -148,13 +155,13 @@ async def draw_stamina_img(bot: Bot, ev: Event):
     return res
 
 
-async def _draw_all_stamina_img(ev: Event, img: Image.Image, valid: Dict, index: int):
-    stamina_img = await _draw_stamina_img(ev, valid)
+async def _draw_all_stamina_img(ev: Event, img: Image.Image, valid: Dict, index: int, locale: str = ""):
+    stamina_img = await _draw_stamina_img(ev, valid, locale)
     stamina_img = stamina_img.convert("RGBA")
     img.paste(stamina_img, (0, based_h * index), stamina_img)
 
 
-async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
+async def _draw_stamina_img(ev: Event, valid: Dict, locale: str = "") -> Image.Image:
     """准备数据并调用绘制函数"""
     daily_info: DailyData = valid["daily_info"]
     account_info: AccountBaseInfo = valid["account_info"]
@@ -162,18 +169,18 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     # 确定签到状态
     if daily_info.hasSignIn:
         sign_in_icon = YES
-        sing_in_text = "签到已完成！"
+        sing_in_text = t("签到已完成！", locale)
     else:
         sign_in_icon = NO
-        sing_in_text = "今日未签到！"
+        sing_in_text = t("今日未签到！", locale)
 
     # 确定活跃度状态
     if daily_info.livenessData.total != 0 and daily_info.livenessData.cur == daily_info.livenessData.total:
         active_icon = YES
-        active_text = "活跃度已满！"
+        active_text = t("活跃度已满！", locale)
     else:
         active_icon = NO
-        active_text = "活跃度未满！"
+        active_text = t("活跃度未满！", locale)
 
     # 加载基础图片资源
     img = Image.open(TEXT_PATH / "bg.jpg").convert("RGBA")
@@ -185,7 +192,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
     avatar = await get_event_avatar(ev)
 
     # 随机获得pile
-    user = await WavesUser.get_user_by_attr(ev.user_id, ev.bot_id, "uid", daily_info.roleId, game_id=WAVES_GAME_ID)
+    user = await WavesUser.get_user_by_attr(ruser_id(ev), ev.bot_id, "uid", daily_info.roleId, game_id=WAVES_GAME_ID)
     pile_id = None
     force_use_bg = False
     force_not_use_bg = False
@@ -201,7 +208,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         )
         char_id = char_name_to_char_id(stamina_bg_value)
         if char_id in SPECIAL_CHAR:
-            ck = await waves_api.get_self_waves_ck(daily_info.roleId, ev.user_id, ev.bot_id)
+            ck = await waves_api.get_self_waves_ck(daily_info.roleId, ruser_id(ev), ev.bot_id)
             if ck:
                 for char_id in SPECIAL_CHAR[char_id]:
                     role_detail_info = await waves_api.get_role_detail_info(char_id, daily_info.roleId, ck)
@@ -252,6 +259,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
             active_icon=active_icon,
             active_text=active_text,
             mr_use_bg=mr_use_bg,
+            locale=locale,
         )
 
     try:
@@ -269,6 +277,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
             ),
             active_text=active_text,
             avatar=avatar,
+            locale=locale,
         )
         if html_res:
             return html_res
@@ -292,6 +301,7 @@ async def _draw_stamina_img(ev: Event, valid: Dict) -> Image.Image:
         active_icon=active_icon,
         active_text=active_text,
         mr_use_bg=mr_use_bg,
+        locale=locale,
     )
 
 
@@ -306,6 +316,7 @@ async def _render_stamina_card(
     active_status: bool,
     active_text: str,
     avatar: Image.Image,
+    locale: str = "",
 ) -> Image.Image:
     # 准备上下文数据
     
@@ -369,15 +380,15 @@ async def _render_stamina_card(
             is_stamina_urgent = True
 
         if date_from_timestamp.date() == today:
-            recover_text = "今天 " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
+            recover_text = t("今天", locale) + " " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
         elif date_from_timestamp.date() == tomorrow:
-            recover_text = "明天 " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
+            recover_text = t("明天", locale) + " " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
         else:
              recover_text = datetime.fromtimestamp(refreshTimeStamp).strftime("%m.%d %H:%M:%S")
     else:
-        recover_text = "漂泊者该上潮了"
+        recover_text = t("漂泊者该上潮了", locale)
         is_stamina_urgent = True
-        
+
     # 结晶
     store_cur = account_info.storeEnergy
     store_total = account_info.storeEnergyLimit if account_info.storeEnergyLimit else 480
@@ -406,11 +417,11 @@ async def _render_stamina_card(
     tower_urgent = False
     if tower_refresh > curr_time:
          remain_days = (datetime.fromtimestamp(tower_refresh) - datetime.now()).days
-         tower_time_text = f"余 {remain_days} 天"
+         tower_time_text = t("余 {} 天", locale).format(remain_days)
          if tower_cur != 36 and remain_days < 7:
              tower_urgent = True
     else:
-         tower_time_text = "已结束"
+         tower_time_text = t("已结束", locale)
 
     # Slash Tower (冥歌海墟) - 只有name为'冥歌海墟·再生-湍渊'才视为完成
     slash_data = getattr(daily_info, 'slashTowerData', None)
@@ -421,7 +432,7 @@ async def _render_stamina_card(
     slash_urgent = False
     if slash_refresh > curr_time:
          remain_days = (datetime.fromtimestamp(slash_refresh) - datetime.now()).days
-         slash_time_text = f"余 {remain_days} 天"
+         slash_time_text = t("余 {} 天", locale).format(remain_days)
          slash_completed = (
              slash_name == '冥歌海墟·再生-湍渊'
              and slash_total
@@ -430,10 +441,11 @@ async def _render_stamina_card(
          if not slash_completed and remain_days < 7:
              slash_urgent = True
     else:
-         slash_time_text = "已结束"
+         slash_time_text = t("已结束", locale)
 
     # 我去，我真变态！
     context = {
+        "locale": locale,
         "user_name": daily_info.roleName,
         "role_id": daily_info.roleId,
         "uid": daily_info.roleId,
@@ -502,6 +514,18 @@ async def _render_stamina_card(
             "text": active_text
         },
         "urgent_color": URGENT_COLOR,
+
+        # 本地化标签
+        "label_daily_status": t("每日状态", locale),
+        "label_recovery_time": t("回满时间：", locale),
+        "label_stamina": t("结晶波片", locale),
+        "label_store": t("结晶单质", locale),
+        "label_liveness": t("活跃度", locale),
+        "label_weekly_boss": t("战歌重奏", locale),
+        "label_battle_pass": t("先约电台", locale),
+        "label_rogue": t("千道门扉", locale),
+        "label_tower": t("逆境深塔", locale),
+        "label_slash_tower": t("冥歌海墟", locale),
     }
     
     img_bytes = await render_html(waves_templates, "stamina_card.html", context)
@@ -525,6 +549,7 @@ async def _render_stamina_card_pil(
     active_icon: Image.Image,
     active_text: str,
     mr_use_bg: bool = False,
+    locale: str = "",
 ) -> Image.Image:
     """实际的绘制逻辑"""
     # 处理背景图片
@@ -545,12 +570,13 @@ async def _render_stamina_card_pil(
 
     base_info_draw = ImageDraw.Draw(base_info_bg)
     base_info_draw.text((275, 120), f"{daily_info.roleName[:7]}", GREY, waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {daily_info.roleId}", GOLD, waves_font_25, "lm")
+    base_info_draw.text((226, 173), f"{t('特征码:', locale)}  {daily_info.roleId}", GOLD, waves_font_25, "lm")
     # 账号基本信息，由于可能会没有，放在一起
 
     title_bar = Image.open(TEXT_PATH / "title_bar.png")
     title_bar_draw = ImageDraw.Draw(title_bar)
-    title_bar_draw.text((480, 125), "战歌重奏", GREY, waves_font_26, "mm")
+    hud_label_font = waves_font_18 if locale and locale != "chs" else waves_font_26
+    title_bar_draw.text((480, 125), t("战歌重奏", locale), GREY, hud_label_font, "mm")
     color = URGENT_COLOR if account_info.weeklyInstCount != 0 else GREEN
     if account_info.weeklyInstCountLimit is not None and account_info.weeklyInstCount is not None:
         title_bar_draw.text(
@@ -561,7 +587,7 @@ async def _render_stamina_card_pil(
             "mm",
         )
 
-    title_bar_draw.text((630, 125), "先约电台", GREY, waves_font_26, "mm")
+    title_bar_draw.text((630, 125), t("先约电台", locale), GREY, hud_label_font, "mm")
     title_bar_draw.text(
         (630, 78),
         f"Lv.{daily_info.battlePassData[0].cur}",
@@ -571,7 +597,7 @@ async def _render_stamina_card_pil(
     )
 
     color = RED if account_info.rougeScore != account_info.rougeScoreLimit else GREEN
-    title_bar_draw.text((810, 125), "千道门扉的异想", GREY, waves_font_26, "mm")
+    title_bar_draw.text((810, 125), t("千道门扉的异想", locale), GREY, hud_label_font, "mm")
     title_bar_draw.text(
         (810, 78),
         f"{account_info.rougeScore}/{account_info.rougeScoreLimit}",
@@ -598,13 +624,13 @@ async def _render_stamina_card_pil(
 
         remain_time = datetime.fromtimestamp(refreshTimeStamp).strftime("%m.%d %H:%M:%S")
         if date_from_timestamp.date() == today:
-            remain_time = "今天 " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
+            remain_time = t("今天", locale) + " " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
         elif date_from_timestamp.date() == tomorrow:
-            remain_time = "明天 " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
+            remain_time = t("明天", locale) + " " + datetime.fromtimestamp(refreshTimeStamp).strftime("%H:%M:%S")
 
         time_img_draw.text((10, 15), f"{remain_time}", "white", waves_font_24, "lm")
     else:
-        time_img_draw.text((10, 15), "漂泊者该上潮了", "white", waves_font_24, "lm")
+        time_img_draw.text((10, 15), t("漂泊者该上潮了", locale), "white", waves_font_24, "lm")
 
     info.alpha_composite(time_img, (280, 50))
 
@@ -701,7 +727,7 @@ async def _render_stamina_card_pil(
 
 
 async def draw_pic_with_ring(ev: Event):
-    pic = await get_event_avatar(ev, is_valid_at_param=False)
+    pic = await get_event_avatar(ev)
 
     mask_pic = Image.open(TEXT_PATH / "avatar_mask.png")
     img = Image.new("RGBA", (200, 200))

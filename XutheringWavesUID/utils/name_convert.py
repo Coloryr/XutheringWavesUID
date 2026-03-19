@@ -8,6 +8,7 @@ from gsuid_core.logger import logger
 from ..utils.resource.RESOURCE_PATH import (
     MAP_PATH,
     MAP_ALIAS_PATH,
+    LOCALIZATION_PATH,
     CUSTOM_ID2NAME_PATH,
     CUSTOM_CHAR_ALIAS_PATH,
     CUSTOM_ECHO_ALIAS_PATH,
@@ -29,7 +30,41 @@ echo_alias_data: Dict[str, List[str]] = {}
 char_id_data: Dict[str, Dict[str, str]] = {}
 id2name: Dict[str, str] = {}
 
+# i18n 反向查找表: {normalized_foreign_name: chs_name}
+_char_i18n_reverse: Dict[str, str] = {}
+_weapon_i18n_reverse: Dict[str, str] = {}
+_echo_i18n_reverse: Dict[str, str] = {}
+
 _data_loaded = False
+
+
+def _normalize(name: str) -> str:
+    """归一化名称: 小写并去除空格"""
+    return name.lower().replace(" ", "").replace("\u3000", "")
+
+
+def _build_i18n_reverse(i18n_path) -> Dict[str, str]:
+    """从 i18n JSON 文件构建反向查找表"""
+    reverse_map: Dict[str, str] = {}
+    if not i18n_path.exists():
+        return reverse_map
+    try:
+        with open(i18n_path, "r", encoding="UTF-8") as f:
+            data = msgjson.decode(f.read(), type=Dict[str, Dict[str, str]])
+        for chs_name, translations in data.items():
+            for foreign_name in translations.values():
+                normalized = _normalize(foreign_name)
+                if normalized and normalized != _normalize(chs_name):
+                    reverse_map[normalized] = chs_name
+    except Exception as e:
+        logger.exception(f"Failed to load i18n file {i18n_path}: {e}")
+    return reverse_map
+
+
+def _i18n_to_chs(name: str, reverse_map: Dict[str, str]) -> Optional[str]:
+    """尝试将其它语言名称解析为简体中文名称"""
+    normalized = _normalize(name)
+    return reverse_map.get(normalized)
 
 
 def add_dictionaries(dict1, dict2):
@@ -119,11 +154,17 @@ def ensure_data_loaded(force: bool = False):
         force: 如果为 True，强制重新加载所有数据，即使已经加载过
     """
     global _data_loaded, char_id_data, id2name
+    global _char_i18n_reverse, _weapon_i18n_reverse, _echo_i18n_reverse
 
     if _data_loaded and not force:
         return
 
     load_alias_data()
+
+    # 加载 i18n 反向查找表
+    _char_i18n_reverse = _build_i18n_reverse(LOCALIZATION_PATH / "char_i18n.json")
+    _weapon_i18n_reverse = _build_i18n_reverse(LOCALIZATION_PATH / "weapon_i18n.json")
+    _echo_i18n_reverse = _build_i18n_reverse(LOCALIZATION_PATH / "echo_i18n.json")
 
     try:
         with open(MAP_PATH / "CharId2Data.json", "r", encoding="UTF-8") as f:
@@ -166,6 +207,10 @@ def ensure_data_loaded(force: bool = False):
 
 def alias_to_char_name(char_name: str) -> str:
     ensure_data_loaded()
+    # 先尝试 i18n 反向查找（忽略大小写和空格）
+    chs = _i18n_to_chs(char_name, _char_i18n_reverse)
+    if chs:
+        char_name = chs
     for key, aliases in char_alias_data.items():
         if char_name == key or char_name in aliases:
             return key
@@ -185,6 +230,10 @@ def alias_to_char_name_optional(char_name: Optional[str]) -> Optional[str]:
     ensure_data_loaded()
     if not char_name:
         return None
+    # 先尝试 i18n 反向查找（忽略大小写和空格）
+    chs = _i18n_to_chs(char_name, _char_i18n_reverse)
+    if chs:
+        char_name = chs
     for key, aliases in char_alias_data.items():
         if char_name == key or char_name in aliases:
             return key
@@ -196,6 +245,10 @@ def alias_to_char_name_optional(char_name: Optional[str]) -> Optional[str]:
 
 def alias_to_char_name_list(char_name: str) -> List[str]:
     ensure_data_loaded()
+    # 先尝试 i18n 反向查找（忽略大小写和空格）
+    chs = _i18n_to_chs(char_name, _char_i18n_reverse)
+    if chs:
+        char_name = chs
     for key, aliases in char_alias_data.items():
         if char_name == key or char_name in aliases:
             return aliases
@@ -228,6 +281,10 @@ def char_name_to_char_id(char_name: str) -> Optional[str]:
 
 def alias_to_weapon_name(weapon_name: str) -> str:
     ensure_data_loaded()
+    # 先尝试 i18n 反向查找（忽略大小写和空格）
+    chs = _i18n_to_chs(weapon_name, _weapon_i18n_reverse)
+    if chs:
+        weapon_name = chs
     for i in weapon_alias_data:
         if (weapon_name in i) or (weapon_name in weapon_alias_data[i]):
             return i
@@ -274,6 +331,10 @@ def alias_to_sonata_name(sonata_name: str | None) -> str | None:
 
 def alias_to_echo_name(echo_name: str) -> str:
     ensure_data_loaded()
+    # 先尝试 i18n 反向查找（忽略大小写和空格）
+    chs = _i18n_to_chs(echo_name, _echo_i18n_reverse)
+    if chs:
+        echo_name = chs
     for i, j in echo_alias_data.items():
         if echo_name == i:
             return i

@@ -36,6 +36,7 @@ from ..utils.image import (
     get_custom_waves_bg,
     get_attribute_effect,
     get_role_pile_default,
+    parse_bot_color_config,
 )
 from ..utils.api.wwapi import (
     GET_RANK_URL,
@@ -203,7 +204,9 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
     results = await asyncio.gather(*tasks)
 
     bot_color = copy.deepcopy(BOT_COLOR)
-    bot_color_map = {}
+    bot_color_map = parse_bot_color_config(
+        WutheringWavesConfig.get_config("BotColorMap").data
+    )
     avg_num = 0
     damage_name = ""
     for index, temp in enumerate(zip(rankInfoList.data.details, results)):

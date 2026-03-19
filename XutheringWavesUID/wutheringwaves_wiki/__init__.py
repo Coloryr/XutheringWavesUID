@@ -13,7 +13,7 @@ from ..utils.char_info_utils import PATTERN
 from ..wutheringwaves_abyss.period import (
     get_tower_period_number,
     get_slash_period_number,
-    get_matrix_season_number,
+    get_matrix_period_number,
 )
 
 sv_waves_guide = SV("鸣潮攻略", priority=10)
@@ -23,7 +23,7 @@ sv_waves_matrix = SV("waves查询矩阵信息", priority=4)
 
 
 @sv_waves_guide.on_regex(
-    rf"^(?P<wiki_name>{PATTERN})(?P<wiki_type>共鸣链|gml|命座|天赋|技能|jn|图鉴|专武|wiki|介绍|回路|操作|机制|jz)$",
+    rf"^(?P<wiki_name>{PATTERN})(?P<wiki_type>共鸣链|共鳴鏈|gml|命座|天赋|天賦|技能|jn|图鉴|圖鑑|专武|專武|wiki|介绍|介紹|回路|操作|机制|機制|jz)$",
     block=True,
 )
 async def send_waves_wiki(bot: Bot, ev: Event):
@@ -31,18 +31,18 @@ async def send_waves_wiki(bot: Bot, ev: Event):
     wiki_type = ev.regex_dict.get("wiki_type", "")
 
     at_sender = True if ev.group_id else False
-    if wiki_type in ("共鸣链", "gml", "命座", "天赋", "技能", "jn", "回路", "操作", "机制", "jz"):
+    if wiki_type in ("共鸣链", "共鳴鏈", "gml", "命座", "天赋", "天賦", "技能", "jn", "回路", "操作", "机制", "機制", "jz"):
         char_name = wiki_name
         char_id = char_name_to_char_id(char_name)
         if not char_id:
             msg = f"[鸣潮] 未找到指定角色, 请先检查输入是否正确！\n"
             return await bot.send(msg, at_sender)
 
-        if wiki_type in ("技能", "天赋", "jn"):
+        if wiki_type in ("技能", "天赋", "天賦", "jn"):
             query_role_type = "技能"
-        elif wiki_type in ("共鸣链", "命座", "gml"):
+        elif wiki_type in ("共鸣链", "共鳴鏈", "命座", "gml"):
             query_role_type = "共鸣链"
-        elif wiki_type in ("回路", "操作", "机制", "jz"):
+        elif wiki_type in ("回路", "操作", "机制", "機制", "jz"):
             query_role_type = "机制"
         else:
             query_role_type = wiki_type
@@ -53,7 +53,7 @@ async def send_waves_wiki(bot: Bot, ev: Event):
             return await bot.send(msg, at_sender)
         await bot.send(img)
     else:
-        if wiki_type == "专武":
+        if wiki_type in ("专武", "專武"):
             wiki_name = wiki_name + "专武"
         img = await draw_wiki_weapon(wiki_name)
         if isinstance(img, str) or not img:
@@ -84,7 +84,7 @@ async def send_weapon_list(bot: Bot, ev: Event):
     await bot.send(img)
 
 
-@sv_waves_guide.on_regex(r"^(?:(?P<version_pre>\d+\.\d+))?套装(列表)?(?:(?P<version_post>\d+\.\d+))?$", block=True)
+@sv_waves_guide.on_regex(r"^(?:(?P<version_pre>\d+\.\d+))?(?:套装|套裝)(列表)?(?:(?P<version_post>\d+\.\d+))?$", block=True)
 async def send_sonata_list(bot: Bot, ev: Event):
     # 版本号可以在前面或后面
     version = ev.regex_dict.get("version_pre") or ev.regex_dict.get("version_post") or ""
@@ -118,12 +118,12 @@ async def send_tower_challenge_info(bot: Bot, ev: Event):
     im = await draw_tower_challenge_img(ev, target_period)
     if isinstance(im, str):
         at_sender = True if ev.group_id else False
-        await bot.send(im, at_sender)
+        await bot.send(im, at_sender=at_sender)
     else:
         await bot.send(im)
 
 @sv_waves_slash_info.on_regex(
-    r"^(?:海墟|冥海|无尽|hx|wj)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
+    r"^(?:海墟|冥海|无尽|無盡|hx|wj)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
     block=True,
 )
 async def send_slash_challenge_info(bot: Bot, ev: Event):
@@ -148,13 +148,13 @@ async def send_slash_challenge_info(bot: Bot, ev: Event):
     im = await draw_slash_challenge_img(ev, target_period)
     if isinstance(im, str):
         at_sender = True if ev.group_id else False
-        await bot.send(im, at_sender)
+        await bot.send(im, at_sender=at_sender)
     else:
         await bot.send(im)
 
 
 @sv_waves_matrix.on_regex(
-    r"^(?:矩阵|jz信息|matrix)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
+    r"^(?:矩阵|矩陣|jz信息|matrix)(?:(?:信息(?:第)?|第)(?P<period>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期)?|(?P<period_force>\d+|下(?:一)?期|下下期|上(?:一)?期|上上期))期?$",
     block=True,
 )
 @sv_waves_matrix.on_regex(
@@ -165,7 +165,7 @@ async def send_matrix_challenge_info(bot: Bot, ev: Event):
     """查询矩阵挑战信息"""
     period_val = ev.regex_dict.get("period", "") or ev.regex_dict.get("period_force", "")
 
-    current_period = get_matrix_season_number()
+    current_period = get_matrix_period_number()
     target_period = current_period
 
     if period_val:
@@ -183,6 +183,6 @@ async def send_matrix_challenge_info(bot: Bot, ev: Event):
     im = await draw_matrix_challenge_img(ev, target_period)
     if isinstance(im, str):
         at_sender = True if ev.group_id else False
-        await bot.send(im, at_sender)
+        await bot.send(im, at_sender=at_sender)
     else:
         await bot.send(im)

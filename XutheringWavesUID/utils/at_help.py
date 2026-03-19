@@ -7,10 +7,9 @@ def ruser_id(ev: Event) -> str:
     )
 
     AtCheck = WutheringWavesConfig.get_config("AtCheck").data
-    if AtCheck:
-        return ev.at if ev.at else ev.user_id
-    else:
-        return ev.user_id
+    if AtCheck and ev.at and ev.at != ev.bot_self_id:
+        return ev.at
+    return ev.user_id
 
 
 def is_valid_at(ev: Event) -> bool:

@@ -687,6 +687,15 @@ class Weapon_21020066(WeaponAbstract):
 
     # 施放变奏技能或普攻后10秒内，施放声骸技能时，获得1层【解竹】，重击伤害加成提升30%，同名声骸只可触发一次，最多可叠加2层，持续12秒，叠加至2层后施放声骸技能不刷新持续时间。该效果10秒内最多生效1次，若切换至其他角色则该效果提前结束。
     # 施放变奏技能时，队伍中的角色声骸技能伤害加成提升20%，持续30秒，同名效果之间不可叠加。
+    def cast_variation(self, attr: DamageAttribute, isGroup: bool = False):
+        """施放变奏技能"""
+        if attr.char_damage != phantom_damage:
+            return
+        dmg = f"{self.param(5)}"
+        title = self.get_title()
+        msg = f"施放变奏技能时，队伍声骸技能伤害加成提升{dmg}"
+        attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
+
     def cast_phantom(self, attr: DamageAttribute, isGroup: bool = False):
         """施放声骸技能"""
         if attr.char_damage == hit_damage:
@@ -1481,6 +1490,27 @@ class Weapon_21040104(WeaponAbstract):
             title = self.get_title()
             msg = f"施放共鸣解放时，共鸣解放伤害加成提升{dmg}"
             attr.add_dmg_bonus(calc_percent_expression(dmg), title, msg)
+
+
+class Weapon_21040066(WeaponAbstract):
+    id = 21040066
+    type = 4
+    name = "昭日译注"
+
+    # 攻击提升{0}。施放变奏技能或声骸技能时，声骸技能伤害加深{1}，持续{2}秒。造成声骸技能伤害时，气动伤害无视目标{3}防御，持续{4}秒。
+    def cast_phantom(self, attr: DamageAttribute, isGroup: bool = False):
+        """施放声骸技能"""
+        if attr.char_damage == phantom_damage:
+            dmg = f"{self.param(1)}"
+            title = self.get_title()
+            msg = f"施放声骸技能时，声骸技能伤害加深{dmg}"
+            attr.add_dmg_deepen(calc_percent_expression(dmg), title, msg)
+
+        if attr.char_attr == CHAR_ATTR_SIERRA:
+            dmg = f"{self.param(3)}"
+            title = self.get_title()
+            msg = f"造成声骸技能伤害时，气动伤害无视目标{dmg}防御"
+            attr.add_defense_ignore(calc_percent_expression(dmg), title, msg)
 
 
 class Weapon_21050011(WeaponAbstract):

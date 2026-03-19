@@ -263,9 +263,19 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "外置渲染服务的API地址，例如：http://127.0.0.1:3000/render",
         "http://127.0.0.1:3000/render",
     ),
+    "BotColorMap": GsStrConfig(
+        "排行榜Bot名称固定颜色",
+        "格式: 名称-(R,G,B)，颜色为RGB值(0-255)，多个用逗号分隔，如: 小维-(234,183,4),千咲-(0,128,255)",
+        "",
+    ),
+    "EnableLocalization": GsBoolConfig(
+        "启用多语言本地化",
+        "启用后将加载多语言翻译字典到内存，用户可通过【设置语言】切换界面语言。关闭后不加载字典，节省内存",
+        False,
+    ),
     "FontCssUrl": GsStrConfig(
         "外置渲染字体CSS地址",
         "用于HTML渲染的字体CSS URL，外置渲染时传递，一般保留默认即可，如果在本地，可以填http://127.0.0.1:8765/waves/fonts/fonts.css，如果有自己的登录域名：可以使用 你的登录域名根/waves/fonts/fonts.css",
-        "https://fonts.loli.net/css2?family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Color+Emoji&display=swap",
+        "https://fonts.loli.net/css2?family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Color+Emoji&display=swap",
     ),
 }

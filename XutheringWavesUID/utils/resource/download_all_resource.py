@@ -22,6 +22,7 @@ from .RESOURCE_PATH import (
     MATERIAL_PATH,
     SHARE_BG_PATH,
     MAP_ALIAS_PATH,
+    LOCALIZATION_PATH,
     MAP_BUILD_TEMP,
     ROLE_PILE_PATH,
     XFM_GUIDE_PATH,
@@ -194,6 +195,7 @@ async def download_all_resource(force: bool = False):
                 "resource/map/detail_json/challenge": MAP_CHALLENGE_PATH,
                 "resource/map/detail_json/forte": MAP_FORTE_PATH,
                 "resource/map/alias": MAP_ALIAS_PATH,
+                "resource/map/i18n": LOCALIZATION_PATH,
             },
             url,
             tag,
@@ -227,3 +229,7 @@ async def reload_all_modules():
     card_list = await load_limit_user_card()
     if card_list:
         logger.info(f"[鸣潮][加载角色极限面板] 数量: {len(card_list)}")
+
+    # 重新加载本地化字典
+    from ..localization import init_localization
+    init_localization()
