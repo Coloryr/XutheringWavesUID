@@ -112,7 +112,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
 
         # 准备渲染数据
         avatar = await get_event_avatar(ev)
-        avatar_url = pil_to_b64(avatar)
+        avatar_url = pil_to_b64(avatar, quality=75)
 
         # 根据面板数据获取详细信息
         role_detail_info_map = await get_all_roleid_detail_info(uid)
@@ -133,7 +133,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         for difficulty in reversed(slash_detail.difficultyList):
             # 加载难度背景
             difficulty_bg = Image.open(TEXT_PATH / f"difficulty_{difficulty.difficulty}.png")
-            difficulty_bg_url = pil_to_b64(difficulty_bg)
+            difficulty_bg_url = pil_to_b64(difficulty_bg, quality=75)
 
             for challenge in difficulty.challengeList:
                 if challenge.challengeId not in query_challenge_ids:
@@ -145,7 +145,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                 # 加载分数背景
                 rank = challenge.get_rank()
                 score_bg = Image.open(TEXT_PATH / f"score_{rank}.png")
-                score_bg_url = pil_to_b64(score_bg)
+                score_bg_url = pil_to_b64(score_bg, quality=75)
 
                 # 构建半场数据
                 half_list = []
@@ -153,7 +153,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                     team_name = "队伍一" if half_index == 0 else "队伍二"
 
                     # Buff 数据
-                    buff_icon_b64 = await get_image_b64_with_cache(slash_half.buffIcon, SLASH_PATH) if slash_half.buffIcon else ""
+                    buff_icon_b64 = await get_image_b64_with_cache(slash_half.buffIcon, SLASH_PATH, quality=75, cover_size=(100, 100)) if slash_half.buffIcon else ""
                     buff_quality = slash_half.buffQuality
                     buff_color_rgb = COLOR_QUALITY.get(buff_quality, (188, 188, 188))
                     buff_color_hex = f"rgb({buff_color_rgb[0]}, {buff_color_rgb[1]}, {buff_color_rgb[2]})"
@@ -182,7 +182,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             chain_name = temp.get_chain_name()
 
                         # 使用本地头像（和PIL版本一致）
-                        role_icon_b64 = img_to_b64(get_square_avatar_path(slash_role.roleId), quality=80, bake=True)
+                        role_icon_b64 = img_to_b64(get_square_avatar_path(slash_role.roleId), quality=75, bake=True, cover_size=(128, 128))
 
                         roles_data.append({
                             "id": slash_role.roleId,
@@ -220,13 +220,13 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                 })
 
         bg_img = get_waves_bg(bg = "bg9", crop=False)
-        bg_url = pil_to_b64(bg_img)
+        bg_url = pil_to_b64(bg_img, quality=75)
 
         title_bar = Image.open(TEXT_PATH / "title_bar.png")
-        title_bar_url = pil_to_b64(title_bar)
+        title_bar_url = pil_to_b64(title_bar, quality=75)
 
         role_hang_bg = Image.open(TEXT_PATH / "role_hang_bg.png")
-        role_hang_bg_url = pil_to_b64(role_hang_bg)
+        role_hang_bg_url = pil_to_b64(role_hang_bg, quality=75)
 
         current_date = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")
 

@@ -82,7 +82,7 @@ async def calculate_score(uid: str, ck: str) -> Optional[Dict]:
         total_char_score += total_score
 
         # 从本地获取角色头像
-        avatar_b64 = img_to_b64(get_square_avatar_path(role.roleId), quality=80, bake=True)
+        avatar_b64 = img_to_b64(get_square_avatar_path(role.roleId), quality=75, bake=True, cover_size=(128, 128))
 
         character_items.append({
             "name": role.roleName,
@@ -113,7 +113,7 @@ async def calculate_score(uid: str, ck: str) -> Optional[Dict]:
 
         # 获取武器图标 (优先使用本地资源)
         try:
-            icon_b64 = img_to_b64(get_square_weapon_path(weapon.weaponId), quality=80, bake=True)
+            icon_b64 = img_to_b64(get_square_weapon_path(weapon.weaponId), quality=75, bake=True, cover_size=(128, 128))
         except Exception:
             # 回退到网络图片
             icon_url = weapon.weaponIcon or ""
@@ -189,11 +189,11 @@ async def draw_reward_img(uid: str, ck: str, ev: Event):
 
     # 准备头像
     avatar = await get_event_avatar(ev)
-    avatar_url = pil_to_b64(avatar)
+    avatar_url = pil_to_b64(avatar, quality=75)
 
     # 准备背景
     bg_img = get_custom_waves_bg(bg="bg3", crop=False)
-    bg_url = pil_to_b64(bg_img)
+    bg_url = pil_to_b64(bg_img, quality=75)
 
     # 准备模板数据
     context = {

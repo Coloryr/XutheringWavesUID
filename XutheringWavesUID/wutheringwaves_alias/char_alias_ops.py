@@ -110,12 +110,12 @@ async def char_alias_list(char_name: str) -> Union[str, bytes]:
             char_id = char_name_to_char_id(std_char_name)
             if char_id:
                 avatar = await get_square_avatar(char_id)
-                avatar_url = pil_to_b64(avatar)
+                avatar_url = pil_to_b64(avatar, quality=75)
             else:
                 avatar_url = ""
 
             bg_img = get_custom_waves_bg(bg="bg12", crop=False)
-            bg_url = pil_to_b64(bg_img)
+            bg_url = pil_to_b64(bg_img, quality=75)
 
             # 准备模板数据
             footer_b64 = get_footer_b64(footer_type="white") or ""

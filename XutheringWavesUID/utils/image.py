@@ -107,12 +107,14 @@ def pil_to_b64(img: Image.Image, quality: int = 0) -> str:
     return "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
 
 
-def img_to_b64(path: Union[str, Path], quality: int = 0, bake: bool = False) -> str:
+def img_to_b64(path: Union[str, Path], quality: int = 0, bake: bool = False,
+               cover_size: Optional[Tuple[int, int]] = None) -> str:
     """文件路径 → base64 data URL，支持烘焙缓存。
 
     quality=0: 原格式直读（最快，不经过PIL）
     quality>0: WebP压缩
     bake=True + quality>0: 烘焙缓存，命中时跳过PIL，直接读文件
+    cover_size: (w, h) 模拟 object-fit:cover 居中裁切到指定尺寸
     """
     from .resource.RESOURCE_PATH import BAKE_PATH
 
@@ -120,16 +122,29 @@ def img_to_b64(path: Union[str, Path], quality: int = 0, bake: bool = False) -> 
     if not path.exists():
         return ""
 
+    size_tag = f"_{cover_size[0]}x{cover_size[1]}" if cover_size else ""
+
+    def _apply_cover(img: Image.Image) -> Image.Image:
+        if cover_size is None:
+            return img
+        tw, th = cover_size
+        scale = max(tw / img.width, th / img.height)
+        new_w, new_h = int(img.width * scale), int(img.height * scale)
+        img = img.resize((new_w, new_h), Image.LANCZOS)
+        left = (new_w - tw) // 2
+        top = (new_h - th) // 2
+        return img.crop((left, top, left + tw, top + th))
+
     # 烘焙命中：直接读 bake 文件，不打开 PIL
     if bake and quality > 0:
         import hashlib
         path_hash = hashlib.md5(str(path.resolve()).encode()).hexdigest()[:8]
-        bake_path = BAKE_PATH / f"{path.stem}_{path_hash}_q{quality}.webp"
+        bake_path = BAKE_PATH / f"{path.stem}_{path_hash}_q{quality}{size_tag}.webp"
         if bake_path.exists() and bake_path.stat().st_mtime >= path.stat().st_mtime:
             with open(bake_path, "rb") as f:
                 return "data:image/webp;base64," + base64.b64encode(f.read()).decode('utf-8')
         # 未命中：PIL 打开 → WebP → 写入烘焙
-        img = Image.open(path).convert("RGBA")
+        img = _apply_cover(Image.open(path).convert("RGBA"))
         buffered = BytesIO()
         img.save(buffered, format="WEBP", quality=quality)
         data = buffered.getvalue()
@@ -141,12 +156,12 @@ def img_to_b64(path: Union[str, Path], quality: int = 0, bake: bool = False) -> 
 
     # 不烘焙
     if quality > 0:
-        img = Image.open(path).convert("RGBA")
+        img = _apply_cover(Image.open(path).convert("RGBA"))
         buffered = BytesIO()
         img.save(buffered, format="WEBP", quality=quality)
         return "data:image/webp;base64," + base64.b64encode(buffered.getvalue()).decode('utf-8')
 
-    # quality=0: 原格式直读
+    # quality=0: 原格式直读（不支持 cover_size）
     ext = path.suffix.lstrip(".").lower()
     if ext == "jpg":
         ext = "jpeg"

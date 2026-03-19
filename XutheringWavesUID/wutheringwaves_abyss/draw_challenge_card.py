@@ -66,7 +66,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
 
         # 准备渲染数据
         avatar = await get_event_avatar(ev)
-        avatar_url = pil_to_b64(avatar)
+        avatar_url = pil_to_b64(avatar, quality=75)
 
         # 获取角色详细信息（用于获取共鸣链）
         role_detail_info_map = await get_all_roleid_detail_info(uid)
@@ -79,7 +79,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
 
             # Boss 信息
             boss = _challenge[0]
-            boss_icon_b64 = await get_image_b64_with_cache(boss.bossIconUrl, CHALLENGE_PATH) if boss.bossIconUrl else ""
+            boss_icon_b64 = await get_image_b64_with_cache(boss.bossIconUrl, CHALLENGE_PATH, quality=75, cover_size=(130, 100)) if boss.bossIconUrl else ""
 
             # 通关记录（取最后一个有角色的记录）
             best_record = None
@@ -120,7 +120,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
                         chain_name = temp.get_chain_name()
 
                     # 使用本地头像（和PIL版本一致）
-                    role_icon_b64 = img_to_b64(get_square_avatar_path(role_id), quality=80, bake=True)
+                    role_icon_b64 = img_to_b64(get_square_avatar_path(role_id), quality=75, bake=True, cover_size=(128, 128))
 
                     roles_data.append({
                         "id": role_id or "",
@@ -142,7 +142,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
             })
 
         bg_img = get_waves_bg(bg = "bg8", crop=False)
-        bg_url = pil_to_b64(bg_img)
+        bg_url = pil_to_b64(bg_img, quality=75)
 
         # 当前日期
         current_date = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=8))).strftime("%Y-%m-%d")

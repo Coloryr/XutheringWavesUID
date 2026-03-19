@@ -120,7 +120,7 @@ async def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[st
         try:
             material_img = await get_material_img(material_id)
             if material_img:
-                materials.append(pil_to_b64(material_img))
+                materials.append(pil_to_b64(material_img, quality=75))
         except Exception:
             pass
 
@@ -130,7 +130,7 @@ async def _get_base_context(char_model: CharacterModel, char_id: str) -> Dict[st
         "element_icon": image_to_base64(element_icon_path),
         "weapon_icon": image_to_base64(weapon_icon_path),
         "rarity_icon": image_to_base64(rarity_path),
-        "bg_url": pil_to_b64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "portrait_url": image_to_base64(role_pile_path),
         "hakushin_logo": hakushin_logo,
         "materials": materials,
