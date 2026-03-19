@@ -152,6 +152,10 @@ class KuroApiResp(BaseModel, Generic[T]):
             return True
         return self.msg in ("数据令牌已失效")
 
+    @property
+    def is_server_maintenance(self) -> bool:
+        return self.code == 999 or "维护" in (self.msg or "")
+
     @model_validator(mode="after")
     def _post_validate(self) -> "KuroApiResp[T]":
         if check_send_master_info(self.code, self.msg, self.data):

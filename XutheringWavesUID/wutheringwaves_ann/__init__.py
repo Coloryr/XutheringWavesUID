@@ -16,7 +16,7 @@ from ..utils.waves_api import waves_api
 from ..utils.limit_request import check_request_rate_limit
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..wutheringwaves_config.ann_config import get_ann_new_ids, set_ann_new_ids
-from ..utils.resource.RESOURCE_PATH import ANN_CARD_PATH, CALENDAR_PATH, WIKI_CACHE_PATH
+from ..utils.resource.RESOURCE_PATH import ANN_CARD_PATH, BAKE_PATH, CALENDAR_PATH, WIKI_CACHE_PATH
 from ..utils.database.waves_subscribe import WavesSubscribe
 
 sv_ann = SV("鸣潮公告")
@@ -260,8 +260,26 @@ async def clean_cache_directories(days: int) -> str:
         total_count += wiki_count
         total_space += wiki_space
 
+    # 烘焙缓存（含子目录）
+    bake_count, bake_space = 0, 0.0
+    if BAKE_PATH.exists():
+        cutoff = time.time() - (days * 86400)
+        for f in BAKE_PATH.rglob("*"):
+            if f.is_file() and f.stat().st_ctime < cutoff:
+                try:
+                    sz = f.stat().st_size
+                    f.unlink()
+                    bake_count += 1
+                    bake_space += sz
+                except Exception:
+                    pass
+    if bake_count > 0:
+        results.append(f"烘焙: {bake_count}个文件, {bake_space / 1024 / 1024:.2f}MB")
+        total_count += bake_count
+        total_space += bake_space / 1024 / 1024
+
     if total_count == 0:
-        return f"没有找到需要清理的缓存文件(公告/日历保留{days}天内的文件，wiki全部删除)"
+        return f"没有找到需要清理的缓存文件(公告/日历/烘焙保留{days}天内的文件，wiki全部删除)"
 
     result_msg = f"[鸣潮] 清理完成！共删除{total_count}个文件，{total_space:.2f}MB\n"
     result_msg += "\n".join(f" - {r}" for r in results)

@@ -25,6 +25,7 @@ from .request_util import (
     get_base_header,
     get_community_header,
 )
+
 from .api import (
     BBS_LIST,
     LOGIN_URL,
@@ -192,6 +193,10 @@ class WavesApi:
 
         data = await self.refresh_data(uid, waves_user.cookie)
         if not data.success:
+            if data.is_server_maintenance:
+                logger.warning(f"[鸣潮] 官方系统维护中，跳过刷新，UID: {uid}")
+                await WavesUser.update_last_used_time(uid, user_id, bot_id, game_id=WAVES_GAME_ID)
+                return waves_user.cookie
             if data.is_bat_token_invalid:
                 if waves_user := await self.refresh_bat_token(waves_user):
                     # 更新最后使用时间
