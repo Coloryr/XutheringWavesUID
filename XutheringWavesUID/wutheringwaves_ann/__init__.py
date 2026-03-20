@@ -122,7 +122,7 @@ async def unsub_ann_(bot: Bot, ev: Event):
 
 
 @scheduler.scheduled_job("interval", minutes=ann_minute_check)
-async def check_waves_ann():
+async def waves_check_ann_job():
     if not WutheringWavesConfig.get_config("WavesAnnOpen").data:
         return
     await check_waves_ann_state()
@@ -294,7 +294,7 @@ async def clean_cache_(bot: Bot, ev: Event):
 
 
 @scheduler.scheduled_job("cron", hour=3, minute=0)
-async def auto_clean_cache_daily():
+async def waves_auto_clean_cache_daily():
     """每天凌晨3点自动清理缓存"""
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data
     logger.info(f"[缓存清理] 定时任务: 开始清理缓存，保留{days}天内的文件")
@@ -304,7 +304,7 @@ async def auto_clean_cache_daily():
 
 
 @scheduler.scheduled_job("date")
-async def clean_cache_on_startup():
+async def waves_clean_cache_on_startup():
     """启动时清理一次缓存"""
     await asyncio.sleep(5)
 
