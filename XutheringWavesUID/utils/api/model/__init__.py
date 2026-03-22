@@ -37,6 +37,11 @@ from .role import (  # noqa: F401
     EquipPhantomData,
 )
 from .gacha import GachaLog  # noqa: F401
+from .sign import (  # noqa: F401
+    SignInInitData,
+    SignInGoodsConfig,
+    SignInSurfaceData,
+)
 from .battle import (  # noqa: F401
     AbyssRole,
     AbyssArea,

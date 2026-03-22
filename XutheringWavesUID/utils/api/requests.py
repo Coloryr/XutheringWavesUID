@@ -67,6 +67,8 @@ from .api import (
     ONLINE_LIST_WEAPON,
     ONLINE_LIST_PHANTOM,
     ROLE_CULTIVATE_STATUS,
+    SIGNIN_TASK_LIST_URL,
+    SIGNIN_SURFACE_URL,
     WIKI_ENTRY_DETAIL_URL,
     CALCULATOR_REFRESH_DATA_URL,
     get_local_proxy_url,
@@ -328,6 +330,30 @@ class WavesApi:
         else:
             info = await self._waves_request(BASE_DATA_URL, "POST", header, data=data)
         return info
+
+    async def get_sign_in_init(
+        self, roleId: str, token: str, gameId: int = WAVES_GAME_ID, serverId: Optional[str] = None
+    ):
+        """签到日历 initSignInV2"""
+        header = await get_base_header()
+        used_headers = await self.get_used_headers(
+            cookie=token, uid=roleId, needToken=True, game_id=gameId
+        )
+        header.update(used_headers)
+        header["devcode"] = ""
+        data = {
+            "gameId": gameId,
+            "serverId": serverId or self.get_server_id(roleId),
+            "roleId": roleId,
+        }
+        return await self._waves_request(SIGNIN_TASK_LIST_URL, "POST", header, data=data)
+
+    async def get_sign_in_surface(self, token: str, gameId: int = WAVES_GAME_ID):
+        """签到皮肤资源 signIn/surface"""
+        header = await get_base_header()
+        header["token"] = token
+        data = {"gameId": gameId}
+        return await self._waves_request(SIGNIN_SURFACE_URL, "POST", header, data=data)
 
     async def get_role_info(self, roleId: str, token: str, serverId: Optional[str] = None):
         header = await get_base_header()
