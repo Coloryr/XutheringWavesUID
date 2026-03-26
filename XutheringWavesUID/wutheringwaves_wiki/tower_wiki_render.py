@@ -12,10 +12,11 @@ from ..utils.resource.RESOURCE_PATH import (
     MAP_CHALLENGE_PATH,
     waves_templates,
 )
-from ..utils.image import ELEMENT_COLOR_MAP
+from ..utils.image import ELEMENT_COLOR_MAP, pil_to_b64, img_to_b64
 from ..utils.resource.download_file import get_phantom_img
-from ..utils.image import get_square_avatar
+from ..utils.image import get_square_avatar, get_square_avatar_path
 from ..utils.name_convert import echo_name_to_echo_id, char_name_to_char_id
+from ..utils.resource.RESOURCE_PATH import PHANTOM_PATH
 from ..utils.render_utils import (
     PLAYWRIGHT_AVAILABLE,
     image_to_base64,
@@ -40,20 +41,16 @@ ELEMENT_NAME_MAP = {
 }
 
 
-def pil_to_base64(img: Image.Image) -> str:
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-async def get_monster_icon(monster_name: str) -> Optional[str]:
+def get_monster_icon(monster_name: str) -> Optional[str]:
     echo_id = echo_name_to_echo_id(monster_name)
     if echo_id:
-        try:
-            img = await get_phantom_img(int(echo_id), "")
-            return pil_to_base64(img)
-        except Exception:
-            return None
+        path = PHANTOM_PATH / f"phantom_{echo_id}.png"
+        if not path.exists():
+            path = PHANTOM_PATH / "phantom_390070051.png"
+        b64 = img_to_b64(path, quality=75, bake=True, cover_size=(128, 128))
+        return b64 if b64 else None
     return None
 
 
@@ -95,7 +92,7 @@ async def _process_floor_data(floor_data: Dict[str, Any]) -> Dict[str, Any]:
         m_element_id = m_info.get("Element", 0)
         element_name = ELEMENT_NAME_MAP.get(m_element_id, "未知")
         
-        icon_base64 = await get_monster_icon(m_name)
+        icon_base64 = get_monster_icon(m_name)
         
         monsters_data.append({
             "name": m_name,
@@ -183,7 +180,7 @@ async def draw_tower_wiki_render(period: Optional[int] = None) -> Optional[bytes
     context = {
         "title": f"逆境深塔 第{period}期",
         "duration": duration,
-        "bg_url": pil_to_base64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "theme_color": "#4e7cff", # Blue-ish for Tower
         "left_tower": {
             "name": "残响之塔 (左塔)",
@@ -256,7 +253,7 @@ async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[byte
         seen_names.add(name)
 
         # 通过名字反查本地声骸图标
-        icon_base64 = await get_monster_icon(name)
+        icon_base64 = get_monster_icon(name)
 
         # 提取Tags
         tags = []
@@ -300,11 +297,7 @@ async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[byte
         role_icon = None
         char_id = char_name_to_char_id(name)
         if char_id:
-            try:
-                img = await get_square_avatar(char_id)
-                role_icon = pil_to_base64(img)
-            except Exception:
-                pass
+            role_icon = img_to_b64(get_square_avatar_path(char_id), quality=75, bake=True, cover_size=(128, 128)) or None
 
         # 获取增益描述
         enhance_descs = role_data.get("EnhanceSkillDesc", [])
@@ -325,7 +318,7 @@ async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[byte
     context = {
         "title": f"矩阵叠兵 第{season}期",
         "subtitle": level_name,
-        "bg_url": pil_to_base64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "theme_color": "#ff6b6b",
         "buffs": buffs,
         "bosses": bosses,
@@ -418,7 +411,7 @@ async def draw_slash_wiki_render(period: Optional[int] = None) -> Optional[bytes
             m_element_id = m_info.get("Element", 0)
             element_name = ELEMENT_NAME_MAP.get(m_element_id, "未知")
 
-            icon_base64 = await get_monster_icon(m_name)
+            icon_base64 = get_monster_icon(m_name)
 
             monsters_data.append({
                 "name": m_name,
@@ -441,7 +434,7 @@ async def draw_slash_wiki_render(period: Optional[int] = None) -> Optional[bytes
     context = {
         "title": f"冥歌海墟 第{period}期",
         "duration": duration,
-        "bg_url": pil_to_base64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "theme_color": "#ffca28", # Gold-ish for Slash
         "desc": desc_lines,
         "global_buffs": global_buffs,

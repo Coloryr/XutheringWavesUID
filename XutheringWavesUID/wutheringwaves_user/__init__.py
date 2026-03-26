@@ -73,9 +73,13 @@ async def send_waves_add_ck_msg(bot: Bot, ev: Event):
 
     ck_msg = await add_cookie(ev, ck, did, is_login=False)
     if "成功" in ck_msg:
+        # 先发绑定概要
+        await bot.send((" " if at_sender else "") + ck_msg.rstrip("\n"), at_sender)
+
         user = await WavesUser.get_user_by_attr(ev.user_id, ev.bot_id, "cookie", ck, game_id=WAVES_GAME_ID)
         if user:
             return await login_success_msg(bot, ev, user)
+        return
 
     ck_msg = ck_msg.rstrip("\n") if isinstance(ck_msg, str) else ck_msg
     await bot.send((" " if at_sender and isinstance(ck_msg, str) else "") + ck_msg if isinstance(ck_msg, str) else ck_msg, at_sender)

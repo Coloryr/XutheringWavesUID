@@ -96,7 +96,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
             return "探索数据为空"
 
         avatar = await get_event_avatar(ev)
-        avatar_url = pil_to_b64(avatar)
+        avatar_url = pil_to_b64(avatar, quality=75)
 
         explore_list_data = []
         for _explore in reversed(explore_data.exploreList):
@@ -162,7 +162,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
             })
         
         bg_img = get_waves_bg(bg = "bg3", crop=False)
-        bg_url = pil_to_b64(bg_img)
+        bg_url = pil_to_b64(bg_img, quality=75)
 
         context = {
             "user_name": account_info.name,

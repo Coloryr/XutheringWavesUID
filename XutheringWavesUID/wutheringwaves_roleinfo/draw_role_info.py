@@ -25,10 +25,13 @@ from ..utils.render_utils import (
 from ..utils.resource.RESOURCE_PATH import waves_templates
 from ..utils.image import (
     pil_to_b64,
+    img_to_b64,
     get_custom_waves_bg,
     get_event_avatar,
     get_square_avatar,
+    get_square_avatar_path,
     get_square_weapon,
+    get_square_weapon_path,
     get_attribute,
     CHAIN_COLOR,
 )
@@ -108,14 +111,12 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
             if role.roleSkin and role.roleSkin.quality and role.roleSkin.quality > 3:
                 skin_icon_url = role.roleSkin.skinIcon
                 if skin_icon_url:
-                    role_avatar_b64 = await get_image_b64_with_cache(skin_icon_url, SKIN_IMAGE_PATH)
+                    role_avatar_b64 = await get_image_b64_with_cache(skin_icon_url, SKIN_IMAGE_PATH, quality=75, cover_size=(128, 128))
                     if not role_avatar_b64:
-                        role_avatar = await get_square_avatar(role.roleId)
-                        role_avatar_b64 = pil_to_b64(role_avatar) if role_avatar else ""
+                        role_avatar_b64 = img_to_b64(get_square_avatar_path(role.roleId), quality=75, bake=True, cover_size=(128, 128))
             else:
                 # 使用默认头像
-                role_avatar = await get_square_avatar(role.roleId)
-                role_avatar_b64 = pil_to_b64(role_avatar) if role_avatar else ""
+                role_avatar_b64 = img_to_b64(get_square_avatar_path(role.roleId), quality=75, bake=True, cover_size=(128, 128))
 
             # 查找角色详细信息
             if role.roleId in SPECIAL_CHAR_INT:
@@ -134,8 +135,7 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
             chain_name = ""
             if temp:
                 # 获取武器图标
-                weapon_icon = await get_square_weapon(temp.weaponData.weapon.weaponId)
-                weapon_icon_b64 = pil_to_b64(weapon_icon) if weapon_icon else ""
+                weapon_icon_b64 = img_to_b64(get_square_weapon_path(temp.weaponData.weapon.weaponId), quality=75, bake=True, cover_size=(128, 128))
                 chain_num = temp.get_chain_num()
                 chain_name = temp.get_chain_name()
 
@@ -153,11 +153,11 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
 
         # 准备头像
         avatar = await get_event_avatar(ev)
-        avatar_url = pil_to_b64(avatar)
+        avatar_url = pil_to_b64(avatar, quality=75)
 
         # 准备背景
         bg_img = get_custom_waves_bg(bg="bg3", crop=False)
-        bg_url = pil_to_b64(bg_img)
+        bg_url = pil_to_b64(bg_img, quality=75)
 
         # 将 CHAIN_COLOR 转换为 RGB 字符串格式
         chain_colors = {i: f"rgba({r}, {g}, {b}, 0.8)" for i, (r, g, b) in CHAIN_COLOR.items()}

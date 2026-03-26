@@ -367,7 +367,6 @@ def parse_phantom_position(
     phantom_info.toPositions = toPositions
 
     results = []
-    # 只有角色名不为空时才添加
     if phantom_info.charName:
         results.append(phantom_info)
 
@@ -497,8 +496,12 @@ class ChangeParser:
 
     def parse_phantom(self, cont: str) -> list[str]:
         matched_list = [f"换{self.rr.phantom.PREFIX_RE[0]}"]
+
+        # 先检查是否是纯主词条指令（跳过声骸角色替换解析）
+        is_main_only = re.match(r"^(?:主词条|主词|main)\s*", cont)
+
         # 使用抽象的位置解析函数
-        phantom_info_list = parse_phantom_position(cont)
+        phantom_info_list = [] if is_main_only else parse_phantom_position(cont)
         if phantom_info_list:
             self.rr.phantom.phantomList.extend(phantom_info_list)
             for phantom_info in phantom_info_list:

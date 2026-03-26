@@ -14,8 +14,10 @@ from gsuid_core.logger import logger
 POOL_TYPE_MAP = {
     "角色精准调谐": "1",
     "武器精准调谐": "2",
+    "角色精准调谐-2": "2",  # 国际服
     "角色调谐（常驻池）": "3",
     "武器调谐（常驻池）": "4",
+    "全频调谐": "4",  # 国际服
     "新手调谐": "5",
     "新手自选唤取": "6",
     "新手自选唤取（感恩定向唤取）": "7",
@@ -176,6 +178,14 @@ def merge_gacha_data(original_data: dict, latest_data: dict) -> dict:
                 extract_five_cards(item)
 
     extract_five_cards(card_analysis)
+
+    # 国际服重定向: 存在全频调谐时, 武器精准调谐+角色 -> 角色调谐（常驻池）
+    has_global_pool = any(x.get("cardPoolType") == "4" for x in latest_5stars)
+    if has_global_pool:
+        for x in latest_5stars:
+            if x.get("cardPoolType") == "2" and x.get("resourceType") == "角色":
+                x["cardPoolType"] = "3"
+
     logger.debug(f"[GachaHandler] 解析出最新五星记录 {len(latest_5stars)} 条")
 
     orig_types = [str(x.get("cardPoolType")) for x in original_list if x.get("cardPoolType")]

@@ -114,13 +114,40 @@ from .utils.localization import init_localization
 init_localization()
 
 
+# 修正: API曾错误地将陆·赫斯的resourceType标记为武器
+import json as _json
+from .utils.resource.RESOURCE_PATH import PLAYER_PATH as _PLAYER_PATH
+_fix_flag = _PLAYER_PATH / ".fix_hesi_done"
+if not _fix_flag.exists():
+    _fix_count = 0
+    for _uid_dir in _PLAYER_PATH.iterdir():
+        _gl = _uid_dir / "gacha_logs.json"
+        if not _gl.is_file():
+            continue
+        try:
+            _raw = _json.loads(_gl.read_text("utf-8"))
+            _modified = False
+            for _records in _raw.get("data", {}).values():
+                for _r in _records:
+                    if "赫斯" in _r.get("name", "") and _r.get("resourceType") == "武器":
+                        _r["resourceType"] = "角色"
+                        _modified = True
+            if _modified:
+                _gl.write_text(_json.dumps(_raw, ensure_ascii=False), "utf-8")
+                _fix_count += 1
+        except Exception:
+            continue
+    _fix_flag.write_text(f"fixed {_fix_count} players")
+    if _fix_count:
+        logger.info(f"[XutheringWavesUID] 已修正 {_fix_count} 个玩家的赫斯 resourceType: 武器->角色")
+
 # 修正: 仇远calc.json 热熔->气动
-_calc_1411 = get_res_path() / "XutheringWavesUID" / "resource" / "map" / "character" / "1411" / "calc.json"
-if _calc_1411.exists():
-    _content = _calc_1411.read_text(encoding="utf-8")
-    if "热熔" in _content:
-        _calc_1411.write_text(_content.replace("热熔", "气动"), encoding="utf-8")
-        logger.info("[XutheringWavesUID] 已修正仇远calc.json: 热熔->气动")
+# _calc_1411 = get_res_path() / "XutheringWavesUID" / "resource" / "map" / "character" / "1411" / "calc.json"
+# if _calc_1411.exists():
+#     _content = _calc_1411.read_text(encoding="utf-8")
+#     if "热熔" in _content:
+#         _calc_1411.write_text(_content.replace("热熔", "气动"), encoding="utf-8")
+#         logger.info("[XutheringWavesUID] 已修正仇远calc.json: 热熔->气动")
 
 # 以下是2025年的迁移
 # # 迁移部分
