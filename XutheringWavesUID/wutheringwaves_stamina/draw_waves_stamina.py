@@ -140,10 +140,12 @@ async def draw_stamina_img(bot: Bot, ev: Event):
         if len(valid_daily_list) == 0:
             return ERROR_CODE[WAVES_CODE_102]
 
-        # 逐个绘图（避免并发渲染竞争）
+        # 开始绘图任务
+        task = []
         img = Image.new("RGBA", (based_w, based_h * len(valid_daily_list)), (0, 0, 0, 0))
         for uid_index, valid in enumerate(valid_daily_list):
-            await _draw_all_stamina_img(ev, img, valid, uid_index, locale)
+            task.append(_draw_all_stamina_img(ev, img, valid, uid_index, locale))
+        await asyncio.gather(*task)
         res = await convert_img(img)
         logger.info("[鸣潮][每日信息]绘图已完成,等待发送!")
     except TypeError:
@@ -335,10 +337,10 @@ async def _render_stamina_card(
     # 压缩图片并转Base64
     def compress_and_b64(img: Image.Image) -> str:
         try:
-            max_size = 1500
+            max_size = 1150
             if img.width > max_size or img.height > max_size:
                 img.thumbnail((max_size, max_size), Image.LANCZOS)
-            return pil_to_b64(img, quality=80)
+            return pil_to_b64(img, quality=75)
         except Exception:
             return pil_to_b64(img)
 
@@ -348,7 +350,7 @@ async def _render_stamina_card(
     stamina_icon_b64 = load_b64("结晶波片.png")
     store_icon_b64 = load_b64("结晶单质.png")
     liveness_icon_b64 = load_b64("活跃度.png")
-    bg_url_b64 = load_b64("bg.jpg", quality=80)
+    bg_url_b64 = load_b64("bg.jpg", quality=75)
     
     # 体力
     stamina_cur = daily_info.energyData.cur
@@ -440,7 +442,7 @@ async def _render_stamina_card(
         "user_name": daily_info.roleName,
         "role_id": daily_info.roleId,
         "uid": daily_info.roleId,
-        "avatar_url": pil_to_b64(avatar, quality=80),
+        "avatar_url": pil_to_b64(avatar, quality=75),
         "pile_url": compress_and_b64(pile),
         "has_bg": has_bg,
         

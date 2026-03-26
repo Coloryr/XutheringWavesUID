@@ -102,7 +102,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
             return ABYSS_ERROR_MESSAGE_NO_DEEP
 
         avatar = await get_event_avatar(ev)
-        avatar_url = pil_to_b64(avatar)
+        avatar_url = pil_to_b64(avatar, quality=75)
 
         role_detail_info_map = await get_all_roleid_detail_info(uid)
 
@@ -124,7 +124,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
 
                 try:
                     abyss_bg = Image.open(TEXT_PATH / f"abyss_bg_{floor.floor}.jpg").convert("RGBA")
-                    abyss_bg_url = pil_to_b64(abyss_bg)
+                    abyss_bg_url = pil_to_b64(abyss_bg, quality=75)
                 except Exception:
                     abyss_bg_url = ""
 
@@ -153,7 +153,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             chain_name = temp.get_chain_name()
                             chain_num = temp.get_chain_num()
 
-                        role_icon_b64 = img_to_b64(get_square_avatar_path(_role.roleId), quality=80, bake=True)
+                        role_icon_b64 = img_to_b64(get_square_avatar_path(_role.roleId), quality=75, bake=True, cover_size=(128, 128))
 
                         roles_data.append({
                             "id": _role.roleId,
@@ -181,7 +181,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
             })
 
         bg_img = get_waves_bg(bg = "bg4", crop=False)
-        bg_url = pil_to_b64(bg_img)
+        bg_url = pil_to_b64(bg_img, quality=75)
 
         tower_name_bg = Image.open(TEXT_PATH / "tower_name_bg.png")
         tower_name_bg_url = pil_to_b64(tower_name_bg)

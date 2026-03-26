@@ -1,0 +1,26 @@
+from gsuid_core.sv import SV
+from gsuid_core.bot import Bot
+from gsuid_core.models import Event
+
+from ..utils.at_help import ruser_id
+from ..utils.error_reply import ERROR_CODE, WAVES_CODE_103
+from ..utils.database.models import WavesBind
+from .draw_sign_calendar import draw_sign_calendar
+
+waves_sign_calendar = SV("waves签到日历")
+
+
+@waves_sign_calendar.on_fullmatch(
+    (
+        "签到日历",
+        "签到记录",
+        "qdjl",
+    ),
+    block=True,
+)
+async def send_sign_calendar(bot: Bot, ev: Event):
+    await bot.logger.info(f"[鸣潮]开始执行[签到日历]: {ruser_id(ev)}")
+    uid = await WavesBind.get_uid_by_game(ruser_id(ev), ev.bot_id)
+    if not uid:
+        return await bot.send(ERROR_CODE[WAVES_CODE_103])
+    return await bot.send(await draw_sign_calendar(uid, ev))

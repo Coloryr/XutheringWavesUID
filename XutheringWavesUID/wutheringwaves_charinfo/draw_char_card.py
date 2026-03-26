@@ -1519,7 +1519,7 @@ async def get_card_bg(
     img: Optional[Image.Image] = None
     if ShowConfig.get_config("CardBg").data:
         bg_path = Path(ShowConfig.get_config("CardBgPath").data)
-        if bg_path.exists():
+        if bg_path.is_file():
             img = Image.open(bg_path).convert("RGBA")
             img = crop_center_img(img, w, h)
 

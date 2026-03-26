@@ -51,7 +51,7 @@ async def draw_weapon_wiki_render(weapon_name: str) -> Optional[bytes]:
 async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> Dict[str, Any]:
     """准备武器渲染上下文"""
     # 获取武器图片
-    weapon_pic_b64 = img_to_b64(get_square_weapon_path(weapon_id), quality=80, bake=True)
+    weapon_pic_b64 = img_to_b64(get_square_weapon_path(weapon_id), quality=75, bake=True, cover_size=(128, 128))
 
     # 获取稀有度图标
     rarity_path = WIKI_TEXTURE_PATH / f"rarity_{weapon_model.starLevel}.png"
@@ -72,7 +72,7 @@ async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> 
     for material_id in weapon_model.get_ascensions_max_list():
         material_img = await get_material_img(material_id)
         if material_img:
-            materials.append(pil_to_b64(material_img))
+            materials.append(pil_to_b64(material_img, quality=75))
 
     # 背景
     bg_path = TEXTURE2D_PATH / "bg6.jpg"
@@ -90,7 +90,7 @@ async def _prepare_weapon_context(weapon_id: str, weapon_model: WeaponModel) -> 
         "effect_name": weapon_model.effectName,
         "effect_desc": weapon_model.get_effect_detail(),
         "materials": materials,
-        "bg_url": pil_to_b64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
@@ -118,7 +118,7 @@ async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str
     """准备声骸渲染上下文"""
     # 获取声骸图片
     echo_pic = await get_phantom_img(int(echo_id), "")
-    echo_pic_b64 = pil_to_b64(echo_pic) if echo_pic else ""
+    echo_pic_b64 = pil_to_b64(echo_pic, quality=75) if echo_pic else ""
 
     # 获取合鸣效果图标
     group_icons = []
@@ -128,7 +128,7 @@ async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str
         if effect_img:
             group_icons.append({
                 "name": group_name,
-                "icon": pil_to_b64(effect_img)
+                "icon": pil_to_b64(effect_img, quality=75)
             })
 
     # 获取属性数据
@@ -147,7 +147,7 @@ async def _prepare_echo_context(echo_id: str, echo_model: EchoModel) -> Dict[str
         "group_icons": group_icons,
         "stats": stats,
         "skill_desc": echo_model.get_skill_detail(),
-        "bg_url": pil_to_b64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
@@ -200,7 +200,7 @@ async def draw_weapon_list_render(weapon_type: str = "") -> Optional[bytes]:
                 "name": weapon["name"],
                 "star": weapon["star_level"],
                 "effect_name": weapon["effect_name"],
-                "icon": img_to_b64(get_square_weapon_path(weapon["id"]), quality=80, bake=True),
+                "icon": img_to_b64(get_square_weapon_path(weapon["id"]), quality=75, bake=True, cover_size=(128, 128)),
             })
 
         groups_data.append({
@@ -223,7 +223,7 @@ async def draw_weapon_list_render(weapon_type: str = "") -> Optional[bytes]:
         "title": title,
         "single_type": single_type,
         "groups": groups_data,
-        "bg_url": pil_to_b64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 
@@ -277,7 +277,7 @@ async def draw_sonata_list_render(version: str = "") -> Optional[bytes]:
 
             sonatas_render.append({
                 "name": sonata["name"],
-                "icon": pil_to_b64(effect_img) if effect_img else "",
+                "icon": pil_to_b64(effect_img, quality=75) if effect_img else "",
                 "effects": effects,
             })
 
@@ -300,7 +300,7 @@ async def draw_sonata_list_render(version: str = "") -> Optional[bytes]:
         "list_type": "sonata",
         "title": title,
         "groups": groups_data,
-        "bg_url": pil_to_b64(bg_img),
+        "bg_url": pil_to_b64(bg_img, quality=75),
         "footer_url": image_to_base64(TEXTURE2D_PATH / "footer_white.png"),
     }
 

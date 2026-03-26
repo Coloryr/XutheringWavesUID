@@ -34,6 +34,14 @@ def get_help_data() -> Dict[str, PluginHelp]:
             "need_admin": False,
         },
         {
+            "name": "签到日历",
+            "desc": "鸣潮签到日历",
+            "eg": "签到日历",
+            "need_ck": True,
+            "need_sk": False,
+            "need_admin": False,
+        },
+        {
             "name": "开启自动签到",
             "desc": "开启每天的自动签到功能",
             "eg": "开启自动签到",

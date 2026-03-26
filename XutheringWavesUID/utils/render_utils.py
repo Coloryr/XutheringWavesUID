@@ -172,7 +172,14 @@ async def _acquire_page():
                 break
 
         # Create shared context if needed (rare, only first time)
-        if _pool_ctx is None or _pool_ctx._impl_obj._is_closed:
+        ctx_closed = _pool_ctx is None
+        if not ctx_closed:
+            try:
+                ctx_closed = _pool_ctx._impl_obj._is_closed
+            except AttributeError:
+                # Playwright 版本不支持 _is_closed，尝试创建页面来检测
+                ctx_closed = True
+        if ctx_closed:
             _pool_ctx = await browser.new_context(
                 viewport={"width": 1200, "height": 1000}
             )
@@ -216,7 +223,8 @@ async def _render_via_remote(html_content: str, remote_url: str) -> Optional[byt
             if response.status_code == 200:
                 image_data = response.content
                 elapsed_time = time.time() - start_time
-                logger.info(f"[鸣潮] 外置渲染成功，耗时: {elapsed_time:.2f}s，图片大小: {len(image_data)} bytes")
+                html_kb = len(html_content) / 1024
+                logger.info(f"[鸣潮] 外置渲染成功，耗时: {elapsed_time:.2f}s，HTML大小: {html_kb:.1f}KB，图片大小: {len(image_data)} bytes")
                 return image_data
             else:
                 logger.warning(f"[鸣潮] 外置渲染失败，状态码: {response.status_code}, 错误: {response.text}")
@@ -421,6 +429,10 @@ async def get_image_b64_with_cache(
 
         filename = url.split("/")[-1]
         local_path = cache_path / filename
+        # pic_download_from_url 会将图片转为 webp 并删除原文件
+        webp_path = local_path.with_suffix(".webp")
+        if not local_path.exists() and webp_path.exists():
+            local_path = webp_path
 
         # 不压缩也不裁切，直接返回原图
         if quality is None and cover_size is None:

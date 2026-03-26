@@ -12,11 +12,13 @@ WAVES_ERROR_CODE.update(ERROR_CODE)
 
 def error_reply(code: Optional[int] = None, msg: str = "") -> str:
     msg_list = []
-    if isinstance(code, int):
-        logger.error(f"❌ 错误代码：{code}")
     if msg:
-        logger.error(f"📝 错误信息：{msg}")
         msg_list.append(msg)
     elif code in WAVES_ERROR_CODE:
         msg_list.append(WAVES_ERROR_CODE[code])
-    return "\n".join(msg_list)
+    reply = "\n".join(msg_list)
+    if isinstance(code, int):
+        logger.error(f"❌ 错误代码：{code} 📤 发送消息：{reply}")
+    if msg:
+        logger.error(f"📝 错误信息：{msg}")
+    return reply

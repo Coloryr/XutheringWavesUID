@@ -741,9 +741,9 @@ async def draw_slash_rank_list(bot: Bot, ev: Event):
             uid_color = RED
         role_bg_draw.text((210, 70), f"{rankInfo.uid}", uid_color, waves_font_20, "lm")
 
-        # 总分数
+        # 总分数 (左移5px)
         role_bg_draw.text(
-            (880, 55),
+            (875, 55),
             f"{rankInfo.score}",
             get_local_score_color(rankInfo.score),
             waves_font_44,
