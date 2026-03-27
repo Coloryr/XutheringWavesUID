@@ -84,9 +84,33 @@ def draw_text_with_fallback(
 ) -> float:
     """分段 fallback 绘制文本，参数顺序与 PIL draw.text 一致。
 
-    支持 anchor 参数 (lm/mm/rm 等)。
+    支持 anchor 参数 (lm/mm/rm 等)，支持多行文本（\\n）。
     返回绘制后的总宽度。
     """
+    # 多行文本：按 \n 分割后逐行绘制
+    if "\n" in text:
+        lines = text.split("\n")
+        line_height = font.size if font else 16
+        total_height = len(lines) * line_height
+
+        x0, y0 = xy
+        v_anchor = (anchor or "la")[1] if anchor and len(anchor) > 1 else "a"
+        if v_anchor == "m":
+            y_start = y0 - total_height / 2
+        elif v_anchor in ("b", "d"):
+            y_start = y0 - total_height
+        else:
+            y_start = y0
+
+        h_anchor = (anchor or "l")[0]
+        line_anchor = h_anchor + "t"
+        max_width = 0.0
+        for i, line in enumerate(lines):
+            line_y = int(y_start + i * line_height)
+            w = draw_text_with_fallback(draw, (x0, line_y), line, fill, font, line_anchor, fallback_font, **kwargs)
+            max_width = max(max_width, w)
+        return max_width
+
     if not _waves_cmap or not text or not _need_fallback(text):
         draw.text(xy, text, fill=fill, font=font, anchor=anchor, **kwargs)
         return font.getlength(text) if font else 0
