@@ -38,6 +38,7 @@ from ..utils.image import (
     pic_download_from_url,
     parse_bot_color_config,
 )
+from .rank_badge import draw_rank_badge
 from ..utils.resource.RESOURCE_PATH import MATRIX_PATH
 from ..utils.api.model import MatrixDetail
 from ..utils.api.wwapi import (
@@ -48,7 +49,7 @@ from ..utils.api.wwapi import (
 )
 from ..utils.ascension.char import get_char_model
 from ..utils.database.models import WavesBind, WavesUser
-from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL
+from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL, NORMAL_LIST_IDS, randomize_special_char_id
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
     waves_font_12,
@@ -81,9 +82,9 @@ pic_cache = TimedCache(600, 200)
 
 def get_score_color(score: int):
     """总排行分数颜色"""
-    if score >= 200000:
+    if score >= 300000:
         return CRYSTAL_SENTINEL
-    elif score >= 150000:
+    elif score >= 200000:
         return (255, 0, 0)
     elif score >= 45000:
         return (234, 183, 4)
@@ -299,27 +300,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
 
         # 排名
         rank_id = rank_temp.rank
-        rank_color = (54, 54, 54)
-        if rank_id == 1:
-            rank_color = (255, 0, 0)
-        elif rank_id == 2:
-            rank_color = (255, 180, 0)
-        elif rank_id == 3:
-            rank_color = (185, 106, 217)
-
-        def draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30)):
-            info_rank = Image.new("RGBA", size, color=(255, 255, 255, 0))
-            rank_draw = ImageDraw.Draw(info_rank)
-            rank_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),))
-            rank_draw.text(draw, f"{rank_id}", "white", waves_font_34, "mm")
-            role_bg.alpha_composite(info_rank, dest)
-
-        if rank_id > 999:
-            draw_rank_id("999+", size=(100, 50), draw=(50, 24), dest=(10, 30))
-        elif rank_id > 99:
-            draw_rank_id(rank_id, size=(75, 50), draw=(37, 24), dest=(25, 30))
-        else:
-            draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30))
+        draw_rank_badge(role_bg, rank_id)
 
         # 名字
         role_bg_draw.text((210, 75), f"{rank_temp.kuro_name}", "white", waves_font_20, "lm")
@@ -330,9 +311,10 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
             uid_color = RED
         role_bg_draw.text((210, 40), f"{rank_temp.waves_id}", uid_color, waves_font_20, "lm")
 
-        # 原特征码位置 → 显示上场队伍数量
+        # 原特征码位置 → 显示上场队伍数量（未登录时为0，不显示）
         team_count = rank_temp.team_count if rank_temp.team_count else len(rank_temp.teams)
-        role_bg_draw.text((350, 40), f"上场队伍数量: {team_count}", GREY, waves_font_20, "lm")
+        if team_count:
+            role_bg_draw.text((350, 40), f"上场队伍数量: {team_count}", GREY, waves_font_20, "lm")
 
         # bot主人名字
         botName = rank_temp.alias_name if rank_temp.alias_name else ""
@@ -376,6 +358,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
                 char_id = char_detail.char_id
                 char_chain = char_detail.chain
 
+                char_id = randomize_special_char_id(char_id)
                 char_model = get_char_model(char_id)
                 if char_model is None:
                     continue
@@ -619,8 +602,12 @@ async def get_avatar(
 
 
 async def get_role_chain_count(uid: str, role_id: int) -> int:
-    """从rawData.json获取角色共鸣链数量"""
+    """从rawData.json获取角色共鸣链数量，特殊角色遍历所有形态"""
     from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
+    from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL
+
+    # 漂泊者的所有形态头像可能互相匹配，遍历全部6个ID
+    candidates = SPECIAL_CHAR_INT_ALL if role_id in SPECIAL_CHAR_INT_ALL else [role_id]
 
     try:
         raw_data_path = Path(PLAYER_PATH / str(uid) / "rawData.json")
@@ -631,11 +618,12 @@ async def get_role_chain_count(uid: str, role_id: int) -> int:
             raw_data = json.loads(await f.read())
 
         if isinstance(raw_data, list):
-            for role_data in raw_data:
-                if role_data.get("role", {}).get("roleId") == role_id:
-                    chain_list = role_data.get("chainList", [])
-                    unlocked_chains = [c for c in chain_list if c.get("unlocked", False)]
-                    return len(unlocked_chains)
+            for cid in candidates:
+                for role_data in raw_data:
+                    if role_data.get("role", {}).get("roleId") == cid:
+                        chain_list = role_data.get("chainList", [])
+                        unlocked_chains = [c for c in chain_list if c.get("unlocked", False)]
+                        return len(unlocked_chains)
         return -1
     except Exception as e:
         logger.debug(f"获取角色{role_id}共鸣链失败: {e}")
@@ -763,39 +751,23 @@ async def draw_matrix_rank_list(bot: Bot, ev: Event):
 
         # 排名
         rank_id = rank_temp_index + 1
-        rank_color = (54, 54, 54)
-        if rank_id == 1:
-            rank_color = (255, 0, 0)
-        elif rank_id == 2:
-            rank_color = (255, 180, 0)
-        elif rank_id == 3:
-            rank_color = (185, 106, 217)
+        draw_rank_badge(role_bg, rank_id)
 
-        def draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30)):
-            info_rank = Image.new("RGBA", size, color=(255, 255, 255, 0))
-            rank_draw = ImageDraw.Draw(info_rank)
-            rank_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),))
-            rank_draw.text(draw, f"{rank_id}", "white", waves_font_34, "mm")
-            role_bg.alpha_composite(info_rank, dest)
-
-        if rank_id > 999:
-            draw_rank_id("999+", size=(100, 50), draw=(50, 24), dest=(10, 30))
-        elif rank_id > 99:
-            draw_rank_id(rank_id, size=(75, 50), draw=(37, 24), dest=(25, 30))
-        else:
-            draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30))
-
-        # 计算所有队伍出场角色的金数
+        # 计算所有队伍出场限定角色的金数（去重，排除常驻和漂泊者）
         char_gold_total = 0
+        seen_ids = set()
         for role_id in rankInfo.all_char_ids:
-            if role_id in SPECIAL_CHAR_INT_ALL:
+            if role_id in seen_ids:
+                continue
+            seen_ids.add(role_id)
+            if role_id in SPECIAL_CHAR_INT_ALL or role_id in NORMAL_LIST_IDS:
                 continue
             char_model = get_char_model(role_id)
             if char_model and char_model.starLevel == 5:
                 chain_count = await get_role_chain_count(rankInfo.uid, role_id)
                 char_gold_total += (chain_count + 1) if chain_count >= 0 else 0
 
-        role_bg_draw.text((210, 40), f"上场角色金数: {char_gold_total}", "white", waves_font_18, "lm")
+        role_bg_draw.text((210, 40), f"限定角色金数: {char_gold_total}", "white", waves_font_18, "lm")
 
         # 特征码
         uid_color = "white"

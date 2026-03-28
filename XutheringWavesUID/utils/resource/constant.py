@@ -73,6 +73,14 @@ SPECIAL_CHAR_INT = {
 
 SPECIAL_CHAR_INT_ALL = [1501, 1502, 1604, 1605, 1406, 1408]
 
+def randomize_special_char_id(char_id: int) -> int:
+    """排行展示时随机将特殊角色替换为配对形态，保护用户隐私/公平性"""
+    import random
+    if char_id in SPECIAL_CHAR_INT:
+        return random.choice(SPECIAL_CHAR_INT[char_id])
+    return char_id
+
+
 SPECIAL_CHAR_NAME = {
     "1501": "光主",
     "1502": "光主",

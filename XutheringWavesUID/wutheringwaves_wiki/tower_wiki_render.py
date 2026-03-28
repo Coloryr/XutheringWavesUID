@@ -243,10 +243,10 @@ async def draw_matrix_wiki_render(season: Optional[int] = None) -> Optional[byte
             "desc": desc,
         })
 
-    # 处理Boss（前4个，去重）
+    # 处理Boss（去重）
     bosses = []
     seen_names = set()
-    for wave in target_level.get("Waves", [])[:4]:
+    for wave in target_level.get("Waves", []):
         name = wave.get("Name", "未知")
         if name in seen_names:
             continue

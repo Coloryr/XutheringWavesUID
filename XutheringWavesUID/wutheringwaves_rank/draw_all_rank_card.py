@@ -12,6 +12,7 @@ from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
+from .rank_badge import draw_rank_badge
 from ..utils.util import get_version
 from ..utils.cache import TimedCache
 from ..utils.image import (
@@ -62,7 +63,7 @@ from ..utils.fonts.waves_fonts import (
     waves_font_40,
     waves_font_44,
 )
-from ..utils.resource.constant import ATTRIBUTE_ID_MAP, SPECIAL_CHAR_NAME
+from ..utils.resource.constant import ATTRIBUTE_ID_MAP, SPECIAL_CHAR_NAME, randomize_special_char_id
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 TITLE_I = Image.open(TEXT_PATH / "title.png")
@@ -194,7 +195,8 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
     total_score = 0
     total_damage = 0
 
-    pic = await get_square_avatar(char_id)
+    display_char_id = randomize_special_char_id(int(char_id))
+    pic = await get_square_avatar(display_char_id)
 
     pic_temp = Image.new("RGBA", pic.size)
     pic_temp.paste(pic.resize((160, 160)), (10, 10))
@@ -308,30 +310,9 @@ async def draw_all_rank_card(bot: Bot, ev: Event, char: str, rank_type: str, pag
 
         # 排名
         rank_id = rank.rank
-        rank_color = (54, 54, 54)
-        if rank_id == 1:
-            rank_color = (255, 0, 0)
-        elif rank_id == 2:
-            rank_color = (255, 180, 0)
-        elif rank_id == 3:
-            rank_color = (185, 106, 217)
-
-        def draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30)):
-            info_rank = Image.new("RGBA", size, color=(255, 255, 255, 0))
-            rank_draw = ImageDraw.Draw(info_rank)
-            rank_draw.rounded_rectangle([0, 0, size[0], size[1]], radius=8, fill=rank_color + (int(0.9 * 255),))
-            rank_draw.text(draw, f"{rank_id}", "white", waves_font_34, "mm")
-            bar_bg.alpha_composite(info_rank, dest)
-
-        # rank_id = index + 1 + (pages - 1) * 20
-        if rank_id > 999:
-            draw_rank_id("999+", size=(100, 50), draw=(50, 24), dest=(10, 30))
-        elif rank_id > 99:
-            draw_rank_id(rank_id, size=(75, 50), draw=(37, 24), dest=(25, 30))
-        elif rank_id > 0:
-            draw_rank_id(rank_id, size=(50, 50), draw=(24, 24), dest=(40, 30))
-        else:
+        if rank_id <= 0:
             continue
+        draw_rank_badge(bar_bg, rank_id)
 
         # 名字
         bar_star_draw.text((210, 75), f"{rank.kuro_name}", "white", waves_font_20, "lm")
@@ -455,6 +436,7 @@ async def get_avatar(
     qid: Optional[str],
     char_id: Union[int, str],
 ) -> Image.Image:
+    char_id = randomize_special_char_id(int(char_id))
     # 检查qid 为纯数字
     if qid and qid.isdigit():
         if WutheringWavesConfig.get_config("QQPicCache").data:

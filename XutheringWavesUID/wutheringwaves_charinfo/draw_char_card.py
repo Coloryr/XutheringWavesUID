@@ -819,10 +819,10 @@ async def draw_char_detail_img(
     weapon_icon_bg.paste(weapon_icon, (10, 20), weapon_icon)
 
     weapon_bg_temp_draw = ImageDraw.Draw(weapon_bg_temp)
-    draw_text_with_fallback(weapon_bg_temp_draw, (200, 30), t(weaponData.weapon.weaponName, locale), SPECIAL_GOLD, waves_font_40, "lm")
+    _weapon_name_width = draw_text_with_fallback(weapon_bg_temp_draw, (200, 30), t(weaponData.weapon.weaponName, locale), SPECIAL_GOLD, waves_font_40, "lm")
     draw_text_with_fallback(weapon_bg_temp_draw, (203, 75), f"Lv.{weaponData.level}/90", "white", waves_font_30, "lm")
 
-    _x = 220 + 43 * len(weaponData.weapon.weaponName)
+    _x = min(int(200 + _weapon_name_width + 20), weapon_bg.width - 50)
     _y = 37
     wrc_fill = WEAPON_RESONLEVEL_COLOR[weaponData.resonLevel] + (int(0.8 * 255),)  # type: ignore
     weapon_bg_temp_draw.rounded_rectangle([_x - 15, _y - 15, _x + 50, _y + 15], radius=7, fill=wrc_fill)
@@ -884,17 +884,21 @@ async def draw_char_detail_img(
 
         name = re.sub(r'[",，]+', "", _mz.name) if _mz.name else ""
         name = t(name, locale, partial=True)
-        if locale == 'en':
-            # 英文：缩小字体，超长时换行
-            _chain_font = waves_font_12
-            if len(name) > 14:
-                mid = len(name) // 2
-                name = name[:mid] + "\n" + name[mid:]
-            draw_text_with_fallback(mz_bg_temp_draw, (147, 228), name, "white", _chain_font, "mm")
-        elif len(name) >= 8:
-            draw_text_with_fallback(mz_bg_temp_draw, (147, 230), f"{name}", "white", waves_font_16, "mm")
+        if locale == 'en' and len(name) > 14 and ' ' in name:
+            mid = len(name) // 2
+            left = name.rfind(' ', 0, mid)
+            right = name.find(' ', mid)
+            if left == -1:
+                split_pos = right
+            elif right == -1:
+                split_pos = left
+            else:
+                split_pos = left if (mid - left) <= (right - mid) else right
+            name = name[:split_pos] + "\n" + name[split_pos + 1:]
+        if len(name) >= 8:
+            draw_text_with_fallback(mz_bg_temp_draw, (147, 230), name, "white", waves_font_16, "mm")
         else:
-            draw_text_with_fallback(mz_bg_temp_draw, (147, 230), f"{name}", "white", waves_font_20, "mm")
+            draw_text_with_fallback(mz_bg_temp_draw, (147, 230), name, "white", waves_font_20, "mm")
 
         if not _mz.unlocked:
             mz_bg_temp = ImageEnhance.Brightness(mz_bg_temp).enhance(0.3)
