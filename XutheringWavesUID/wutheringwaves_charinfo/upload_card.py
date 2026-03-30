@@ -63,7 +63,7 @@ async def upload_custom_card(
     new_images = []
     size_check_failed = []
     for index, upload_image in enumerate(upload_images, start=1):
-        name = f"{char}_{int(time.time() * 1000)}.jpg"
+        name = f"{char_id}_{int(time.time() * 1000)}.jpg"
         temp_path = temp_dir / name
 
         if not temp_path.exists():
@@ -290,8 +290,39 @@ async def delete_all_custom_card(bot: Bot, ev: Event, char: str, target_type: st
 
 async def compress_all_custom_card(bot: Bot, ev: Event):
     count = 0
+    rename_count = 0
     use_cores = max(os.cpu_count() - 2 if os.cpu_count() else 0, 1)  # 避免2c服务器卡死
     await bot.send(f"[鸣潮] 开始压缩面板、体力、背景图, 使用 {use_cores} 核心")
+
+    # 重命名含中文的文件名为 char_id 格式，避免 opencv 不兼容中文路径
+    for PATH in CUSTOM_PATH_MAP.values():
+        for char_id_path in PATH.iterdir():
+            if not char_id_path.is_dir():
+                continue
+            char_id = char_id_path.name
+            for img_path in list(char_id_path.iterdir()):
+                if not img_path.is_file():
+                    continue
+                if img_path.suffix.lower() not in [".jpg", ".png", ".jpeg", ".webp"]:
+                    continue
+                if img_path.stem.isascii():
+                    continue
+                base_ts = int(time.time() * 1000)
+                new_name = f"{char_id}_{base_ts}{img_path.suffix}"
+                new_path = char_id_path / new_name
+                counter = 1
+                while new_path.exists():
+                    new_name = f"{char_id}_{base_ts + counter}{img_path.suffix}"
+                    new_path = char_id_path / new_name
+                    counter += 1
+                try:
+                    delete_orb_cache(img_path)
+                    img_path.rename(new_path)
+                    if new_path.suffix.lower() == ".webp":
+                        update_orb_cache(new_path)
+                    rename_count += 1
+                except Exception as e:
+                    logger.error(f"[鸣潮] 重命名失败 {img_path}: {e}")
 
     task_list = []
     for PATH in CUSTOM_PATH_MAP.values():
@@ -319,7 +350,12 @@ async def compress_all_custom_card(bot: Bot, ev: Event):
             except Exception as exc:
                 logger.error(f"Error processing {file_info[0]}: {exc}")
 
+    msgs = []
+    if rename_count > 0:
+        msgs.append(f"重命名【{rename_count}】张中文命名图片")
     if count > 0:
-        return await bot.send(f"[鸣潮] 压缩【{count}】张图成功！")
+        msgs.append(f"压缩【{count}】张图")
+    if msgs:
+        return await bot.send(f"[鸣潮] {'，'.join(msgs)}成功！")
     else:
-        return await bot.send("[鸣潮] 暂未找到需要压缩的资源！")
+        return await bot.send("[鸣潮] 暂未找到需要压缩或重命名的资源！")

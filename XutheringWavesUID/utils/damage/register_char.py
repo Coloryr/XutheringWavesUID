@@ -276,7 +276,7 @@ class Char_1209(CharAbstract):
 
         # 宙算仪轨
         weapon_clz = WavesWeaponRegister.find_class(21010066)
-        if weapon_clz and attr.env_tune_strain:
+        if weapon_clz:
             w = weapon_clz(21010066, 90, 6, resonLevel)
             w.do_action("cast_healing", attr, isGroup)
 

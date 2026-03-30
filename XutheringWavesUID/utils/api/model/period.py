@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import Field, BaseModel
 
@@ -32,7 +32,7 @@ class PeriodDetailNode(BaseModel):
 class PeriodDetailItem(BaseModel):
     type: int
     total: int
-    inc: Optional[int] = None
+    inc: Optional[Union[int, str]] = None
     detail: List[PeriodDetailNode] = Field(default_factory=list)
     copyWriting: Optional[str] = None
 
