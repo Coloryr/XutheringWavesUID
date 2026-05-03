@@ -326,6 +326,8 @@ async def ph_card_draw(
 
         if phantom_score > 0:
             phantom_score = round(phantom_score, 2)
+            if phantom_score > 249.9:
+                phantom_score = 250.0
             _bg = get_total_score_bg(char_name, phantom_score, calc.calc_temp)
             sh_score_bg_c = Image.open(TEXT_PATH / f"sh_score_bg_{_bg}.png")
             score_temp = Image.new("RGBA", sh_score_bg_c.size)
@@ -488,7 +490,7 @@ async def draw_fixed_img(img, avatar, account_info, role_detail, locale=""):
 
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
-    draw_text_with_fallback(base_info_draw, (275, 120), f"{account_info.name[:7]}", "white", waves_font_30, "lm")
+    draw_text_with_fallback(base_info_draw, (275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
     draw_text_with_fallback(base_info_draw, (226, 173), f"{t('特征码:', locale)}  {account_info.id}", GOLD, waves_font_25, "lm")
     img.paste(base_info_bg, (35, -30), base_info_bg)
 
@@ -612,12 +614,15 @@ async def draw_char_detail_img(
     char, damageId = parse_text_and_number(char)
 
     char_id = char_name_to_char_id(char)
-    if not char_id:
+    if not char_id or len(char_id) != 4 or not char_id.isdigit():
         return f"未找到指定角色, 请检查输入是否正确！"
 
     char_name = alias_to_char_name(char)
 
     damageDetail = DamageDetailRegister.find_class(char_id)
+    if damageDetail and not WutheringWavesConfig.get_config("WavesToken").data:
+        logger.info(f"[鸣潮] {char_name} 未接入总服务器, 跳过伤害绘制")
+        damageDetail = None
     ph_sum_value = 250
     jineng_len = 180
     dd_len = 0
@@ -690,6 +695,25 @@ async def draw_char_detail_img(
     )
     if isinstance(role_detail, str):
         return role_detail
+
+    # def _ph_fp(rd):
+    #     try:
+    #         pd = rd.phantomData
+    #         if pd is None:
+    #             return "phantomData=None"
+    #         ep = pd.equipPhantomList
+    #         if ep is None:
+    #             return f"phantomData.cost={pd.cost} equipPhantomList=None"
+    #         slots = [bool(x and x.phantomProp) for x in ep]
+    #         return f"phantomData.cost={pd.cost} equipPhantomList(len={len(ep)} bool={slots})"
+    #     except Exception as ex:
+    #         return f"_ph_fp_err: {type(ex).__name__}: {ex}"
+    # logger.warning(
+    #     f"[鸣潮·伤害诊断] entry char_id={char_id} char={char_name} "
+    #     f"is_limit_query={is_limit_query} damageId={damageId} uid={uid} "
+    #     f"role_id={getattr(getattr(role_detail, 'role', None), 'roleId', None)} "
+    #     f"role_detail_id={id(role_detail)} {_ph_fp(role_detail)}"
+    # )
 
     change_command = ""
     oneRank: Optional[OneRankResponse] = None
@@ -1061,7 +1085,7 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
     char, damageId = parse_text_and_number(char)
 
     char_id = char_name_to_char_id(char)
-    if not char_id:
+    if not char_id or len(char_id) != 4 or not char_id.isdigit():
         return f"未找到指定角色, 请检查输入是否正确！"
     char_name = alias_to_char_name(char)
 
@@ -1250,6 +1274,8 @@ async def draw_char_score_img(ev: Event, uid: str, char: str, user_id: str, wave
 
         if phantom_score > 0:
             phantom_score = round(phantom_score, 2)
+            if phantom_score > 249.9:
+                phantom_score = 250.0
             _bg = get_total_score_bg(char_name, phantom_score, calc.calc_temp)
             sh_score_bg_c = Image.open(TEXT_PATH / f"sh_score_bg_{_bg}.png")
             score_temp = Image.new("RGBA", sh_score_bg_c.size)

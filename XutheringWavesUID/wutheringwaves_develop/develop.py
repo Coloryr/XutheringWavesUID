@@ -19,6 +19,7 @@ from ..utils.api.model import (
 )
 from ..utils.char_info_utils import get_all_role_detail_info_list
 from ..utils.error_reply import WAVES_CODE_102, WAVES_CODE_103, WAVES_CODE_108
+from ..utils.at_help import is_intl_uid, intl_unavailable_msg
 from ..utils.hint import error_reply
 from ..utils.image import (
     SPECIAL_GOLD,
@@ -140,6 +141,8 @@ async def calc_develop_cost(
     uid = await WavesBind.get_uid_by_game(user_id, ev.bot_id)
     if not uid:
         return error_reply(WAVES_CODE_103)
+    if is_intl_uid(uid):
+        return intl_unavailable_msg(uid)
 
     token_result, token = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not token_result or not token:

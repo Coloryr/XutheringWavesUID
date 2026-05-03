@@ -166,25 +166,49 @@ def ensure_data_loaded(force: bool = False):
     _weapon_i18n_reverse = _build_i18n_reverse(LOCALIZATION_PATH / "weapon_i18n.json")
     _echo_i18n_reverse = _build_i18n_reverse(LOCALIZATION_PATH / "echo_i18n.json")
 
+    _prev_char_id_data_len = len(char_id_data)
+    _prev_id2name_len = len(id2name)
     try:
         with open(MAP_PATH / "CharId2Data.json", "r", encoding="UTF-8") as f:
             char_id_data = msgjson.decode(f.read(), type=Dict[str, Dict[str, str]])
     except FileNotFoundError:
-        logger.warning(f"CharId2Data.json not found at {MAP_PATH / 'CharId2Data.json'}, using empty dict")
+        logger.warning(
+            f"[鸣潮·伤害诊断] CharId2Data.json not found at "
+            f"{MAP_PATH / 'CharId2Data.json'}, char_id_data 从 {_prev_char_id_data_len} 项重置为空 dict"
+        )
         char_id_data = {}
     except Exception as e:
-        logger.exception(f"Failed to load CharId2Data.json: {e}")
+        logger.exception(
+            f"[鸣潮·伤害诊断] Failed to load CharId2Data.json (char_id_data 从 "
+            f"{_prev_char_id_data_len} 项重置为空 dict): {e}"
+        )
         char_id_data = {}
+    # if _prev_char_id_data_len > 0 and len(char_id_data) == 0:
+    #     logger.error(
+    #         f"[鸣潮·伤害诊断] char_id_data 在本次 reload 中由 {_prev_char_id_data_len} "
+    #         f"项变成空 dict, force={force}"
+    #     )
 
     try:
         with open(MAP_PATH / "id2name.json", "r", encoding="UTF-8") as f:
             id2name = msgjson.decode(f.read(), type=Dict[str, str])
     except FileNotFoundError:
-        logger.warning(f"id2name.json not found at {MAP_PATH / 'id2name.json'}, using empty dict")
+        logger.warning(
+            f"[鸣潮·伤害诊断] id2name.json not found at "
+            f"{MAP_PATH / 'id2name.json'}, id2name 从 {_prev_id2name_len} 项重置为空 dict"
+        )
         id2name = {}
     except Exception as e:
-        logger.exception(f"Failed to load id2name.json: {e}")
+        logger.exception(
+            f"[鸣潮·伤害诊断] Failed to load id2name.json (id2name 从 "
+            f"{_prev_id2name_len} 项重置为空 dict): {e}"
+        )
         id2name = {}
+    # if _prev_id2name_len > 0 and len(id2name) == 0:
+    #     logger.error(
+    #         f"[鸣潮·伤害诊断] id2name 在本次 reload 中由 {_prev_id2name_len} "
+    #         f"项变成空 dict, force={force}"
+    #     )
 
     # 加载自定义 id2name.json
     if CUSTOM_ID2NAME_PATH.exists():
@@ -195,8 +219,10 @@ def ensure_data_loaded(force: bool = False):
             logger.exception(f"读取自定义id2name失败 {CUSTOM_ID2NAME_PATH} - {e}")
             custom_id2name = {}
 
-        # 合并自定义数据（自定义数据会覆盖默认数据）
-        id2name.update(custom_id2name)
+        # 合并自定义数据：资源中已存在的 key 以资源 value 为准，
+        # custom 仅能新增资源中没有的 kv 对，不允许覆盖资源
+        for k, v in custom_id2name.items():
+            id2name.setdefault(k, v)
 
     # 将合并后的数据写回到自定义文件中
     with open(CUSTOM_ID2NAME_PATH, "w", encoding="UTF-8") as f:

@@ -20,6 +20,9 @@ from ..utils.resource.RESOURCE_PATH import (
     MAP_BUILD_TEMP,
 )
 
+# 网页面板编辑器 (导入即注册路由 /waves/panel-edit/, 由 WavesPanelEditPassword 启停)
+from . import panel_editor  # noqa: F401
+
 RESOURCE_DOWNLOAD_TIME = WutheringWavesConfig.get_config("ResourceDownloadTime").data
 if not RESOURCE_DOWNLOAD_TIME or len(RESOURCE_DOWNLOAD_TIME) != 2:
     logger.warning("[鸣潮] 资源下载时间配置异常，将不进行定时下载")
@@ -59,14 +62,14 @@ async def startup():
     await reload_all_modules()  # 已有资源，先加载，不然检查资源列表太久了
     logger.info("[鸣潮] 等待资源下载完成...")
     await download_all_resource()
-    
+
     logger.info("[鸣潮] 资源下载完成，开始校验...")
-    if check_file_hash(BUILD_TEMP) or check_file_hash(MAP_BUILD_TEMP):    
+    if check_file_hash(BUILD_TEMP) or check_file_hash(MAP_BUILD_TEMP):
         await download_all_resource()
 
     build_updated = copy_if_different(BUILD_TEMP, BUILD_PATH, "安全工具资源", soft=True)
     map_updated = copy_if_different(MAP_BUILD_TEMP, MAP_BUILD_PATH, "伤害计算资源", soft=True)
-    
+
     if build_updated or map_updated:
         logger.info("[鸣潮] 构建文件已更新，正在重启...")
         from gsuid_core.buildin_plugins.core_command.core_restart.restart import (

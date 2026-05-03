@@ -82,16 +82,6 @@
             padding-left: 10px;
         }
 
-        .hakushin-logo {
-            position: absolute;
-            top: -20px;
-            left: -20px;
-            height: 30px;
-            opacity: 0.5;
-            pointer-events: none;
-            z-index: 0;
-        }
-
         .char-name {
             font-size: 80px;
             font-weight: bold;
@@ -270,7 +260,7 @@
             color: #ddd;
             white-space: pre-wrap;
         }
-        
+
         .card-desc strong {
             color: var(--main-color);
         }
@@ -347,9 +337,6 @@
             font-size: 20px;
             line-height: 1.5;
             color: #fff;
-            display: flex;
-            align-items: flex-start;
-            gap: 15px;
             box-shadow: 2px 4px 8px rgba(0,0,0,0.2);
         }
 
@@ -405,10 +392,6 @@
         <div class="content">
             <!-- Header -->
             <div class="header">
-                <!--  {% if hakushin_logo %}
-                <img src="{{ hakushin_logo }}" class="hakushin-logo">
-                {% endif %} -->
-                <!-- 太丑了！再说吧 -->
                 <div class="header-left">
                     <div class="char-name">{{ char_data.name }}</div>
                     

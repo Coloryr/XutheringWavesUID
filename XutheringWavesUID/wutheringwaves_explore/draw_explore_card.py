@@ -2,6 +2,7 @@ from gsuid_core.models import Event
 from gsuid_core.logger import logger
 from gsuid_core.data_store import get_res_path
 
+from ..utils.hint import error_reply
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.error_reply import WAVES_CODE_102
@@ -18,16 +19,14 @@ from ..utils.render_utils import (
 from ..utils.resource.RESOURCE_PATH import waves_templates
 from ..utils.image import (
     YELLOW,
-    WAVES_VOID,
     WAVES_MOLTEN,
     WAVES_SIERRA,
     WAVES_MOONLIT,
-    WAVES_SINKING,
     WAVES_FREEZING,
     WAVES_LINGERING,
     pil_to_b64,
     rgb_to_hex,
-    get_waves_bg,
+    get_custom_waves_bg,
     get_event_avatar,
 )
 
@@ -39,19 +38,22 @@ from ..utils.error_reply import WAVES_CODE_108
 EXPLORE_IMAGE_PATH = get_res_path("XutheringWavesUID") / "other" / "explore"
 
 country_color_map = {
-    "黑海岸": (28, 55, 118, 0.4),
-    "瑝珑": (140, 113, 58, 0.4),
-    "黎那汐塔": (95, 52, 39, 0.4),
-    "罗伊冰原": (141, 159, 77, 0.4),
+    "黑海岸": (28, 55, 118),
+    "瑝珑": (140, 113, 58),
+    "黎那汐塔": (95, 52, 39),
+    "罗伊冰原": (141, 159, 77),
 }
+
+WAVES_OLIVE = (140, 178, 78)
+WAVES_GOLD = (212, 177, 99)
 
 progress_color = [
     (10, WAVES_MOONLIT),
     (20, WAVES_LINGERING),
     (35, WAVES_FREEZING),
     (50, WAVES_SIERRA),
-    (70, WAVES_SINKING),
-    (80, WAVES_VOID),
+    (70, WAVES_OLIVE),
+    (80, WAVES_GOLD),
     (90, YELLOW),
     (100, WAVES_MOLTEN),
 ]
@@ -75,7 +77,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     try:
         is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
         if not ck:
-            return WAVES_CODE_102
+            return error_reply(WAVES_CODE_102)
 
         account_info_res = await waves_api.get_base_info(uid, ck)
         if not account_info_res.success:
@@ -104,6 +106,12 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
             country_name = _explore.country.countryName
             country_color_rgb = country_color_map.get(country_name, YELLOW)
             country_color_hex = rgb_to_hex(country_color_rgb)
+            country_color_rgba = "rgba({}, {}, {}, 0.45)".format(*country_color_rgb[:3])
+            r, g, b = country_color_rgb[:3]
+            bright = (min(255, int(r + (255 - r) * 0.45)),
+                      min(255, int(g + (255 - g) * 0.45)),
+                      min(255, int(b + (255 - b) * 0.45)))
+            country_color_bright = "#{:02x}{:02x}{:02x}".format(*bright)
             
             # Country Icon
             icon_url = _explore.country.homePageIcon
@@ -155,13 +163,16 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
                 "name": country_name,
                 "progress": _explore.countryProgress,
                 "color": country_color_hex,
+                "color_bright": country_color_bright,
+                "color_tint": country_color_rgba,
+                "is_complete": is_complete,
                 "icon_url": icon_b64,
                 "tag_text": tag_text,
                 "completed_sub_areas": completed_sub_areas,
                 "incomplete_sub_areas": incomplete_sub_areas
             })
-        
-        bg_img = get_waves_bg(bg = "bg3", crop=False)
+
+        bg_img = get_custom_waves_bg(bg="bg3", crop=False)
         bg_url = pil_to_b64(bg_img, quality=75)
 
         context = {

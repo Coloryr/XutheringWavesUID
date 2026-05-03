@@ -1,10 +1,27 @@
+import sys
+import types
 from typing import List, Union, Optional
+
+from gsuid_core.logger import logger
 
 from ...utils.damage.damage import DamageAttribute
 
+# 跨命名空间共享: 锚定到 sys.modules 防止 abstract.py 在新命名空间重 exec 时
+# 五个 Register 子类拿到全新空 dict。
+_STATE_KEY = "__waves_register_state__"
+_state = sys.modules.get(_STATE_KEY)
+if _state is None:
+    _state = types.SimpleNamespace(maps={})
+    sys.modules[_STATE_KEY] = _state  # type: ignore[assignment]
+_REGISTRY = _state.maps
+
+
+def _shared_map(cls_name):
+    return _REGISTRY.setdefault(cls_name, {})
+
 
 class WavesRegister(object):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("WavesRegister")
 
     @classmethod
     def find_class(cls, _id):
@@ -12,30 +29,31 @@ class WavesRegister(object):
 
     @classmethod
     def register_class(cls, _id, _clz):
-        # old_cls = cls.find_class(_id)
-        # if old_cls:
-        #     raise TypeError('%s already register %s for type %s' % (cls, old_cls, _id))
+        if _clz is None:
+            return
+        if isinstance(_clz, (list, dict)) and not _clz:
+            return
         cls._id_cls_map[_id] = _clz
 
 
 class WavesWeaponRegister(WavesRegister):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("WavesWeaponRegister")
 
 
 class WavesEchoRegister(WavesRegister):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("WavesEchoRegister")
 
 
 class WavesCharRegister(WavesRegister):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("WavesCharRegister")
 
 
 class DamageDetailRegister(WavesRegister):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("DamageDetailRegister")
 
 
 class DamageRankRegister(WavesRegister):
-    _id_cls_map = {}
+    _id_cls_map = _shared_map("DamageRankRegister")
 
 
 class WeaponAbstract(object):
@@ -79,6 +97,21 @@ class WeaponAbstract(object):
 
         if attr.env_aero_erosion:
             func_list.append("env_aero_erosion")
+
+        if attr.env_havoc_bane:
+            func_list.append("env_havoc_bane")
+
+        if attr.env_fusion_burst:
+            func_list.append("env_fusion_burst")
+
+        if attr.env_glacio_chafe:
+            func_list.append("env_glacio_chafe")
+
+        if attr.env_tune_rupture:
+            func_list.append("env_tune_rupture")
+
+        if attr.env_tune_strain:
+            func_list.append("env_tune_strain")
 
         if attr.env_tune_shifting():
             func_list.append("env_tune_shifting")
@@ -142,6 +175,14 @@ class WeaponAbstract(object):
         """施放谐度破坏技"""
         pass
 
+    def cast_fusion_burst(self, attr: DamageAttribute, isGroup: bool = False):
+        """施加聚爆效应"""
+        pass
+
+    def cast_tune_strain(self, attr: DamageAttribute, isGroup: bool = False):
+        """施加集谐·偏移"""
+        pass
+
     def skill_create_healing(self, attr: DamageAttribute, isGroup: bool = False):
         """共鸣技能造成治疗"""
         pass
@@ -154,8 +195,16 @@ class WeaponAbstract(object):
         """风蚀效应"""
         pass
 
+    def env_havoc_bane(self, attr: DamageAttribute, isGroup: bool = False):
+        """虚湮效应"""
+        pass
+
     def env_fusion_burst(self, attr: DamageAttribute, isGroup: bool = False):
         """聚爆效应"""
+        pass
+
+    def env_glacio_chafe(self, attr: DamageAttribute, isGroup: bool = False):
+        """霜渐效应"""
         pass
 
     def env_tune_shifting(self, attr: DamageAttribute, isGroup: bool = False):

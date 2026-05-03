@@ -3,7 +3,6 @@ import json
 import time
 import shutil
 import asyncio
-from typing import Any, List
 from datetime import datetime
 
 from gsuid_core.sv import SV
@@ -13,10 +12,14 @@ from gsuid_core.segment import MessageSegment
 from gsuid_core.data_store import get_res_path
 
 from ..utils.cache import TimedCache
-from ..utils.button import WavesButton
 from .gacha_handler import fetch_mcgf_data, merge_gacha_data
 from .get_gachalogs import save_gachalogs, export_gachalogs, import_gachalogs
 from .draw_gachalogs import draw_card, draw_card_help
+from .web_view import (  # 导入即注册路由
+    _is_feature_enabled as _gacha_web_enabled,
+    feature_disabled_msg,
+    make_gacha_web_url,
+)
 from ..utils.waves_api import waves_api
 from ..utils.error_reply import ERROR_CODE, WAVES_CODE_102, WAVES_CODE_103
 from ..utils.database.models import WavesBind
@@ -27,11 +30,12 @@ from ..wutheringwaves_rank.draw_gacha_rank_card import draw_gacha_rank_card
 sv_gacha_log = SV("waves抽卡记录")
 sv_gacha_help_log = SV("waves抽卡记录帮助")
 sv_gacha_rank = SV("waves抽卡排行", priority=0)
-sv_get_gachalog_by_link = SV("waves导入抽卡链接", area="DIRECT")
-sv_import_gacha_log = SV("waves导入抽卡记录", area="DIRECT")
+sv_get_gachalog_by_link = SV("waves导入抽卡链接") # , area="DIRECT"
+sv_import_gacha_log = SV("waves导入抽卡记录") # , area="DIRECT"
 sv_export_json_gacha_log = SV("waves导出抽卡记录")
 sv_delete_gacha_log = SV("waves删除抽卡记录")
 sv_delete_import_gacha_log = SV("waves删除抽卡导入", pm=0)
+sv_gacha_web = SV("waves抽卡网页")
 
 DATA_PATH = get_res_path()
 GACHA_BACKUP_PATH = DATA_PATH / "backup" / "gacha_backup"
@@ -139,15 +143,18 @@ async def get_gacha_log_by_link(bot: Bot, ev: Event):
     if ev.command.startswith("强制"):
         await bot.logger.info("[WARNING]本次为强制刷新")
         is_force = True
-    await bot.send(f"UID{uid}开始执行[刷新抽卡记录],需要一定时间...请勿重复触发!")
+    await bot.send(f"UID{uid}开始执行[刷新抽卡记录],需要一定时间，请稍等!\n官方仅保存近180天抽卡记录，仅更新该部分。")
     im = await save_gachalogs(ev, uid, record_id, is_force)
 
     # 设置冷却缓存
     set_gacha_import_cache(ev.user_id, uid)
 
-    if "抽卡记录" in im:
-        buttons: List[Any] = [WavesButton("查看抽卡记录", "抽卡记录")]
-        await bot.send_option(im, buttons)
+    if im.startswith("🌱"):
+        card_img = await draw_card(uid, ev)
+        if isinstance(card_img, str):
+            await bot.send(im)
+        else:
+            await bot.send([im, MessageSegment.image(card_img)])
     else:
         await bot.send(im)
 
@@ -281,3 +288,25 @@ async def send_gacha_rank_info(bot: Bot, ev: Event):
     await bot.logger.info("[鸣潮]开始执行 抽卡排行")
     im = await draw_gacha_rank_card(bot, ev)
     await bot.send(im)
+
+
+@sv_gacha_web.on_fullmatch(("抽卡页面", "抽卡网页", "网页抽卡记录", "抽卡记录网页"))
+async def send_gacha_web_link(bot: Bot, ev: Event):
+    if not _gacha_web_enabled():
+        return await bot.send(feature_disabled_msg())
+
+    uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
+    if not uid:
+        return await bot.send(ERROR_CODE[WAVES_CODE_103])
+
+    url, msg = await make_gacha_web_url(uid, ev)
+    if not url:
+        return await bot.send(msg)
+
+    title = f"[鸣潮] UID{uid} 的抽卡记录网页"
+    expire = "该链接 10 分钟内有效，过期后请重新发送指令。"
+    if not ev.group_id and ev.bot_id == "onebot":
+        # 私聊+onebot 不支持转发节点，回退为多行单条
+        await bot.send("\n".join([title, url, expire]))
+    else:
+        await bot.send(MessageSegment.node([title, f" {url}", expire]))

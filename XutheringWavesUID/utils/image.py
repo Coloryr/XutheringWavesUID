@@ -3,8 +3,13 @@ import re
 import random
 import base64
 from io import BytesIO
+from contextvars import ContextVar
 from typing import Tuple, Union, Literal, Optional
 from pathlib import Path
+
+# 面板编辑器预览用: 强制本次渲染的立绘/背景图。
+_force_pile_path: ContextVar[Optional[Path]] = ContextVar("_ww_force_pile_path", default=None)
+_force_bg_path: ContextVar[Optional[Path]] = ContextVar("_ww_force_bg_path", default=None)
 
 from PIL import (
     Image,
@@ -235,6 +240,26 @@ def _random_image_from_dir(directory: str) -> Optional[str]:
     return random.choice(valid_files) if valid_files else None
 
 
+def _list_custom_char_dirs(base_path: str) -> list:
+    """列出 base_path 下 4 位数字命名且非空的子目录名 (即合法 char_id 子目录)。
+    避免抽到 .DS_Store / 临时目录 / 备份目录之类的脏命名。"""
+    try:
+        entries = os.listdir(base_path)
+    except (FileNotFoundError, NotADirectoryError):
+        return []
+    result = []
+    for name in entries:
+        if len(name) != 4 or not name.isdigit():
+            continue
+        sub = f"{base_path}/{name}"
+        try:
+            if os.path.isdir(sub) and len(os.listdir(sub)) > 0:
+                result.append(name)
+        except OSError:
+            continue
+    return result
+
+
 def get_ICON():
     return Image.open(ICON)
 
@@ -249,15 +274,66 @@ async def get_random_share_bg_path():
     return SHARE_BG_PATH / path
 
 
+def _list_official_image_files(base_path: str) -> list:
+    """列出 base_path 下合法图片文件名 (跳过隐藏/非图片)。"""
+    try:
+        entries = os.listdir(base_path)
+    except (FileNotFoundError, NotADirectoryError):
+        return []
+    return [
+        f for f in entries
+        if not f.startswith(".") and f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+    ]
+
+
+def _pick_from_custom_or_official(
+    custom_base: str,
+    official_base: str,
+    force_not_use_custom: bool,
+) -> Optional[str]:
+    """custom (4 位数字 char_id 子目录) + 官方 文件 等权混合池随机抽一张, 返回完整路径。
+    每个 custom char_id 算一个 slot (内部再随机一张), 每个官方文件算一个 slot。"""
+    slots: list = []
+    if not force_not_use_custom:
+        slots.extend(("custom", cid) for cid in _list_custom_char_dirs(custom_base))
+    slots.extend(("official", fname) for fname in _list_official_image_files(official_base))
+    if not slots:
+        return None
+    kind, ident = random.choice(slots)
+    if kind == "custom":
+        custom_dir = f"{custom_base}/{ident}"
+        picked = _random_image_from_dir(custom_dir)
+        if picked:
+            return f"{custom_dir}/{picked}"
+    else:
+        path = f"{official_base}/{ident}"
+        if os.path.exists(path):
+            return path
+    return None
+
+
 async def get_random_waves_role_pile(char_id: Optional[str] = None, force_not_use_custom: bool = False):
+    forced = _force_pile_path.get()
+    if forced is not None and forced.exists():
+        return Image.open(forced).convert("RGBA")
     if char_id:
         return await get_role_pile_default(char_id, custom=not force_not_use_custom)
 
+    picked = _pick_from_custom_or_official(
+        str(CUSTOM_MR_CARD_PATH), str(ROLE_PILE_PATH), force_not_use_custom
+    )
+    if picked:
+        return Image.open(picked).convert("RGBA")
+
+    # 极端兜底: slots 为空时回落老逻辑
     path = random.choice(os.listdir(f"{ROLE_PILE_PATH}"))
     return Image.open(f"{ROLE_PILE_PATH}/{path}").convert("RGBA")
 
 
 async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custom: bool = False):
+    forced = _force_bg_path.get()
+    if forced is not None and forced.exists():
+        return Image.open(forced).convert("RGBA"), True
     if char_id:
         custom_dir = f"{CUSTOM_MR_BG_PATH}/{char_id}"
         if not force_not_use_custom and os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
@@ -269,22 +345,12 @@ async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custo
             path = ROLE_BG_PATH / name
             if os.path.exists(path):
                 return Image.open(path).convert("RGBA"), True
-
     else:
-        bg_list = [f for f in os.listdir(f"{CUSTOM_MR_BG_PATH}") if os.path.isdir(f"{CUSTOM_MR_BG_PATH}/{f}")]
-        if not force_not_use_custom and bg_list:
-            char_id = random.choice(bg_list)
-            custom_dir = f"{CUSTOM_MR_BG_PATH}/{char_id}"
-            if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
-                path = _random_image_from_dir(custom_dir)
-                if path:
-                    return Image.open(f"{custom_dir}/{path}").convert("RGBA"), True
-
-        else:
-            name = random.choice(os.listdir(f"{ROLE_BG_PATH}"))
-            path = ROLE_BG_PATH / name
-            if os.path.exists(path):
-                return Image.open(path).convert("RGBA"), True
+        picked = _pick_from_custom_or_official(
+            str(CUSTOM_MR_BG_PATH), str(ROLE_BG_PATH), force_not_use_custom
+        )
+        if picked:
+            return Image.open(picked).convert("RGBA"), True
 
     return await get_random_waves_role_pile(char_id, force_not_use_custom), False
 
@@ -307,6 +373,9 @@ async def get_role_pile_with_path(
     resource_id: Union[int, str],
     custom: bool = False,
 ) -> tuple[bool, Image.Image, Optional[Path]]:
+    forced = _force_pile_path.get()
+    if forced is not None and forced.exists():
+        return True, Image.open(forced).convert("RGBA"), forced
     if custom:
         custom_dir = f"{CUSTOM_CARD_PATH}/{resource_id}"
         if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
@@ -322,6 +391,9 @@ async def get_role_pile_with_path(
     return False, Image.open(ROLE_PILE_PATH / "role_pile_1503.png").convert("RGBA"), None
 
 async def get_role_pile_default(resource_id: Union[int, str], custom: bool = False) -> Image.Image:
+    forced = _force_pile_path.get()
+    if forced is not None and forced.exists():
+        return Image.open(forced).convert("RGBA")
     if custom:
         custom_dir = f"{CUSTOM_MR_CARD_PATH}/{resource_id}"
         if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
@@ -514,7 +586,7 @@ def get_small_logo(logo_num=1):
     return Image.open(TEXT_PATH / f"logo_small_{logo_num}.png")
 
 
-def get_footer(color: Literal["white", "black", "hakush"] = "white"):
+def get_footer(color: Literal["white", "black"] = "white"):
     return Image.open(TEXT_PATH / f"footer_{color}.png")
 
 
@@ -523,7 +595,7 @@ def add_footer(
     w: int = 0,
     offset_y: int = 0,
     is_invert: bool = False,
-    color: Literal["white", "black", "hakush"] = "white",
+    color: Literal["white", "black"] = "white",
 ):
     footer = get_footer(color)
     if is_invert:

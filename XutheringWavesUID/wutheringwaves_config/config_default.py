@@ -42,6 +42,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
             "小沐XMu",
             "吃我无痕",
             "巡游天国FM",
+            "社区攻略",
         ],
     ),
     "WavesGuideMaxSize": GsIntConfig(
@@ -217,13 +218,23 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "RefreshSingleCharBehavior": GsStrConfig(
         "刷新单角色面板逻辑",
         "控制刷新单个角色面板后的行为：refresh_only(仅刷新)、refresh_and_send(刷新并合并发送)、refresh_and_send_separately(刷新并分别发送)、concatenate(拼接为一张图发送)",
-        "refresh_and_send",
+        "concatenate",
         options=[
             "refresh_only",
             "refresh_and_send",
             "refresh_and_send_separately",
             "concatenate",
         ],
+    ),
+    "WavesUploadAudit": GsBoolConfig(
+        "上传面板图允许审核（需订阅联系主人，建议配合白名单）",
+        "开启后, 无权限的用户使用上传面板图指令时, 若附带了图片, 会通过【联系主人】订阅转发给主人, 由主人审核后用上传指令落地",
+        False,
+    ),
+    "AutoSendCharAfterRefresh": GsBoolConfig(
+        "刷新面板时自动发送角色面板",
+        "全量刷新面板后，自动猜测用户可能想查看的角色面板",
+        True,
     ),
     "HelpExtraModules": GsListStrConfig(
         "帮助显示额外模块（重启生效）",
@@ -240,7 +251,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "CacheDaysToKeep": GsIntConfig(
         "保留缓存公告、日历资源天数",
         "自动删除创建时间早于此天数的公告和日历图片缓存，每次启动和每天定时执行",
-        42,
+        45,
         3650,
     ),
     "RankActiveFilterGroup": GsBoolConfig(
@@ -277,5 +288,20 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         "外置渲染字体CSS地址",
         "用于HTML渲染的字体CSS URL，外置渲染时传递，一般保留默认即可，如果在本地，可以填http://127.0.0.1:8765/waves/fonts/fonts.css，如果有自己的登录域名：可以使用 你的登录域名根/waves/fonts/fonts.css",
         "https://fonts.loli.net/css2?family=JetBrains+Mono:wght@500;700&family=Oswald:wght@500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&family=Noto+Sans+KR:wght@400;700&family=Noto+Color+Emoji&display=swap",
+    ),
+    "WavesPanelEditPassword": GsStrConfig(
+        "面板图编辑面板密码",
+        "为空则关闭网页面板图/背景图编辑工具；设置后通过 HTTP Basic Auth 鉴权（用户名固定 admin），地址 /waves/panel-edit/",
+        "",
+    ),
+    "WavesPanelEditGuestView": GsBoolConfig(
+        "面板图编辑访客只读浏览",
+        "开启后，未登录用户可浏览图片列表（不渲染预览，不占用服务器资源）；上传/裁剪/删除/覆盖仍需密码",
+        False,
+    ),
+    "WavesGachaWebPage": GsBoolConfig(
+        "抽卡网页查看功能",
+        "开启后，用户可发送【抽卡页面/抽卡网页/网页抽卡记录】打开网页查看抽卡详细记录",
+        False,
     ),
 }

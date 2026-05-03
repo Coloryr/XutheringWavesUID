@@ -3,7 +3,8 @@ from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 
-from ..utils.at_help import ruser_id
+from ..utils.hint import error_reply
+from ..utils.at_help import ruser_id, is_intl_uid, intl_unavailable_msg
 from .draw_role_info import draw_role_img
 from .draw_reward_card import draw_reward_img
 from ..utils.waves_api import waves_api
@@ -29,6 +30,9 @@ async def send_role_info(bot: Bot, ev: Event):
     if not uid:
         await bot.send(error_reply(WAVES_CODE_102))
         return
+    if is_intl_uid(uid):
+        await bot.send(intl_unavailable_msg(uid))
+        return
 
     _, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
@@ -47,6 +51,9 @@ async def send_score_info(bot: Bot, ev: Event):
     logger.info(f"[鸣潮][伴行积分] user_id: {user_id} UID: {uid}")
     if not uid:
         await bot.send(error_reply(WAVES_CODE_102))
+        return
+    if is_intl_uid(uid):
+        await bot.send(intl_unavailable_msg(uid))
         return
 
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
