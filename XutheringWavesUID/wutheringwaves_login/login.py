@@ -350,6 +350,11 @@ async def waves_login_index(auth: str):
 
         return await render_email_login_page(auth, state)
 
+    if isinstance(state, dict) and state.get("flow") == "cloud":
+        from .cloud_login import render_cloud_login_page
+
+        return await render_cloud_login_page(auth, state)
+
     temp = state
     if temp is None:
         # 多 worker / 进程重启 / TTL 过期都会走这里，打点便于排查

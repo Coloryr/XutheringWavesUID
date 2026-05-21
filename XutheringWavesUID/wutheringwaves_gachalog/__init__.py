@@ -37,6 +37,7 @@ sv_gacha_log = SV("waves抽卡记录")
 sv_gacha_help_log = SV("waves抽卡记录帮助")
 sv_gacha_rank = SV("waves抽卡排行", priority=0)
 sv_get_gachalog_by_link = SV("waves导入抽卡链接") # , area="DIRECT"
+sv_update_gacha_log = SV("waves更新抽卡记录")
 sv_import_gacha_log = SV("waves导入抽卡记录") # , area="DIRECT"
 sv_export_json_gacha_log = SV("waves导出抽卡记录")
 sv_delete_gacha_log = SV("waves删除抽卡记录")
@@ -191,6 +192,62 @@ async def get_gacha_log_by_link(bot: Bot, ev: Event):
             await bot.send(im)
     finally:
         gacha_import_lock.release(f"{ev.user_id}_{uid}")
+
+
+async def pull_cloud_gacha(bot: Bot, ev: Event, uid: str, record_id: str):
+    """用 recordId 走导入抽卡记录链路，复用导入锁，直接发送 save_gachalogs 结果。"""
+    if not gacha_import_lock.acquire(f"{ev.user_id}_{uid}"):
+        return
+    try:
+        im = await save_gachalogs(ev, uid, record_id)
+        if im.startswith("🌱"):
+            card_img = await draw_card(uid, ev)
+            if isinstance(card_img, str):
+                await bot.send(im)
+            else:
+                await bot.send([im, MessageSegment.image(card_img)])
+        else:
+            await bot.send(im)
+    finally:
+        gacha_import_lock.release(f"{ev.user_id}_{uid}")
+
+
+@sv_update_gacha_log.on_fullmatch(("刷新抽卡记录", "更新抽卡记录", "刷新抽卡", "更新抽卡"), block=True)
+async def update_gacha_log_by_cloud(bot: Bot, ev: Event):
+    from ..utils.database.waves_gacha_cloud import WavesGachaCloud
+    from ..wutheringwaves_login.cloud_login import fetch_cloud_record_id
+
+    at_sender = True if ev.group_id else False
+
+    uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
+    if not uid:
+        return await bot.send(ERROR_CODE[WAVES_CODE_103])
+
+    ck = await waves_api.get_self_waves_ck(uid, ev.user_id, ev.bot_id)
+    if not ck:
+        return await bot.send(ERROR_CODE[WAVES_CODE_102])
+
+    record = await WavesGachaCloud.select_record(ev.user_id, ev.bot_id, uid)
+    if not record:
+        return await bot.send(
+            (" " if at_sender else "")
+            + f"未找到云鸣潮登录记录，请先使用【{PREFIX}抽卡登录】",
+            at_sender=at_sender,
+        )
+
+    record_id = await fetch_cloud_record_id(ev.user_id, ev.bot_id, uid)
+    if not record_id:
+        return await bot.send(
+            (" " if at_sender else "")
+            + f"云鸣潮登录已失效或请求出错，请稍后重试或重新使用【{PREFIX}抽卡登录】",
+            at_sender=at_sender,
+        )
+
+    await bot.send(
+        (" " if at_sender else "") + f"UID{hide_uid(uid)} 正在更新抽卡记录，请稍候...",
+        at_sender=at_sender,
+    )
+    await pull_cloud_gacha(bot, ev, uid, record_id)
 
 
 @sv_gacha_log.on_fullmatch(
