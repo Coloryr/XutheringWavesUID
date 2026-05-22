@@ -859,7 +859,7 @@ async def draw_char_detail_img(
         right_prop_y = 100
         right_weapon_banner_y = 620
         weapon_name_y = 780
-        weapon_bg_y = 770
+        weapon_bg_y = 750
     else:
         right_prop_y = 80
         right_weapon_banner_y = 550
@@ -1899,7 +1899,7 @@ async def draw_char_optimize_img(ev: Event, uid: str, char: str, user_id: str, w
     right_prop_y = 100
     right_weapon_banner_y = 620
     weapon_name_y = 780
-    weapon_bg_y = 770
+    weapon_bg_y = 750
 
     # 武器 banner
     banner2 = Image.open(TEXT_PATH / "banner2.png")
