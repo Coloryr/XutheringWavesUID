@@ -1,8 +1,10 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from gsuid_core.models import Event
 from gsuid_core.logger import logger
 
+from ..utils.at_help import ruser_id
+from ..utils.util import get_hide_uid_pref, hide_uid
 from ..utils.waves_api import waves_api
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..utils.api.model import (
@@ -27,9 +29,33 @@ from ..utils.image import (
     get_square_weapon_path,
 )
 from gsuid_core.data_store import get_res_path
+from .draw_reward_card_pil import draw_reward_img_pil
 
 SCORE_IMAGE_PATH = get_res_path("XutheringWavesUID") / "other" / "reward"
 SCORE_IMAGE_PATH.mkdir(parents=True, exist_ok=True)
+
+
+def _format_reward_text(display_uid: str, score_data: Dict) -> str:
+    return (
+        f"UID {display_uid} 伴行积分：{score_data['total_score']}，"
+        f"{score_data['char_weapon_total_capped']}分"
+        f"（角色{score_data['char_score_raw']}分 + "
+        f"武器{score_data['weapon_score_raw']}分） + "
+        f"成就{score_data['achievement_score']}分 + "
+        f"活跃天数{score_data['active_days_score']}分"
+    )
+
+
+async def _draw_reward_pil_fallback(
+    score_data: Dict,
+    ev: Event,
+    display_uid: str,
+) -> Union[str, bytes]:
+    try:
+        return await draw_reward_img_pil(score_data, ev)
+    except Exception as e:
+        logger.exception(f"[鸣潮] 积分PIL渲染失败: {e}")
+        return _format_reward_text(display_uid, score_data)
 
 
 async def calculate_score(uid: str, ck: str) -> Optional[Dict]:
@@ -173,19 +199,21 @@ async def calculate_score(uid: str, ck: str) -> Optional[Dict]:
 
 async def draw_reward_img(uid: str, ck: str, ev: Event):
     """绘制积分卡片"""
+    user_pref = await get_hide_uid_pref(uid, ruser_id(ev), ev.bot_id)
+    display_uid = hide_uid(uid, user_pref=user_pref)
 
-    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
-    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
-        # 计算积分并返回文本
-        score_data = await calculate_score(uid, ck)
-        if not score_data:
-            return "获取数据失败，请先登录，或尝试刷新面板！"
-        return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分"
-
-    # 计算积分
     score_data = await calculate_score(uid, ck)
     if not score_data:
         return "获取数据失败，请先登录，或尝试刷新面板！"
+    score_data["display_uid"] = display_uid
+
+    use_html_render = WutheringWavesConfig.get_config("UseHtmlRender").data
+    if not PLAYWRIGHT_AVAILABLE or not use_html_render:
+        return await _draw_reward_pil_fallback(
+            score_data,
+            ev,
+            display_uid,
+        )
 
     account_info = score_data["account_info"]
 
@@ -200,7 +228,7 @@ async def draw_reward_img(uid: str, ck: str, ev: Event):
     # 准备模板数据
     context = {
         "user_name": account_info.name,
-        "user_id": account_info.id,
+        "user_id": hide_uid(account_info.id, user_pref=user_pref),
         "level": account_info.level or 0,
         "world_level": account_info.worldLevel or 0,
         "show_stats": account_info.is_full,
@@ -226,10 +254,22 @@ async def draw_reward_img(uid: str, ck: str, ev: Event):
     }
 
     logger.debug("[鸣潮] 准备通过HTML渲染积分卡片")
-    img_bytes = await render_html(waves_templates, "roleinfo/reward_card.html", context)
+    try:
+        img_bytes = await render_html(
+            waves_templates,
+            "roleinfo/reward_card.html",
+            context,
+        )
+    except Exception as e:
+        logger.exception(f"[鸣潮] 积分HTML渲染失败: {e}")
+        img_bytes = None
 
     if img_bytes:
         return img_bytes
     else:
-        logger.warning("[鸣潮] 积分卡片渲染失败")
-        return f"UID {uid} 伴行积分：{score_data['total_score']}，{score_data['char_weapon_total_capped']}分（角色{score_data['char_score_raw']}分 + 武器{score_data['weapon_score_raw']}分） + 成就{score_data['achievement_score']}分 + 活跃天数{score_data['active_days_score']}分"
+        logger.warning("[鸣潮] 积分HTML渲染失败，回退到PIL")
+        return await _draw_reward_pil_fallback(
+            score_data,
+            ev,
+            display_uid,
+        )

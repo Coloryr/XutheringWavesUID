@@ -15,8 +15,8 @@ from ..util import timed_async_cache
 from .captcha.base import CaptchaResult
 from ..error_reply import WAVES_CODE_999, WAVES_CODE_104
 from .captcha.errors import CaptchaError
-from ...utils.constants import WAVES_GAME_ID
-from ...utils.database.models import WavesUser
+from ..constants import WAVES_GAME_ID
+from ..database.models import WavesUser
 from ..resource.RESOURCE_PATH import CACHE_PATH
 from ...wutheringwaves_config import WutheringWavesConfig
 from .request_util import (
@@ -190,6 +190,12 @@ class WavesApi:
         if not waves_user or not waves_user.cookie:
             return ""
 
+        # 国际服账号走 launcher SDK auto_token，cookie 不是 kurobbs JWT，
+        # 不能跑 login_log，否则会被错误地标记 status="无效"。SDK 链路自行处理凭据。
+        # is_login=True 不能用作判别（kurobbs 登录流也会写 is_login=True）。
+        if self.is_net(uid):
+            return ""
+
         if waves_user.status == "无效":
             return ""
 
@@ -221,12 +227,14 @@ class WavesApi:
         if WutheringWavesConfig.get_config("WavesOnlySelfCk").data:
             return None
 
-        # 公共ck 随机一个
+        # 公共 ck 随机抽一个可用的; login_log 失败不计次, refresh 最多深探 5 个 (耗配额)
         user_list = await WavesUser.get_waves_all_user()
         random.shuffle(user_list)
-        ck_list = []
-        times = 1
+        deep_probe = 0
         for user in user_list:
+            if self.is_net(user.uid):
+                # 国际服账号 cookie 是 launcher auto_token，作为 kurobbs JWT 用必失败
+                continue
             if not await WavesUser.cookie_validate(user.uid):
                 continue
 
@@ -235,21 +243,22 @@ class WavesApi:
                 await data.mark_cookie_invalid(user.uid, user.cookie)
                 continue
 
+            if deep_probe >= 5:
+                break
+            deep_probe += 1
+
             data = await self.refresh_data(user.uid, user.cookie)
+            if not data.success and data.is_bat_token_invalid:
+                # bat 失效但 login 仍有效: 续 bat 后重探, 不算 cookie 失效
+                await self.refresh_bat_token(user)
+                data = await self.refresh_data(user.uid, user.cookie)
             if not data.success:
-                await data.mark_cookie_invalid(user.uid, user.cookie)
-
-                if times <= 0:
-                    break
-
-                times -= 1
+                # 维护 / 续 bat 后仍失败: cookie 未必失效, 不标失效
+                if not (data.is_server_maintenance or data.is_bat_token_invalid):
+                    await data.mark_cookie_invalid(user.uid, user.cookie)
                 continue
 
-            ck_list.append(user.cookie)
-            break
-
-        if len(ck_list) > 0:
-            return random.choices(ck_list, k=1)[0]
+            return user.cookie
 
     async def get_kuro_role_list(self, token: str, did: str, game_id: Union[int, str] = WAVES_GAME_ID):
         header = await get_base_header()
@@ -919,12 +928,12 @@ class WavesApi:
             value = [{**x, "id": int(x["postId"])} for x in raw_data["data"]["postList"]]
             self.ann_list_data.extend(value)
 
-        res = await self.get_bbs_list("10011001", pageIndex=1, pageSize=9)
+        res = await self.get_bbs_list("10011001", pageIndex=1, pageSize=20)
         if res.success:
             raw_data = res.model_dump()
-            post_list = raw_data["data"]["postList"]
+            post_list = [x for x in raw_data["data"]["postList"] if x.get("gameId") == WAVES_GAME_ID]
             post_list.sort(key=lambda x: x.get("showTime", 0), reverse=True)
-            value = [{**x, "id": int(x["postId"]), "eventType": 4} for x in post_list]
+            value = [{**x, "id": int(x["postId"]), "eventType": 4} for x in post_list[:9]]
             self.ann_list_data.extend(value)
 
         return self.ann_list_data

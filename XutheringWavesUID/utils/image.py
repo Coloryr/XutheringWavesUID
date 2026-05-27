@@ -25,7 +25,7 @@ from gsuid_core.models import Event
 from gsuid_core.utils.image.utils import sget
 from gsuid_core.utils.image.image_tools import crop_center_img
 
-from ..utils.resource.RESOURCE_PATH import (
+from .resource.RESOURCE_PATH import (
     AVATAR_PATH,
     CACHE_PATH,
     WEAPON_PATH,
@@ -96,6 +96,52 @@ def rgb_to_hex(rgb: Tuple) -> str:
     if len(rgb) == 4:
         return "rgba({}, {}, {}, {})".format(rgb[0], rgb[1], rgb[2], rgb[3])
     return "#{:02x}{:02x}{:02x}".format(rgb[0], rgb[1], rgb[2])
+
+
+def clean_alpha_matte(img: Image.Image, matte: Tuple[int, int, int, int]) -> Image.Image:
+    """用指定底色清理透明图边缘的 RGB，避免缩放后出现白边/白点。"""
+    img = img.convert("RGBA")
+    alpha = img.getchannel("A")
+    if alpha.getextrema() == (255, 255):
+        return img
+    clean = Image.new("RGBA", img.size, matte)
+    clean.alpha_composite(img)
+    clean.putalpha(alpha)
+    return clean
+
+
+def flatten_rgba(
+    img: Image.Image,
+    bg_color: Union[str, Tuple[int, ...]],
+) -> Image.Image:
+    """把 RGBA 图按指定底色压平成不透明图，避免转 JPEG 时透明层变白。"""
+    base = Image.new("RGBA", img.size, bg_color)
+    base.alpha_composite(img.convert("RGBA"))
+    return base
+
+
+def make_smooth_rounded_mask(size: Tuple[int, int], radius: int, scale: int = 4) -> Image.Image:
+    scaled_size = (size[0] * scale, size[1] * scale)
+    mask = Image.new("L", scaled_size, 0)
+    draw = ImageDraw.Draw(mask)
+    draw.rounded_rectangle(
+        (0, 0, scaled_size[0] - 1, scaled_size[1] - 1),
+        radius=radius * scale,
+        fill=255,
+    )
+    return mask.resize(size, Image.Resampling.LANCZOS)
+
+
+def make_smooth_circle_mask(size: int, scale: int = 4) -> Image.Image:
+    mask_size = size * scale
+    mask = Image.new("L", (mask_size, mask_size), 0)
+    draw = ImageDraw.Draw(mask)
+    inset = scale
+    draw.ellipse(
+        (inset, inset, mask_size - inset - 1, mask_size - inset - 1),
+        fill=255,
+    )
+    return mask.resize((size, size), Image.Resampling.LANCZOS)
 
 
 def pil_to_b64(img: Image.Image, quality: int = 0) -> str:
@@ -312,10 +358,13 @@ def _pick_from_custom_or_official(
     return None
 
 
-async def get_random_waves_role_pile(char_id: Optional[str] = None, force_not_use_custom: bool = False):
+async def get_random_waves_role_pile(
+    char_id: Optional[str] = None,
+    force_not_use_custom: bool = False,
+) -> tuple[Image.Image, Optional[Path]]:
     forced = _force_pile_path.get()
     if forced is not None and forced.exists():
-        return Image.open(forced).convert("RGBA")
+        return Image.open(forced).convert("RGBA"), forced
     if char_id:
         return await get_role_pile_default(char_id, custom=not force_not_use_custom)
 
@@ -323,36 +372,42 @@ async def get_random_waves_role_pile(char_id: Optional[str] = None, force_not_us
         str(CUSTOM_MR_CARD_PATH), str(ROLE_PILE_PATH), force_not_use_custom
     )
     if picked:
-        return Image.open(picked).convert("RGBA")
+        return Image.open(picked).convert("RGBA"), Path(picked)
 
     # 极端兜底: slots 为空时回落老逻辑
     path = random.choice(os.listdir(f"{ROLE_PILE_PATH}"))
-    return Image.open(f"{ROLE_PILE_PATH}/{path}").convert("RGBA")
+    full = Path(f"{ROLE_PILE_PATH}/{path}")
+    return Image.open(full).convert("RGBA"), full
 
 
-async def get_random_waves_bg(char_id: Optional[str] = None, force_not_use_custom: bool = False):
+async def get_random_waves_bg(
+    char_id: Optional[str] = None,
+    force_not_use_custom: bool = False,
+) -> tuple[Image.Image, bool, Optional[Path]]:
     forced = _force_bg_path.get()
     if forced is not None and forced.exists():
-        return Image.open(forced).convert("RGBA"), True
+        return Image.open(forced).convert("RGBA"), True, forced
     if char_id:
         custom_dir = f"{CUSTOM_MR_BG_PATH}/{char_id}"
         if not force_not_use_custom and os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
-            path = _random_image_from_dir(custom_dir)
-            if path:
-                return Image.open(f"{custom_dir}/{path}").convert("RGBA"), True
+            name = _random_image_from_dir(custom_dir)
+            if name:
+                full = Path(custom_dir) / name
+                return Image.open(full).convert("RGBA"), True, full
         else:
             name = f"{char_id}.webp"
             path = ROLE_BG_PATH / name
             if os.path.exists(path):
-                return Image.open(path).convert("RGBA"), True
+                return Image.open(path).convert("RGBA"), True, path
     else:
         picked = _pick_from_custom_or_official(
             str(CUSTOM_MR_BG_PATH), str(ROLE_BG_PATH), force_not_use_custom
         )
         if picked:
-            return Image.open(picked).convert("RGBA"), True
+            return Image.open(picked).convert("RGBA"), True, Path(picked)
 
-    return await get_random_waves_role_pile(char_id, force_not_use_custom), False
+    pile, pile_path = await get_random_waves_role_pile(char_id, force_not_use_custom)
+    return pile, False, pile_path
 
 
 async def get_role_pile(resource_id: Union[int, str], custom: bool = False) -> tuple[bool, Image.Image]:
@@ -390,22 +445,26 @@ async def get_role_pile_with_path(
         return False, Image.open(path).convert("RGBA"), path
     return False, Image.open(ROLE_PILE_PATH / "role_pile_1503.png").convert("RGBA"), None
 
-async def get_role_pile_default(resource_id: Union[int, str], custom: bool = False) -> Image.Image:
+async def get_role_pile_default(
+    resource_id: Union[int, str],
+    custom: bool = False,
+) -> tuple[Image.Image, Optional[Path]]:
     forced = _force_pile_path.get()
     if forced is not None and forced.exists():
-        return Image.open(forced).convert("RGBA")
+        return Image.open(forced).convert("RGBA"), forced
     if custom:
         custom_dir = f"{CUSTOM_MR_CARD_PATH}/{resource_id}"
         if os.path.isdir(custom_dir) and len(os.listdir(custom_dir)) > 0:
-            path = _random_image_from_dir(custom_dir)
-            if path:
-                return Image.open(f"{custom_dir}/{path}").convert("RGBA")
+            name = _random_image_from_dir(custom_dir)
+            if name:
+                full = Path(custom_dir) / name
+                return Image.open(full).convert("RGBA"), full
 
     name = f"role_pile_{resource_id}.png"
     path = ROLE_PILE_PATH / name
     if not os.path.exists(path):
         path = ROLE_PILE_PATH / "role_pile_1503.png"
-    return Image.open(path).convert("RGBA")
+    return Image.open(path).convert("RGBA"), path
 
 
 def get_square_avatar_path(resource_id: Union[int, str]) -> Path:
@@ -545,7 +604,7 @@ async def get_event_avatar(
     img = None
 
     if is_valid_at_param:
-        from ..utils.at_help import is_valid_at
+        from .at_help import is_valid_at
 
         is_valid_at_param = is_valid_at(ev)
 

@@ -16,10 +16,8 @@ from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
-from gsuid_core.utils.image.image_tools import crop_center_img
 
-from ..utils.util import get_version
-from ..utils.cache import TimedCache
+from ..utils.util import get_version, hide_uid
 from ..utils.image import (
     RED,
     GREY,
@@ -33,12 +31,12 @@ from ..utils.image import (
     get_ICON,
     add_footer,
     get_waves_bg,
-    get_qq_avatar,
     get_square_avatar,
     pic_download_from_url,
     parse_bot_color_config,
 )
 from .rank_badge import draw_rank_badge
+from .rank_avatar import get_avatar
 from ..utils.resource.RESOURCE_PATH import MATRIX_PATH
 from ..utils.api.model import MatrixDetail
 from ..utils.api.wwapi import (
@@ -79,102 +77,14 @@ BOT_COLOR = [
     WAVES_MOONLIT,
 ]
 
-avatar_mask = Image.open(TEXT_PATH / "avatar_mask.png")
-default_avatar_char_id = "1505"
-pic_cache = TimedCache(600, 200)
 
 
-def get_score_color(score: int):
-    """总排行分数颜色"""
-    if score >= 300000:
-        return CRYSTAL_SENTINEL
-    elif score >= 200000:
-        return (255, 0, 0)
-    elif score >= 45000:
-        return (234, 183, 4)
-    elif score >= 21000:
-        return (185, 106, 217)
-    elif score >= 12000:
-        return (53, 152, 219)
-    else:
-        return (128, 128, 128)
-
-
-CRYSTAL_SENTINEL = (-1, -1, -1)  # 标记需要使用水晶炫彩
-
-CRYSTAL_COLORS = [
-    (255, 120, 180),  # 粉
-    (180, 120, 255),  # 紫
-    (100, 200, 255),  # 蓝
-    (120, 255, 200),  # 青
-    (255, 230, 100),  # 金
-    (255, 150, 100),  # 橙
-    (255, 120, 180),  # 粉 (循环)
-]
-
-
-def draw_crystal_text(img: Image.Image, text: str, x: int, y: int, font, anchor="lm"):
-    """在 img 上绘制水晶炫彩文字"""
-    draw = ImageDraw.Draw(img)
-    bbox = draw.textbbox((0, 0), text, font=font, anchor="lt")
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    if tw <= 0 or th <= 0:
-        return
-
-    # 根据 anchor 调整起点
-    if "m" in anchor:
-        if anchor == "mm":
-            x -= tw // 2
-            y -= th // 2
-        elif anchor == "lm":
-            y -= th // 2
-
-    # 创建渐变层
-    gradient = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    for px in range(tw):
-        ratio = px / tw
-        seg = ratio * (len(CRYSTAL_COLORS) - 1)
-        idx = min(int(seg), len(CRYSTAL_COLORS) - 2)
-        frac = seg - idx
-        c1, c2 = CRYSTAL_COLORS[idx], CRYSTAL_COLORS[idx + 1]
-        r = int(c1[0] + (c2[0] - c1[0]) * frac)
-        g = int(c1[1] + (c2[1] - c1[1]) * frac)
-        b = int(c1[2] + (c2[2] - c1[2]) * frac)
-        for py in range(th):
-            brightness = 0.7 + 0.3 * math.sin(py / th * math.pi)
-            gradient.putpixel((px, py), (
-                min(255, int(r * brightness)),
-                min(255, int(g * brightness)),
-                min(255, int(b * brightness)),
-                255,
-            ))
-
-    # 文字蒙版
-    mask = Image.new("L", (tw, th), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.text((0, 0), text, fill=255, font=font, anchor="lt")
-
-    # 合成
-    result = Image.new("RGBA", (tw, th), (0, 0, 0, 0))
-    result.paste(gradient, (0, 0), mask)
-    img.alpha_composite(result, (x, y))
-
-
-def get_local_score_color(score: int):
-    """群排行分数颜色 — 红/彩分界线比总排行低"""
-    if score >= 150000:
-        return CRYSTAL_SENTINEL
-    elif score >= 100000:
-        return (255, 0, 0)
-    elif score >= 45000:
-        return (234, 183, 4)
-    elif score >= 21000:
-        return (185, 106, 217)
-    elif score >= 12000:
-        return (53, 152, 219)
-    else:
-        return (128, 128, 128)
+from ._colors import (
+    CRYSTAL_SENTINEL,
+    draw_crystal_text,
+    get_matrix_local_rank_color as get_local_score_color,
+    get_matrix_total_rank_color as get_score_color,
+)
 
 
 async def get_rank(item: MatrixRankItem) -> Optional[MatrixRankRes]:
@@ -202,6 +112,7 @@ async def get_rank(item: MatrixRankItem) -> Optional[MatrixRankRes]:
             logger.exception(f"获取矩阵排行失败: {e}")
 
 
+# TODO: PIL 卸到线程池 (loop 内 await get_square_avatar / pic_download_from_url 频繁, 需要批量预取重构)
 async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
     waves_id = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
     match = re.search(r"(\d+)", ev.raw_text)
@@ -287,7 +198,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
     card_img.paste(char_mask_temp, (0, 0), char_mask_temp)
 
     rank_list = rankInfoList.data.rank_list
-    tasks = [get_avatar(rank.user_id) for rank in rank_list]
+    tasks = [get_avatar(rank.user_id, getattr(rank, "sender_avatar", "")) for rank in rank_list]
     results = await asyncio.gather(*tasks)
 
     bot_color_map = parse_bot_color_config(
@@ -313,7 +224,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
         uid_color = "white"
         if rank_temp.waves_id == item.waves_id:
             uid_color = RED
-        role_bg_draw.text((210, 40), f"{rank_temp.waves_id}", uid_color, waves_font_20, "lm")
+        role_bg_draw.text((210, 40), f"{hide_uid(rank_temp.waves_id)}", uid_color, waves_font_20, "lm")
 
         # 原特征码位置 → 显示上场队伍数量（未登录时为0，不显示）
         team_count = rank_temp.team_count if rank_temp.team_count else len(rank_temp.teams)
@@ -575,42 +486,6 @@ async def get_matrix_rank_token_condition(ev) -> Tuple[bool, Dict[Tuple[str, str
     return tokenLimitFlag, wavesTokenUsersMap
 
 
-async def get_avatar(
-    qid: Optional[str],
-) -> Image.Image:
-    if qid and qid.isdigit():
-        if WutheringWavesConfig.get_config("QQPicCache").data:
-            pic = pic_cache.get(qid)
-            if not pic:
-                pic = await get_qq_avatar(qid, size=100)
-                pic_cache.set(qid, pic)
-        else:
-            pic = await get_qq_avatar(qid, size=100)
-            pic_cache.set(qid, pic)
-        pic_temp = crop_center_img(pic, 120, 120)
-
-        img = Image.new("RGBA", (180, 180))
-        avatar_mask_temp = avatar_mask.copy()
-        mask_pic_temp = avatar_mask_temp.resize((120, 120))
-        img.paste(pic_temp, (0, -5), mask_pic_temp)
-    else:
-        pic = await get_square_avatar(default_avatar_char_id)
-
-        pic_temp = Image.new("RGBA", pic.size)
-        pic_temp.paste(pic.resize((160, 160)), (10, 10))
-        pic_temp = pic_temp.resize((160, 160))
-
-        avatar_mask_temp = avatar_mask.copy()
-        mask_pic_temp = Image.new("RGBA", avatar_mask_temp.size)
-        mask_pic_temp.paste(avatar_mask_temp, (-20, -45), avatar_mask_temp)
-        mask_pic_temp = mask_pic_temp.resize((160, 160))
-
-        img = Image.new("RGBA", (180, 180))
-        img.paste(pic_temp, (0, 0), mask_pic_temp)
-
-    return img
-
-
 async def get_role_chain_count(uid: str, role_id: int) -> int:
     """从rawData.json获取角色共鸣链数量，特殊角色遍历所有形态"""
     from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
@@ -640,6 +515,7 @@ async def get_role_chain_count(uid: str, role_id: int) -> int:
         return -1
 
 
+# TODO: PIL 卸到线程池 (loop 内 await get_role_chain_count / pic_download_from_url 频繁, 需要批量预取重构)
 async def draw_matrix_rank_list(bot: Bot, ev: Event):
     """绘制矩阵群排行 (PIL)"""
     start_time = time.time()
@@ -746,7 +622,7 @@ async def draw_matrix_rank_list(bot: Bot, ev: Event):
     card_img.paste(char_mask_temp, (0, 0), char_mask_temp)
 
     # 获取头像
-    tasks = [get_avatar(rank.user_id) for rank in rankInfoList_display]
+    tasks = [get_avatar(rank.user_id, getattr(rank, "sender_avatar", "")) for rank in rankInfoList_display]
     results = await asyncio.gather(*tasks)
 
     # 绘制排行条目

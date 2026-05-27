@@ -5,6 +5,7 @@ from gsuid_core.logger import logger
 
 from ..utils.api.model import RoleDetailData, EquipPhantomData
 from ..utils.waves_api import waves_api
+from ..utils.util import hide_uid
 from ..utils.name_convert import (
     easy_id_to_name,
     alias_to_sonata_name,
@@ -315,7 +316,7 @@ def parse_main(content: str) -> list[tuple[str, list[str], str]]:
 def parse_phantom_position(
     content: str,
 ) -> list[PhantomInfo]:
-    logger.debug(f"[声骸解析] 输入content: {content}")
+    logger.debug(f"[鸣潮·声骸解析] 输入content: {content}")
 
     # 先去掉"声骸"前缀（如果有）
     content = content.replace("声骸", "").strip()
@@ -330,7 +331,7 @@ def parse_phantom_position(
     for transfer in transfer_matches:
         position = transfer.group(1)
         to_position = transfer.group(2)
-        logger.debug(f"[声骸解析] 位置转换: {position}到{to_position}")
+        logger.debug(f"[鸣潮·声骸解析] 位置转换: {position}到{to_position}")
         if (
             position
             and to_position
@@ -345,7 +346,7 @@ def parse_phantom_position(
     # 从内容中移除所有位置转换信息，剩下的就是UID和角色名
     clean_content = re.sub(r"\s*\d到\d\s*", "", content).strip()
 
-    logger.debug(f"[声骸解析] 清理后的内容: {clean_content}")
+    logger.debug(f"[鸣潮·声骸解析] 清理后的内容: {clean_content}")
 
     # 提取可选的9位UID和角色名
     uid = None
@@ -357,7 +358,7 @@ def parse_phantom_position(
         uid = uid_match.group(1)
         charName = uid_match.group(2).strip()
 
-    logger.debug(f"[声骸解析] 最终结果: uid={uid}, charName={charName}, positions={positions}, toPositions={toPositions}")
+    logger.debug(f"[鸣潮·声骸解析] 最终结果: uid={uid}, charName={charName}, positions={positions}, toPositions={toPositions}")
 
     # 构造结果
     phantom_info = PhantomInfo()
@@ -724,14 +725,14 @@ async def change_role_phantom(
     if parserWavesUid and user_id and bot_id:
         _, ck = await waves_api.get_ck_result(waves_id, user_id, bot_id)
         if not ck:
-            return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】数据查询失败"
+            return f"[鸣潮] 替换目标UID【{hide_uid(waves_id)}】的角色【{parserCharName}】数据查询失败"
 
     remote_role_detail_info = await get_remote_role_detail_info(find_char_id, waves_id, ck)
     if not remote_role_detail_info:
-        return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】数据查询失败"
+        return f"[鸣潮] 替换目标UID【{hide_uid(waves_id)}】的角色【{parserCharName}】数据查询失败"
 
     if not remote_role_detail_info.phantomData or not remote_role_detail_info.phantomData.equipPhantomList:
-        return f"[鸣潮] 替换目标UID【{waves_id}】的角色【{parserCharName}】没有声骸数据"
+        return f"[鸣潮] 替换目标UID【{hide_uid(waves_id)}】的角色【{parserCharName}】没有声骸数据"
 
     if not parserPositions or not parserToPositions:
         role_detail.phantomData = remote_role_detail_info.phantomData

@@ -6,11 +6,12 @@ from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
 
 from gsuid_core.bot import Bot
 from gsuid_core.models import Event
+from gsuid_core.pool import to_thread
 from gsuid_core.utils.image.convert import convert_img
 from gsuid_core.utils.image.image_tools import crop_center_img
 
 from ..utils.hint import error_reply
-from ..utils.util import async_func_lock
+from ..utils.util import async_func_lock, hide_uid, get_hide_uid_pref
 from ..utils.cache import TimedCache
 from ..utils.image import (
     RED,
@@ -42,6 +43,7 @@ from ..utils.fonts.waves_fonts import (
 )
 from ..utils.resource.constant import NAME_ALIAS, SPECIAL_CHAR_NAME
 from ..utils.refresh_char_detail import refresh_char, save_base_info_cache
+from . import base_info_cache
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
@@ -140,6 +142,11 @@ def get_refresh_interval_notify(time_stamp: int, is_single_refresh: bool = False
 
 async def get_refresh_role_img(width: int, height: int):
     path = await get_random_share_bg_path()
+    return await _render_refresh_role_img(path, width, height)
+
+
+@to_thread
+def _render_refresh_role_img(path: Path, width: int, height: int):
     img = Image.open(path).convert("RGBA")
     if path.name in refresh_role_map:
         img = img.crop(refresh_role_map[path.name])
@@ -194,6 +201,7 @@ async def get_refresh_role_img(width: int, height: int):
     return result
 
 
+# TODO: PIL 卸到线程池 (await/PIL 深度交错, draw_pic 已单独卸载)
 @async_func_lock(keys=["user_id", "uid"])
 async def draw_refresh_char_detail_img(
     bot: Bot,
@@ -212,6 +220,7 @@ async def draw_refresh_char_detail_img(
     self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102), 0, None
+    user_pref = await get_hide_uid_pref(uid, user_id, ev.bot_id)
     # 账户数据
     account_info = await waves_api.get_base_info(uid, ck)
     if not account_info.success:
@@ -221,6 +230,7 @@ async def draw_refresh_char_detail_img(
     account_info = AccountBaseInfo.model_validate(account_info.data)
     # 缓存账户基本信息
     await save_base_info_cache(uid, account_info)
+    base_info_cache.set(uid, account_info)
     # 更新group id
     await WavesBind.insert_waves_uid(user_id, ev.bot_id, uid, ev.group_id, lenth_limit=9)
 
@@ -243,6 +253,7 @@ async def draw_refresh_char_detail_img(
             waves_map=waves_map,
             is_self_ck=self_ck,
             refresh_type=refresh_type,
+            is_self=user_id == ev.user_id,
         )
         if isinstance(waves_datas, str):
             return waves_datas, 0, None
@@ -329,7 +340,7 @@ async def draw_refresh_char_detail_img(
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
+    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
     img.paste(base_info_bg, (15, 20), base_info_bg)
 
     # 头像 头像环
@@ -390,11 +401,16 @@ async def draw_refresh_char_detail_img(
 
 async def draw_pic(char_rank: WavesCharRank, isUpdate=False):
     pic = await get_square_avatar(char_rank.roleId)
+    star_bg = await get_star_bg(char_rank.starLevel)
+    return await _compose_refresh_char_pic(char_rank, pic, star_bg, isUpdate)
+
+
+@to_thread
+def _compose_refresh_char_pic(char_rank: WavesCharRank, pic, star_bg, isUpdate=False):
     resize_pic = pic.resize((200, 200))
     img = refresh_char_bg.copy()
     img_draw = ImageDraw.Draw(img)
     img.alpha_composite(resize_pic, (50, 50))
-    star_bg = await get_star_bg(char_rank.starLevel)
     star_bg = star_bg.resize((220, 220))
     img.alpha_composite(star_bg, (40, 30))
 

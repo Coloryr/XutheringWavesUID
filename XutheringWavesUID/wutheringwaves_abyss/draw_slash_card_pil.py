@@ -12,6 +12,7 @@ from gsuid_core.utils.image.convert import convert_img
 
 from .period import get_slash_period_number
 from ..utils.hint import error_reply
+from ..utils.util import hide_uid, get_hide_uid_pref
 from ..utils.image import (
     GOLD,
     GREY,
@@ -100,10 +101,12 @@ async def get_slash_data(uid: str, ck: str, is_self_ck: bool) -> Union[SlashDeta
         return SlashDetail.model_validate(slash_data)
 
 
+# TODO: PIL 卸到线程池 (难度/挑战/队伍多层循环里 await pic_download_from_url / draw_pic 等)
 async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]:
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102)
+    user_pref = await get_hide_uid_pref(uid, user_id, ev.bot_id)
 
     command = ev.command
     text = ev.text.strip()
@@ -178,7 +181,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
+    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
     card_img.paste(base_info_bg, (15, 20), base_info_bg)
 
     # 头像 头像环
@@ -329,8 +332,12 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
             )
             index += 1
 
+    sender_avatar = (ev.sender or {}).get("avatar") or ""
+    if not (isinstance(sender_avatar, str) and sender_avatar.startswith(("http://", "https://"))):
+        sender_avatar = ""
+
     await save_slash_record(uid, slash_detail)
-    await upload_slash_record(is_self_ck, uid, slash_detail)
+    await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar)
 
     card_img = add_footer(card_img, 600, 20)
     card_img = await convert_img(card_img)
@@ -355,13 +362,14 @@ async def save_slash_record(
         async with aiofiles.open(path, "w", encoding="utf-8") as file:
             await file.write(json.dumps(record_payload, ensure_ascii=False))
     except Exception as e:
-        logger.warning(f"[保存无尽数据失败] uid={uid}, error={e}")
+        logger.warning(f"[鸣潮·保存无尽数据失败] uid={uid}, error={e}")
 
 
 async def upload_slash_record(
     is_self_ck: bool,
     waves_id: str,
     slash_data: SlashDetail,
+    sender_avatar: str = "",
 ):
     from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 
@@ -413,6 +421,7 @@ async def upload_slash_record(
             "halfList": half_list,
             "rank": challenge.get_rank(),
             "score": challenge.score,
+            "sender_avatar": sender_avatar,
         }
     )
     # logger.info(f"上传冥海记录: {slash_item.model_dump()}")

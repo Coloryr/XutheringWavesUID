@@ -28,6 +28,11 @@ from . import storage as st
 
 _STATIC_DIR = Path(__file__).parent / "static"
 
+# 框选可超出原图(越界部分白色填充)后, 画布尺寸的安全上限, 防 OOM:
+# 单边 ≤ 原图各边 3 倍且 ≤ 8000px; 同时总像素 ≤ 40MP(单边限幅挡不住极端长宽比)。
+_MAX_CROP_DIM = 8000
+_MAX_CROP_PIXELS = 40_000_000
+
 
 def _try_update_orb_cache(p: Path) -> None:
     try:
@@ -43,6 +48,22 @@ def _try_delete_orb_cache(p: Path) -> None:
         delete_orb_cache(p)
     except Exception:
         pass
+
+
+def _index_add(t: str, char_id: str, p: Path) -> None:
+    try:
+        from ...wutheringwaves_charinfo import card_hash_index
+        card_hash_index.add(t, char_id, p)
+    except Exception as e:
+        logger.debug(f"[鸣潮·面板编辑] hash 索引 add 跳过: {e}")
+
+
+def _index_remove(t: str, char_id: str, p: Path) -> None:
+    try:
+        from ...wutheringwaves_charinfo import card_hash_index
+        card_hash_index.remove(t, char_id, p)
+    except Exception as e:
+        logger.debug(f"[鸣潮·面板编辑] hash 索引 remove 跳过: {e}")
 
 
 _DISABLED_HTML = """<!DOCTYPE html>
@@ -168,7 +189,7 @@ async def api_thumb(
     target = st.safe_target_image(type, char_id, name)
     if target is None or not target.is_file():
         raise HTTPException(404, "image not found")
-    cache = st.get_or_make_thumb(target, size)
+    cache = st.get_or_make_thumb(target, size, type)
     if cache is None:
         return FileResponse(target)
     return FileResponse(cache, media_type="image/webp", headers={"Cache-Control": "max-age=86400"})
@@ -179,12 +200,32 @@ async def api_image(
     type: str,
     char_id: str,
     name: str,
+    trim: int = 0,
     _: str = Depends(auth_or_guest),
 ):
     target = st.safe_target_image(type, char_id, name)
     if target is None or not target.is_file():
         raise HTTPException(404, "image not found")
-    return FileResponse(target)
+    headers = {"Cache-Control": "no-store"}
+    if trim and type == "card":
+        from ...wutheringwaves_charinfo.card_utils import _trim_card_file
+        img = await _trim_card_file(target)
+        with Image.open(target) as orig:
+            orig_size = orig.size
+        if img is not None and img.size != orig_size:
+            buf = BytesIO()
+            ext = target.suffix.lower()
+            if ext in (".jpg", ".jpeg"):
+                img.convert("RGB").save(buf, "JPEG", quality=95)
+                mt = "image/jpeg"
+            elif ext == ".webp":
+                img.save(buf, "WEBP", quality=95)
+                mt = "image/webp"
+            else:
+                img.save(buf, "PNG")
+                mt = "image/png"
+            return Response(buf.getvalue(), media_type=mt, headers=headers)
+    return FileResponse(target, headers=headers)
 
 
 # ------------------------- 临时上传 / 裁剪 -------------------------
@@ -260,11 +301,8 @@ async def api_tmp_crop(
     _: None = Depends(require_auth),
 ):
     """对 tmp 图执行裁剪。
-    payload:
-      token: str
-      x, y, w, h: float (相对当前 tmp 图的像素坐标, 允许越界后会 clamp)
-    在 current 上做增量裁剪 (前端展示的就是 current, 坐标必须以它为基准, 否则
-    第二次起的裁剪会与可视框错位); original 仅用于 /tmp/restore 还原。
+    payload: token; x,y,w,h = 相对【原图】的绝对像素坐标 (前端用 current 在原图内的 offset 换算),
+    越界部分白色填充。始终从 original 裁, 故放大裁剪框能找回先前被裁掉的内容; current 仅是裁剪结果缓存。
     """
     token = payload.get("token")
     if not st.is_safe_token(token):
@@ -283,14 +321,31 @@ async def api_tmp_crop(
     if current is None or original is None:
         raise HTTPException(404, "tmp not found")
 
-    with Image.open(current) as im:
+    with Image.open(original) as im:
         im.load()
         ow, oh = im.size
-        x = max(0, min(x, ow - 1))
-        y = max(0, min(y, oh - 1))
-        w = max(1, min(w, ow - x))
-        h = max(1, min(h, oh - y))
-        cropped = im.crop((x, y, x + w, y + h))
+
+        # 允许框选超出原图: 越界部分白色填充, 不再 clamp 到原图范围。仍限制画布尺寸防 OOM。
+        if w > min(_MAX_CROP_DIM, ow * 3) or h > min(_MAX_CROP_DIM, oh * 3):
+            raise HTTPException(400, "crop size too large")
+        if w * h > _MAX_CROP_PIXELS:
+            raise HTTPException(400, "crop size too large")
+
+        is_jpeg = current.suffix.lower() in (".jpg", ".jpeg")
+        keep_alpha = (not is_jpeg) and im.mode in ("RGBA", "LA", "P")
+        mode = "RGBA" if keep_alpha else "RGB"
+        fill = (255, 255, 255, 255) if keep_alpha else (255, 255, 255)
+        canvas = Image.new(mode, (w, h), fill)
+
+        # 原图与框选框的重叠区域(原图坐标系), 仅在有重叠时把对应内容贴回白底画布。
+        ix0, iy0 = max(0, x), max(0, y)
+        ix1, iy1 = min(ow, x + w), min(oh, y + h)
+        if ix1 > ix0 and iy1 > iy0:
+            region = im.crop((ix0, iy0, ix1, iy1))
+            if region.mode != mode:
+                region = region.convert(mode)
+            canvas.paste(region, (ix0 - x, iy0 - y))
+        cropped = canvas
 
     suffix = current.suffix
     out = BytesIO()
@@ -319,6 +374,56 @@ async def api_tmp_restore(payload: dict, _: None = Depends(require_auth)):
     with Image.open(current) as im:
         w, h = im.size
     return {"token": token, "width": w, "height": h, "size": current.stat().st_size}
+
+
+def _save_resized(p: Path, im: Image.Image) -> None:
+    out = BytesIO()
+    suffix = p.suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        im.convert("RGB").save(out, "JPEG", quality=92)
+    elif suffix == ".webp":
+        im.save(out, "WEBP", quality=90)
+    else:
+        im.save(out, "PNG")
+    p.write_bytes(out.getvalue())
+
+
+@app.post("/waves/panel-edit/api/tmp/resize")
+async def api_tmp_resize(payload: dict, _: None = Depends(require_auth)):
+    """按 scale 倍率等比缩放 tmp 图; current 与 original 同步缩放。"""
+    token = payload.get("token")
+    if not st.is_safe_token(token):
+        raise HTTPException(400, "invalid token")
+    try:
+        scale = float(payload.get("scale"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "scale required")
+    if not (0.05 <= scale <= 8.0):
+        raise HTTPException(400, "scale out of range (0.05 - 8.0)")
+
+    current, original = st.find_tmp_files(token)
+    if current is None or original is None:
+        raise HTTPException(404, "tmp not found")
+
+    def _scale(p: Path):
+        with Image.open(p) as im:
+            im.load()
+            nw = max(1, int(round(im.width * scale)))
+            nh = max(1, int(round(im.height * scale)))
+            if max(nw, nh) > _MAX_CROP_DIM or nw * nh > _MAX_CROP_PIXELS:
+                raise HTTPException(400, "resize result too large")
+            resized = im.resize((nw, nh), Image.Resampling.LANCZOS)
+        _save_resized(p, resized)
+        return nw, nh
+
+    ow, oh = _scale(original)
+    cw, ch = _scale(current)
+    return {
+        "token": token,
+        "width": cw, "height": ch,
+        "source_width": ow, "source_height": oh,
+        "size": current.stat().st_size,
+    }
 
 
 @app.post("/waves/panel-edit/api/tmp/discard")
@@ -354,6 +459,7 @@ async def api_confirm(payload: dict, _: None = Depends(require_auth)):
 
     final = st.relocate_to_target(target_type, char_id, current, suffix_hint=current.suffix)
     _try_update_orb_cache(final)
+    _index_add(target_type, char_id, final)
     if original is not None:
         try:
             original.unlink()
@@ -388,6 +494,7 @@ async def api_replace_existing(payload: dict, _: None = Depends(require_auth)):
     _try_delete_orb_cache(target)
     target.write_bytes(current.read_bytes())
     _try_update_orb_cache(target)
+    _index_add(target_type, char_id, target)
 
     st.cleanup_tmp(token)
     return {"ok": True, "name": target.name, "hash_id": st.hash_id_for(target.name)}
@@ -406,6 +513,7 @@ async def api_delete(payload: dict, _: None = Depends(require_auth)):
         raise HTTPException(404, "image not found")
     _try_delete_orb_cache(target)
     target.unlink()
+    _index_remove(target_type, char_id, target)
     return {"ok": True}
 
 
@@ -503,4 +611,5 @@ async def api_meta(role: str = Depends(auth_or_guest)):
         "id2name": dict(id2name),
         "role": role,
         "guest_view_enabled": is_guest_view_enabled(),
+        "thumb_ver": st._THUMB_VERSION,
     }

@@ -1,4 +1,3 @@
-import hashlib
 import os
 import ssl
 import asyncio
@@ -7,8 +6,12 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from PIL import Image
+from PIL import Image, ImageChops
 from gsuid_core.logger import logger
+from gsuid_core.pool import to_thread
+
+from . import card_hash_index
+from .card_hash_index import compute_hash as get_hash_id  # 对外别名, 旧 import 不破
 
 
 def _import_cv2():
@@ -42,14 +45,13 @@ from ..utils.name_convert import alias_to_char_name, char_name_to_char_id, easy_
 from ..utils.resource.constant import SPECIAL_CHAR, SPECIAL_CHAR_ID
 from ..utils.resource.RESOURCE_PATH import (
     CUSTOM_CARD_PATH,
-    CUSTOM_MR_BG_PATH,
-    CUSTOM_MR_CARD_PATH,
+    CUSTOM_DIRS as CUSTOM_PATH_MAP,
     CUSTOM_ORB_PATH,
+    IMAGE_EXTS,
     MAIN_PATH,
 )
 from ..wutheringwaves_config import WutheringWavesConfig
 
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 ORB_RATIO = 0.75
 ORB_MIN_MATCHES = 40
 ORB_THRESHOLD = 0.7
@@ -59,21 +61,11 @@ ORB_FEATURES = 2000
 CROP_PORTRAIT = (85, 265, 525, 1070)
 CROP_LANDSCAPE = (520, 0, 1100, 620)
 
-CUSTOM_PATH_MAP = {
-    "card": CUSTOM_CARD_PATH,
-    "bg": CUSTOM_MR_BG_PATH,
-    "stamina": CUSTOM_MR_CARD_PATH,
-}
-
 CUSTOM_PATH_NAME_MAP = {
     "card": "面板",
     "bg": "背景",
     "stamina": "体力",
 }
-
-
-def get_hash_id(name: str) -> str:
-    return hashlib.sha256(name.encode()).hexdigest()[:8]
 
 
 def get_char_id_and_name(char: str) -> tuple[Optional[str], str, str]:
@@ -165,6 +157,85 @@ def _compute_orb_features_from_image(image: Image.Image):
     return pts, descriptors
 
 
+@to_thread
+def _match_one_image_orb(
+    image_bytes: bytes,
+    search_types: List[str],
+    target_type: str,
+    char_id: Optional[str],
+) -> Tuple[float, Optional[Path], Optional[str]]:
+    """单张候选图片的 ORB 处理 + 库内匹配, 全部同步, 用线程池执行避免阻塞 loop"""
+    try:
+        image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    except Exception:
+        return 0.0, None, None
+
+    if image.width > image.height:
+        crop_boxes = [CROP_LANDSCAPE]
+    else:
+        crop_boxes = [CROP_PORTRAIT]
+        if image.height > 4000:
+            left0, top0, right0, bottom0 = CROP_PORTRAIT
+            crop_boxes.append((left0, top0 + 875, right0, bottom0 + 875))
+
+    best_sim = 0.0
+    best_path: Optional[Path] = None
+    best_char_id: Optional[str] = None
+
+    for crop_box in crop_boxes:
+        left, top, right, bottom = crop_box
+
+        if left >= image.width or top >= image.height:
+            crop = image
+        else:
+            left = max(0, left)
+            top = max(0, top)
+            right = min(right, image.width)
+            bottom = min(bottom, image.height)
+            if right <= left or bottom <= top:
+                crop = image
+            else:
+                crop = image.crop((left, top, right, bottom))
+        crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
+        feat_new = _compute_orb_features_from_image(crop)
+        if feat_new is None:
+            continue
+
+        for current_type in search_types:
+            if char_id:
+                char_dirs = [CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH) / f"{char_id}"]
+            else:
+                char_dirs = []
+                base = CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH)
+                if base.exists():
+                    for d in base.iterdir():
+                        if d.is_dir():
+                            char_dirs.append(d)
+
+            for dir_path in char_dirs:
+                if not dir_path.exists():
+                    continue
+                for img_path in _iter_images(dir_path):
+                    feat_old = get_orb_features(img_path)
+                    if feat_old is None:
+                        continue
+                    sim = _orb_similarity(feat_new, feat_old)
+                    if sim is None:
+                        continue
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_path = img_path
+                        best_char_id = dir_path.name
+
+            if best_sim >= ORB_THRESHOLD:
+                break
+
+        if best_sim >= ORB_THRESHOLD:
+            break
+
+    return best_sim, best_path, best_char_id
+
+
 async def match_hash_id_from_event(
     ev: Event,
     target_type: str,
@@ -182,7 +253,6 @@ async def match_hash_id_from_event(
     best_path: Optional[Path] = None
     best_char_id: Optional[str] = None
 
-    # 定义搜索顺序：先搜索目标类型，如果找不到则搜索其他类型
     search_types = [target_type]
     other_types = [t for t in ["card", "bg", "stamina"] if t != target_type]
     search_types.extend(other_types)
@@ -191,72 +261,11 @@ async def match_hash_id_from_event(
         image_bytes = await _fetch_image_bytes(url)
         if not image_bytes:
             continue
-        try:
-            image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        except Exception:
-            continue
-
-        if image.width > image.height:
-            crop_boxes = [CROP_LANDSCAPE]
-        else:
-            crop_boxes = [CROP_PORTRAIT]
-            if image.height > 4000:
-                left0, top0, right0, bottom0 = CROP_PORTRAIT
-                crop_boxes.append((left0, top0 + 875, right0, bottom0 + 875))
-
-        for crop_box in crop_boxes:
-            left, top, right, bottom = crop_box
-
-            if left >= image.width or top >= image.height:
-                crop = image
-            else:
-                left = max(0, left)
-                top = max(0, top)
-                right = min(right, image.width)
-                bottom = min(bottom, image.height)
-                if right <= left or bottom <= top:
-                    crop = image
-                else:
-                    crop = image.crop((left, top, right, bottom))
-            crop = crop.resize((crop.width * 2, crop.height * 2), Image.Resampling.LANCZOS)
-            feat_new = _compute_orb_features_from_image(crop)
-            if feat_new is None:
-                continue
-
-            # 按照类型顺序搜索
-            for current_type in search_types:
-                if char_id:
-                    char_dirs = [CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH) / f"{char_id}"]
-                else:
-                    char_dirs = []
-                    base = CUSTOM_PATH_MAP.get(current_type, CUSTOM_CARD_PATH)
-                    if base.exists():
-                        for d in base.iterdir():
-                            if d.is_dir():
-                                char_dirs.append(d)
-
-                for dir_path in char_dirs:
-                    if not dir_path.exists():
-                        continue
-                    for img_path in _iter_images(dir_path):
-                        feat_old = get_orb_features(img_path)
-                        if feat_old is None:
-                            continue
-                        sim = _orb_similarity(feat_new, feat_old)
-                        if sim is None:
-                            continue
-                        if sim > best_sim:
-                            best_sim = sim
-                            best_path = img_path
-                            best_char_id = dir_path.name
-
-                # 如果在当前类型找到了足够相似的结果，停止搜索其他类型
-                if best_sim >= ORB_THRESHOLD:
-                    break
-
-            # 如果已找到匹配，不再尝试其他裁剪区域
-            if best_sim >= ORB_THRESHOLD:
-                break
+        sim, path, c_id = await _match_one_image_orb(image_bytes, search_types, target_type, char_id)
+        if sim > best_sim:
+            best_sim = sim
+            best_path = path
+            best_char_id = c_id
 
     if best_path is None or best_char_id is None:
         return None
@@ -275,29 +284,74 @@ def _shorten_rel_path(path: Path) -> str:
     return rel
 
 
-def find_hash_in_all_types(hash_id: str) -> List[Tuple[str, str, Path]]:
-    results: List[Tuple[str, str, Path]] = []
-    for t, base in CUSTOM_PATH_MAP.items():
-        if not base.exists():
-            continue
-        for char_dir in base.iterdir():
-            if not char_dir.is_dir():
-                continue
-            for f in _iter_images(char_dir):
-                if get_hash_id(f.name) == hash_id:
-                    results.append((t, char_dir.name, f))
-    return results
+# 改了 _compute_orb_features 的预处理流程就 +1, 旧 .npz 当 miss 重算。
+ORB_FEATURE_VERSION = 2
+
+# role_pile 在主面板上的偏移 (25, 170) 与 CROP_PORTRAIT (85, 265, 525, 1070)
+# 决定可见区在 role_pile 局部坐标 = (60, 95, 500, 900)。
+_PANEL_VISIBLE_BOX_LOCAL = (60, 95, 500, 900)
+
+
+def resize_and_center_image(
+    image: Image.Image,
+    output_size: Tuple[int, int] = (560, 1000),
+    background_color=(255, 255, 255, 0),
+    is_custom: bool = False,
+) -> Image.Image:
+    """缩放使图片尽量填满目标尺寸并居中, 给 face_card 渲染与 ORB 预处理共用。
+
+    is_custom=False 直接返回原图。
+    is_custom=True 且图片含 alpha 时走带 mask 粘贴, 否则无 mask 粘贴 (兼容 RGB 输入)。
+    """
+    if not is_custom:
+        return image
+
+    image = image.copy()
+    img_width, img_height = image.size
+    target_width, target_height = output_size
+
+    if img_width > img_height:
+        scale_factor = target_width / img_width
+        new_width = target_width
+        new_height = int(img_height * scale_factor)
+    else:
+        scale_factor = target_height / img_height
+        new_width = int(img_width * scale_factor)
+        new_height = target_height
+
+    image = image.resize((new_width, new_height))
+    result_image = Image.new("RGBA", output_size, background_color)
+    paste_x = (target_width - new_width) // 2
+    paste_y = (target_height - new_height) // 2
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+        result_image.paste(image, (paste_x, paste_y), image)
+    else:
+        result_image.paste(image, (paste_x, paste_y))
+    return result_image
+
+
+def _prepare_card_image_for_orb(image: Image.Image) -> Image.Image:
+    """对 card (面板) 类型: 只取面板真实可见区做 ORB, 与上传分支的 CROP_PORTRAIT 对齐。
+
+    上传分支: 从屏幕坐标 CROP_PORTRAIT (440x805) 裁出来再 ×2;
+    存图分支: resize_and_center → 局部 (60,95,500,900) (440x805) 再 ×2;
+    两者最终落到同一区域同一分辨率, ORB 描述子可比。
+    """
+    canvas = resize_and_center_image(image, is_custom=True)
+    visible = canvas.crop(_PANEL_VISIBLE_BOX_LOCAL)
+    visible = visible.resize(
+        (visible.width * 2, visible.height * 2), Image.Resampling.LANCZOS
+    )
+    return visible.convert("RGB")
 
 
 def _get_orb_cache_path(image_path: Path) -> Optional[Path]:
-    for type_name, base in CUSTOM_PATH_MAP.items():
-        try:
-            rel = image_path.relative_to(base)
-            cache_path = CUSTOM_ORB_PATH / type_name / rel
-            return cache_path.with_suffix(cache_path.suffix + ".npz")
-        except ValueError:
-            continue
-    return None
+    t = card_hash_index.detect_type(image_path)
+    if t is None:
+        return None
+    rel = image_path.relative_to(card_hash_index.TYPE_BASES[t])
+    cache_path = CUSTOM_ORB_PATH / t / rel
+    return cache_path.with_suffix(cache_path.suffix + ".npz")
 
 
 def get_orb_dir_for_char(target_type: str, char_id: str) -> Path:
@@ -315,6 +369,9 @@ def _load_orb_cache(image_path: Path):
         return None
     try:
         data = np.load(cache_path)
+        version = int(data["version"][0]) if "version" in data.files else 1
+        if version != ORB_FEATURE_VERSION:
+            return None
         pts = data["pts"]
         des = data["des"]
         if pts.size == 0 or des.size == 0:
@@ -329,7 +386,9 @@ def _save_orb_cache(image_path: Path, pts, des) -> None:
     if not cache_path:
         return
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(cache_path, pts=pts, des=des)
+    np.savez_compressed(
+        cache_path, pts=pts, des=des, version=np.array([ORB_FEATURE_VERSION])
+    )
 
 
 def delete_orb_cache(image_path: Path) -> None:
@@ -344,11 +403,22 @@ def delete_orb_cache(image_path: Path) -> None:
 def _compute_orb_features(image_path: Path):
     if cv2 is None:
         return None
-    img = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        return None
+    t = card_hash_index.detect_type(image_path)
+    if t == "card":
+        try:
+            with Image.open(image_path) as im:
+                im.load()
+                prepared = _prepare_card_image_for_orb(im)
+        except Exception:
+            return None
+        rgb = np.array(prepared)
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    else:
+        gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+        if gray is None:
+            return None
     orb = cv2.ORB_create(nfeatures=ORB_FEATURES)
-    keypoints, descriptors = orb.detectAndCompute(img, None)
+    keypoints, descriptors = orb.detectAndCompute(gray, None)
     if descriptors is None or not keypoints:
         return None
     pts = np.float32([kp.pt for kp in keypoints])
@@ -367,12 +437,13 @@ def get_orb_features(image_path: Path):
     return pts, des
 
 
-def update_orb_cache(image_path: Path) -> None:
+def update_orb_cache(image_path: Path) -> bool:
     computed = _compute_orb_features(image_path)
     if computed is None:
-        return
+        return False
     pts, des = computed
     _save_orb_cache(image_path, pts, des)
+    return True
 
 
 def _orb_similarity(
@@ -601,6 +672,53 @@ async def send_repeated_custom_cards(
         await bot.send(batch)
 
 
+def _trim_white_border_pil(image: Image.Image, tol: int = 35) -> Image.Image:
+    # 与 numpy 路径同口径 (最小通道<255-tol→getbbox)
+    rgba = image.convert("RGBA")
+    bg = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+    r, g, b = Image.alpha_composite(bg, rgba).convert("RGB").split()
+    min_ch = ImageChops.darker(ImageChops.darker(r, g), b)
+    content = min_ch.point(lambda p: 255 if p < 255 - tol else 0)
+    bbox = content.getbbox()
+    return image.crop(bbox) if bbox else image
+
+
+def _trim_white_border(image: Image.Image, tol: int = 35, ratio: float = 0.995) -> Image.Image:
+    """逐边剥离整行/整列近白(各通道≥255-tol)或全透明的边; ratio 容忍稀疏杂点。"""
+    if np is None:
+        return _trim_white_border_pil(image, tol)
+    arr = np.asarray(image.convert("RGBA"))
+    white = np.all(arr[:, :, :3].astype(np.int16) >= 255 - tol, axis=2) | (arr[:, :, 3] == 0)
+    H, W = white.shape
+    row_white = white.mean(axis=1) >= ratio
+    col_white = white.mean(axis=0) >= ratio
+    top = 0
+    while top < H and row_white[top]:
+        top += 1
+    bottom = H
+    while bottom > top and row_white[bottom - 1]:
+        bottom -= 1
+    left = 0
+    while left < W and col_white[left]:
+        left += 1
+    right = W
+    while right > left and col_white[right - 1]:
+        right -= 1
+    if right <= left or bottom <= top:
+        return image
+    return image.crop((left, top, right, bottom))
+
+
+@to_thread
+def _trim_card_file(path: Path) -> Optional[Image.Image]:
+    try:
+        with Image.open(path) as im:
+            im.load()
+            return _trim_white_border(im)
+    except Exception:
+        return None
+
+
 async def send_custom_card_single(
     bot: Bot,
     ev: Event,
@@ -614,18 +732,12 @@ async def send_custom_card_single(
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     type_label = CUSTOM_PATH_NAME_MAP.get(target_type, target_type)
-    temp_dir = CUSTOM_PATH_MAP.get(target_type, CUSTOM_CARD_PATH) / f"{char_id}"
-    if not temp_dir.exists():
-        msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
-        return await bot.send((" " if at_sender else "") + msg, at_sender)
-
-    files_map = {
-        get_hash_id(f.name): f
-        for f in _iter_images(temp_dir)
-    }
-
-    if hash_id not in files_map:
-        matches = find_hash_in_all_types(hash_id)
+    target = card_hash_index.lookup_in(target_type, char_id, hash_id)
+    if target is None:
+        if not card_hash_index.list_dir(target_type, char_id):
+            msg = f"[鸣潮] 角色【{char}】暂未上传过{type_label}图！"
+            return await bot.send((" " if at_sender else "") + msg, at_sender)
+        matches = card_hash_index.find(hash_id)
         if matches:
             info = []
             for t, other_char_id, _ in matches:
@@ -640,7 +752,8 @@ async def send_custom_card_single(
         msg = f"[鸣潮] 角色【{char}】未找到id为【{hash_id}】的{type_label}图！"
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
-    img = await convert_img(files_map[hash_id])
+    trimmed = await _trim_card_file(target) if target_type == "card" else None
+    img = await convert_img(trimmed if trimmed is not None else target)
     await bot.send(img)
 
 
@@ -651,7 +764,7 @@ async def send_custom_card_single_by_id(
     target_type: Optional[str] = None,
 ) -> None:
     at_sender = True if ev.group_id else False
-    matches = find_hash_in_all_types(hash_id)
+    matches = card_hash_index.find(hash_id)
     filtered = matches
     if target_type:
         filtered = [m for m in matches if m[0] == target_type]
@@ -680,5 +793,6 @@ async def send_custom_card_single_by_id(
         return await bot.send((" " if at_sender else "") + msg, at_sender)
 
     t, other_char_id, path = filtered[0]
-    img = await convert_img(path)
+    trimmed = await _trim_card_file(path) if t == "card" else None
+    img = await convert_img(trimmed if trimmed is not None else path)
     await bot.send(img)

@@ -17,6 +17,9 @@ ANN_DATA_PATH = MAIN_PATH / "ann_data.json"
 # 用户数据保存文件
 PLAYER_PATH = MAIN_PATH / "players"
 
+# 抽卡记录备份目录（import/update/delete 三类备份均在此目录下，按 uid 分子目录）
+GACHA_BACKUP_PATH = MAIN_PATH / "backup"
+
 # 储存数据保存路径
 CACHE_PATH = MAIN_PATH / "cache"
 
@@ -72,6 +75,17 @@ CUSTOM_MR_CARD_PATH = MAIN_PATH / "custom_mr_role_pile"
 CUSTOM_MR_BG_PATH = MAIN_PATH / "custom_mr_bg"
 CUSTOM_ORB_PATH = MAIN_PATH / "custom_orb"
 
+# 三类自定义图 type → 根目录, 全插件唯一来源。
+# card_utils.CUSTOM_PATH_MAP / card_hash_index.TYPE_BASES / storage.TYPE_PATHS 都从这里读。
+CUSTOM_DIRS = {
+    "card": CUSTOM_CARD_PATH,
+    "bg": CUSTOM_MR_BG_PATH,
+    "stamina": CUSTOM_MR_CARD_PATH,
+}
+
+# 自定义图允许的后缀, 同样是单一来源。
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
 # 其他的素材
 OTHER_PATH = MAIN_PATH / "other"
 CALENDAR_PATH = OTHER_PATH / "calendar"
@@ -98,6 +112,7 @@ def init_dir():
     for i in [
         MAIN_PATH,
         PLAYER_PATH,
+        GACHA_BACKUP_PATH,
         RESOURCE_PATH,
         PHANTOM_PATH,
         MATERIAL_PATH,

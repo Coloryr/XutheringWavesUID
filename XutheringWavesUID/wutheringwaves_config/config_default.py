@@ -15,13 +15,13 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         True,
     ),
     "WavesAnnBBSSub": GsListStrConfig(
-        "库洛BBS订阅博主",
-        "库洛BBS订阅博主",
+        "库洛BBS订阅博主，需用网页版获取博主ID",
+        "库洛BBS订阅博主，需用网页版获取博主ID",
         [],
     ),
     "WavesRankUseTokenGroup": GsListStrConfig(
-        "有token才能进排行，群管理可设置",
-        "有token才能进排行，群管理可设置",
+        "是否登录才参与群排行，群管理可设置",
+        "是否登录才参与群排行，群管理可设置",
         [],
     ),
     "WavesRankNoLimitGroup": GsListStrConfig(
@@ -48,7 +48,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "WavesGuideMaxSize": GsIntConfig(
         "攻略图片最大大小(M)",
         "发送攻略图片前会自动转为jpg格式，若超过此大小则自动压缩，单位MB",
-        5,
+        2,
         50,
     ),
     "WavesLoginUrl": GsStrConfig(
@@ -58,17 +58,17 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "WavesLoginUrlSelf": GsBoolConfig(
         "强制【鸣潮登录url】为自己的域名",
-        "强制【鸣潮登录url】为自己的域名",
+        "外置登录服务请关闭；自己穿透或 VPS 反代请打开",
         False,
     ),
     "WavesTencentWord": GsBoolConfig(
-        "腾讯文档",
-        "腾讯文档",
+        "登录链接用腾讯文档重定向",
+        "登录链接用腾讯文档重定向",
         False,
     ),
     "WavesQRLogin": GsBoolConfig(
         "开启后，登录链接变成二维码",
-        "开启后，登录链接变成二维码",
+        "开启后，登录链接变成二维码，用浏览器扫描",
         False,
     ),
     "WavesLoginForward": GsBoolConfig(
@@ -77,18 +77,18 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         False,
     ),
     "WavesOnlySelfCk": GsBoolConfig(
-        "所有查询使用自己的ck",
-        "所有查询使用自己的ck",
+        "是否所有查询使用自己的登录",
+        "是否所有查询使用自己的登录，打开则仅绑定无法查询",
         False,
     ),
     "QQPicCache": GsBoolConfig(
         "排行榜qq头像缓存开关",
-        "排行榜qq头像缓存开关",
+        "排行榜qq头像缓存开关，占内存",
         False,
     ),
     "RankUseToken": GsBoolConfig(
-        "有token才能进排行",
-        "有token才能进排行",
+        "是否登录才能进群排行",
+        "是否登录才能进群排行，全局默认开关，群管理可设置覆盖",
         True,
     ),
     "GachaRankMin": GsIntConfig("抽卡排行最小抽数阈值", "抽卡排行中只显示总抽数达到此阈值的玩家", 1000),
@@ -98,20 +98,20 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         False,
     ),
     "ResourceDownloadTime": GsListStrConfig(
-        "自动资源更新时间设置 重启生效",
-        "每天自动下载全部资源时间设置（时，分），将在该时间点后一小时内随机时间下载资源，注意可能伴随重启，请避开自动签到",
+        "自动资源更新时间设置 重载生效",
+        "每天自动下载全部资源时间设置（时，分），将在该时间点后一小时内随机时间下载资源，注意可能伴随重载，请避开自动签到",
         ["22", "0"],
     ),
     "AnnMinuteCheck": GsIntConfig("公告推送时间检测（单位min）", "公告推送时间检测（单位min）", 10, 60),
     "RefreshInterval": GsIntConfig(
-        "刷新全部面板间隔，重启生效（单位秒）",
-        "刷新全部面板间隔，重启生效（单位秒）",
+        "刷新全部面板间隔，重载生效（单位秒）",
+        "刷新全部面板间隔，重载生效（单位秒）",
         0,
         600,
     ),
     "RefreshSingleCharInterval": GsIntConfig(
-        "刷新单角色面板间隔，重启生效（单位秒）",
-        "刷新单角色面板间隔，重启生效（单位秒）",
+        "刷新单角色面板间隔，重载生效（单位秒）",
+        "刷新单角色面板间隔，重载生效（单位秒）",
         0,
         600,
     ),
@@ -127,7 +127,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "HideUid": GsBoolConfig(
         "隐藏uid",
-        "隐藏uid",
+        "开启后，所有渲染卡片中显示的UID将以 前2位 + **** + 后2位 的形式显示",
         False,
     ),
     "RoleListQuery": GsBoolConfig(
@@ -138,7 +138,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "MaxBindNum": GsIntConfig("绑定特征码限制数量（未登录）", "绑定特征码限制数量（未登录）", 2, 100),
     "WavesToken": GsStrConfig(
         "鸣潮全排行token",
-        "鸣潮全排行token",
+        "鸣潮全排行token，绑定总排行上传获取和伤害计算",
         "",
     ),
     "AtCheck": GsBoolConfig(
@@ -153,8 +153,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         30,
     ),
     "KuroUrlProxyUrl": GsStrConfig(
-        "库洛域名代理（重启生效）",
-        "库洛域名代理（重启生效）",
+        "库洛域名代理（重载生效）",
+        "库洛域名代理（重载生效）",
         "",
     ),
     "LocalProxyUrl": GsStrConfig(
@@ -180,11 +180,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "UseGlobalSemaphore": GsBoolConfig(
         "开启后刷新角色面板并发数为全局共享",
         "开启后刷新角色面板并发数为全局共享",
-        False,
+        True,
     ),
     "CaptchaProvider": GsStrConfig(
-        "验证码提供方（重启生效）",
-        "验证码提供方（重启生效）",
+        "验证码提供方（暂时无用）",
+        "验证码提供方",
         "",
         options=["ttorc"],
     ),
@@ -216,7 +216,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         False,
     ),
     "RefreshSingleCharBehavior": GsStrConfig(
-        "刷新单角色面板逻辑",
+        "刷新单角色面板发送逻辑",
         "控制刷新单个角色面板后的行为：refresh_only(仅刷新)、refresh_and_send(刷新并合并发送)、refresh_and_send_separately(刷新并分别发送)、concatenate(拼接为一张图发送)",
         "concatenate",
         options=[
@@ -237,7 +237,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         True,
     ),
     "HelpExtraModules": GsListStrConfig(
-        "帮助显示额外模块（重启生效）",
+        "帮助显示额外模块（重载生效）",
         "在帮助中额外显示的模块：roversign(签到)、todayecho(梭哈)、scoreecho(评分)、roverreminder(体力推送)，需自行安装对应插件",
         [],
         ["roversign", "todayecho", "scoreecho", "roverreminder", "all"],
@@ -260,8 +260,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
         True,
     ),
     "UseHtmlRender": GsBoolConfig(
-        "使用HTML渲染",
-        "开启后将使用HTML渲染公告卡片，关闭后将回退到PIL或纯文本",
+        "使用HTML渲染，低配机器（1c2g以下）建议不开",
+        "开启后将使用HTML渲染公告卡片，关闭后将回退到PIL",
         True,
     ),
     "RemoteRenderEnable": GsBoolConfig(
@@ -281,8 +281,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "EnableLocalization": GsBoolConfig(
         "启用多语言本地化",
-        "启用后将加载多语言翻译字典到内存，用户可通过【设置语言】切换界面语言。关闭后不加载字典，节省内存",
-        False,
+        "启用后将加载多语言翻译字典到内存，用户可通过【设置语言】切换界面语言。",
+        True,
     ),
     "FontCssUrl": GsStrConfig(
         "外置渲染字体CSS地址",
@@ -301,7 +301,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     ),
     "WavesGachaWebPage": GsBoolConfig(
         "抽卡网页查看功能",
-        "开启后，用户可发送【抽卡页面/抽卡网页/网页抽卡记录】打开网页查看抽卡详细记录",
+        "开启后，用户可发送【抽卡页面/抽卡网页/网页抽卡记录】打开网页查看抽卡详细记录。外置登录需外置登录部署时支持此功能",
         False,
     ),
 }

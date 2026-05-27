@@ -1,6 +1,5 @@
 import re
 import json
-import time
 import shutil
 import asyncio
 from datetime import datetime
@@ -10,10 +9,17 @@ from gsuid_core.bot import Bot
 from gsuid_core.models import Event
 from gsuid_core.segment import MessageSegment
 from gsuid_core.data_store import get_res_path
+from gsuid_core.logger import logger
 
-from ..utils.cache import TimedCache
+from ..utils.single_flight import SingleFlightLock
+from ..utils.util import get_hide_uid_pref, hide_uid
 from .gacha_handler import fetch_mcgf_data, merge_gacha_data
-from .get_gachalogs import save_gachalogs, export_gachalogs, import_gachalogs
+from .get_gachalogs import (
+    save_gachalogs,
+    export_gachalogs,
+    import_gachalogs,
+    prune_gacha_backups,
+)
 from .draw_gachalogs import draw_card, draw_card_help
 from .web_view import (  # 导入即注册路由
     _is_feature_enabled as _gacha_web_enabled,
@@ -24,42 +30,72 @@ from ..utils.waves_api import waves_api
 from ..utils.error_reply import ERROR_CODE, WAVES_CODE_102, WAVES_CODE_103
 from ..utils.database.models import WavesBind
 from ..wutheringwaves_config import PREFIX
-from ..utils.resource.RESOURCE_PATH import PLAYER_PATH
+from ..utils.resource.RESOURCE_PATH import GACHA_BACKUP_PATH, PLAYER_PATH
 from ..wutheringwaves_rank.draw_gacha_rank_card import draw_gacha_rank_card
 
 sv_gacha_log = SV("waves抽卡记录")
 sv_gacha_help_log = SV("waves抽卡记录帮助")
 sv_gacha_rank = SV("waves抽卡排行", priority=0)
 sv_get_gachalog_by_link = SV("waves导入抽卡链接") # , area="DIRECT"
+sv_update_gacha_log = SV("waves更新抽卡记录")
 sv_import_gacha_log = SV("waves导入抽卡记录") # , area="DIRECT"
 sv_export_json_gacha_log = SV("waves导出抽卡记录")
 sv_delete_gacha_log = SV("waves删除抽卡记录")
 sv_delete_import_gacha_log = SV("waves删除抽卡导入", pm=0)
 sv_gacha_web = SV("waves抽卡网页")
 
-DATA_PATH = get_res_path()
-GACHA_BACKUP_PATH = DATA_PATH / "backup" / "gacha_backup"
-
 ERROR_MSG_NOTIFY = f"请给出正确的抽卡记录链接, 可发送【{PREFIX}抽卡帮助】"
 
-# 导入抽卡记录的冷却缓存（固定10秒）
-gacha_import_cache = TimedCache(timeout=10, maxsize=10000)
+
+def _migrate_legacy_gacha_backups():
+    """一次性把旧路径的抽卡备份迁移到 GACHA_BACKUP_PATH。"""
+    def _move(src, target_dir, dst_name):
+        target_dir.mkdir(parents=True, exist_ok=True)
+        dst = target_dir / dst_name
+        while dst.exists():
+            dst = target_dir / f"{dst.stem}_dup{dst.suffix}"
+        try:
+            shutil.move(str(src), str(dst))
+        except Exception as e:
+            logger.warning(f"[鸣潮·抽卡备份迁移] 移动失败 {src} -> {dst}: {e}")
+
+    # 旧路径1: data/backup/gacha_backup/{uid}/(gacha_logs*.json)  → delete 备份
+    legacy_delete_root = get_res_path() / "backup" / "gacha_backup"
+    if legacy_delete_root.exists():
+        for uid_dir in legacy_delete_root.iterdir():
+            if not uid_dir.is_dir():
+                continue
+            for src in uid_dir.glob("gacha_logs*.json"):
+                ts = datetime.fromtimestamp(src.stat().st_mtime).strftime("%Y-%m-%d.%H%M%S")
+                _move(src, GACHA_BACKUP_PATH / uid_dir.name, f"delete_gacha_logs_{ts}.json")
+            prune_gacha_backups(uid_dir.name, "delete")
+            try:
+                uid_dir.rmdir()
+            except OSError:
+                pass
+        try:
+            legacy_delete_root.rmdir()
+        except OSError:
+            pass
+
+    # 旧路径2: PLAYER_PATH/{uid}/{import|update}_gacha_logs_*.json
+    if PLAYER_PATH.exists():
+        for uid_dir in PLAYER_PATH.iterdir():
+            if not uid_dir.is_dir():
+                continue
+            for type_ in ("import", "update"):
+                moved = False
+                for src in uid_dir.glob(f"{type_}_gacha_logs_*.json"):
+                    _move(src, GACHA_BACKUP_PATH / uid_dir.name, src.name)
+                    moved = True
+                if moved:
+                    prune_gacha_backups(uid_dir.name, type_)
 
 
-def can_import_gacha(user_id: str, uid: str) -> int:
-    """检查是否可以导入抽卡记录，返回剩余冷却时间（秒），0表示可以导入"""
-    key = f"{user_id}_{uid}"
-    now = int(time.time())
-    time_stamp = gacha_import_cache.get(key)
-    if time_stamp and time_stamp > now:
-        return time_stamp - now
-    return 0
+_migrate_legacy_gacha_backups()
 
-
-def set_gacha_import_cache(user_id: str, uid: str):
-    """设置导入抽卡记录的缓存"""
-    key = f"{user_id}_{uid}"
-    gacha_import_cache.set(key, int(time.time()) + 10)
+# 导入抽卡记录的触发锁
+gacha_import_lock = SingleFlightLock()
 
 
 @sv_get_gachalog_by_link.on_command(("导入抽卡链接", "导入抽卡记录"), block=True)
@@ -69,97 +105,164 @@ async def get_gacha_log_by_link(bot: Bot, ev: Event):
     if not uid:
         return await bot.send(ERROR_CODE[WAVES_CODE_103])
 
-    # 检查冷却
-    remaining_time = can_import_gacha(ev.user_id, uid)
-    if remaining_time > 0:
+    user_pref = await get_hide_uid_pref(uid, ev.user_id, ev.bot_id)
+
+    if not gacha_import_lock.acquire(f"{ev.user_id}_{uid}"):
         return
+    try:
+        raw = ev.text.strip()
+        if not raw:
+            return await bot.send(ERROR_MSG_NOTIFY)
 
-    raw = ev.text.strip()
-    if not raw:
-        return await bot.send(ERROR_MSG_NOTIFY)
+        # 检查是否为9位UID，若是则尝试从工坊获取并合并数据
+        if raw.isdigit() and len(raw) == 9:
+            target_uid = raw
 
-    # 检查是否为9位UID，若是则尝试从工坊获取并合并数据
-    if raw.isdigit() and len(raw) == 9:
-        target_uid = raw
+            try:
+                latest_data = await fetch_mcgf_data(target_uid)
+                if not latest_data:
+                    return await bot.send("获取工坊数据失败或数据为空")
 
-        try:
-            latest_data = await fetch_mcgf_data(target_uid)
-            if not latest_data:
-                return await bot.send("获取工坊数据失败或数据为空")
+                export_res = await export_gachalogs(uid)
+                original_data = {"info": {}, "list": []}
 
-            export_res = await export_gachalogs(uid)
-            original_data = {"info": {}, "list": []}
+                if export_res["retcode"] == "ok":
+                    import aiofiles
 
-            if export_res["retcode"] == "ok":
-                import aiofiles
+                    async with aiofiles.open(export_res["url"], "r", encoding="utf-8") as f:
+                        original_data = json.loads(await f.read())
 
-                async with aiofiles.open(export_res["url"], "r", encoding="utf-8") as f:
-                    original_data = json.loads(await f.read())
+                if len(original_data.get("list", [])) == 0:
+                    return await bot.send("当前无抽卡记录，无法合并，请先用链接导入抽卡记录后再尝试合并！")
 
-            if len(original_data.get("list", [])) == 0:
-                return await bot.send("当前无抽卡记录，无法合并，请先用链接导入抽卡记录后再尝试合并！")
+                # 合并数据
+                if not original_data["info"].get("uid") == latest_data["data"].get("uid"):
+                    return await bot.send("导入数据UID与当前UID不匹配，无法合并！")
+                merged_data = await asyncio.to_thread(merge_gacha_data, original_data, latest_data)
 
-            # 合并数据
-            if not original_data["info"].get("uid") == latest_data["data"].get("uid"):
-                return await bot.send("导入数据UID与当前UID不匹配，无法合并！")
-            merged_data = await asyncio.to_thread(merge_gacha_data, original_data, latest_data)
+                # 导入合并后的数据
+                merged_json_str = json.dumps(merged_data, ensure_ascii=False)
+                im = await import_gachalogs(ev, merged_json_str, "json", uid, force_overwrite=True)
+                if im.startswith("🌱"):
+                    await bot.send("导入仅包含早于本地记录的部分，此后请使用链接导入更新数据，或删除抽卡记录后再次链接导入+合并！")
+                return await bot.send(im)
 
-            # 导入合并后的数据
-            merged_json_str = json.dumps(merged_data, ensure_ascii=False)
-            im = await import_gachalogs(ev, merged_json_str, "json", uid, force_overwrite=True)
-            await bot.send("导入仅包含早于本地记录的部分，此后请使用链接导入更新数据，或删除抽卡记录后再次链接导入+合并！")
-            return await bot.send(im)
+            except Exception as e:
+                logger.exception(f"[鸣潮·抽卡导入] 工坊合并失败 uid={uid}: {e}")
+                return await bot.send("处理过程中发生错误，请稍后重试")
 
-        except Exception as e:
-            return await bot.send(f"处理过程中发生错误: {e}")
-
-    text = re.sub(r'["\n\t ]+', "", raw)
-    if "https://" in text:
-        # 使用正则表达式匹配参数
-        match_record_id = re.search(r"record_id=([a-zA-Z0-9]+)", text)
-        match_player_id = re.search(r"player_id=(\d+)", text)
-    elif "{" in text:
-        match_record_id = re.search(r"recordId:([a-zA-Z0-9]+)", text)
-        match_player_id = re.search(r"playerId:(\d+)", text)
-    elif "recordId=" in text:
-        match_record_id = re.search(r"recordId=([a-zA-Z0-9]+)", text)
-        match_player_id = re.search(r"playerId=(\d+)", text)
-    else:
-        match_record_id = re.search(r"recordId=([a-zA-Z0-9]+)", "recordId=" + text)
-        match_player_id = ""
-
-    # 提取参数值
-    record_id = match_record_id.group(1) if match_record_id else None
-    player_id = match_player_id.group(1) if match_player_id else None
-
-    if not record_id or len(record_id) != 32:
-        return await bot.send(ERROR_MSG_NOTIFY)
-
-    if player_id and player_id != uid:
-        ERROR_MSG = f"请保证抽卡链接的特征码与当前正在使用的特征码一致\n\n请使用以下命令核查:\n{PREFIX}查看\n{PREFIX}切换{player_id}"
-        return await bot.send(ERROR_MSG)
-
-    is_force = False
-    if ev.command.startswith("强制"):
-        await bot.logger.info("[WARNING]本次为强制刷新")
-        is_force = True
-    await bot.send(f"UID{uid}开始执行[刷新抽卡记录],需要一定时间，请稍等!\n官方仅保存近180天抽卡记录，仅更新该部分。")
-    im = await save_gachalogs(ev, uid, record_id, is_force)
-
-    # 设置冷却缓存
-    set_gacha_import_cache(ev.user_id, uid)
-
-    if im.startswith("🌱"):
-        card_img = await draw_card(uid, ev)
-        if isinstance(card_img, str):
-            await bot.send(im)
+        text = re.sub(r'["\n\t ]+', "", raw)
+        if "https://" in text:
+            # 使用正则表达式匹配参数
+            match_record_id = re.search(r"record_id=([a-zA-Z0-9]+)", text)
+            match_player_id = re.search(r"player_id=(\d+)", text)
+        elif "{" in text:
+            match_record_id = re.search(r"recordId:([a-zA-Z0-9]+)", text)
+            match_player_id = re.search(r"playerId:(\d+)", text)
+        elif "recordId=" in text:
+            match_record_id = re.search(r"recordId=([a-zA-Z0-9]+)", text)
+            match_player_id = re.search(r"playerId=(\d+)", text)
         else:
-            await bot.send([im, MessageSegment.image(card_img)])
-    else:
-        await bot.send(im)
+            match_record_id = re.search(r"recordId=([a-zA-Z0-9]+)", "recordId=" + text)
+            match_player_id = ""
+
+        # 提取参数值
+        record_id = match_record_id.group(1) if match_record_id else None
+        player_id = match_player_id.group(1) if match_player_id else None
+
+        if not record_id or len(record_id) != 32:
+            return await bot.send(ERROR_MSG_NOTIFY)
+
+        if player_id and player_id != uid:
+            ERROR_MSG = f"请保证抽卡链接的特征码与当前正在使用的特征码一致\n\n请使用以下命令核查:\n{PREFIX}查看\n{PREFIX}切换{hide_uid(player_id, user_pref)}"
+            return await bot.send(ERROR_MSG)
+
+        is_force = False
+        if ev.command.startswith("强制"):
+            await bot.logger.info("[WARNING]本次为强制刷新")
+            is_force = True
+        await bot.send(f"UID{hide_uid(uid, user_pref)}开始执行[更新抽卡记录]，需要一定时间，请稍等!\n官方仅保存近180天抽卡记录，仅更新该部分。")
+        im = await save_gachalogs(ev, uid, record_id, is_force)
+
+        if im.startswith("🌱"):
+            card_img = await draw_card(uid, ev)
+            if isinstance(card_img, str):
+                await bot.send(im)
+            else:
+                await bot.send([im, MessageSegment.image(card_img)])
+        else:
+            await bot.send(im)
+    finally:
+        gacha_import_lock.release(f"{ev.user_id}_{uid}")
 
 
-@sv_gacha_log.on_fullmatch(("抽卡记录", "查看抽卡记录", "gacha", "ckjl"))
+async def pull_cloud_gacha(bot: Bot, ev: Event, uid: str, record_id: str):
+    """用 recordId 走导入抽卡记录链路，复用导入锁，直接发送 save_gachalogs 结果。"""
+    if not gacha_import_lock.acquire(f"{ev.user_id}_{uid}"):
+        return
+    try:
+        im = await save_gachalogs(ev, uid, record_id)
+        if im.startswith("🌱"):
+            card_img = await draw_card(uid, ev)
+            if isinstance(card_img, str):
+                await bot.send(im)
+            else:
+                await bot.send([im, MessageSegment.image(card_img)])
+        else:
+            await bot.send(im)
+    finally:
+        gacha_import_lock.release(f"{ev.user_id}_{uid}")
+
+
+@sv_update_gacha_log.on_fullmatch(("刷新抽卡记录", "更新抽卡记录", "刷新抽卡", "更新抽卡"), block=True)
+async def update_gacha_log_by_cloud(bot: Bot, ev: Event):
+    from ..utils.database.waves_gacha_cloud import WavesGachaCloud
+    from ..wutheringwaves_login.cloud_login import fetch_cloud_record_id
+
+    at_sender = True if ev.group_id else False
+
+    uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
+    if not uid:
+        return await bot.send(ERROR_CODE[WAVES_CODE_103])
+
+    user_pref = await get_hide_uid_pref(uid, ev.user_id, ev.bot_id)
+
+    record = await WavesGachaCloud.select_record(ev.user_id, ev.bot_id, uid)
+    if not record:
+        return await bot.send(
+            (" " if at_sender else "")
+            + f"当前绑定 UID{hide_uid(uid, user_pref)} 未找到云鸣潮登录记录\n"
+            + f"请确认已对该 UID 使用【{PREFIX}抽卡登录】",
+            at_sender=at_sender,
+        )
+
+    record_id = await fetch_cloud_record_id(ev.user_id, ev.bot_id, uid)
+    if not record_id:
+        return await bot.send(
+            (" " if at_sender else "")
+            + f"UID{hide_uid(uid, user_pref)} 云鸣潮登录已失效或请求出错\n"
+            + f"请稍后重试或重新使用【{PREFIX}抽卡登录】",
+            at_sender=at_sender,
+        )
+
+    await bot.send(
+        (" " if at_sender else "") + f"UID{hide_uid(uid, user_pref)} 正在更新抽卡记录，请稍候...",
+        at_sender=at_sender,
+    )
+    await pull_cloud_gacha(bot, ev, uid, record_id)
+
+
+@sv_gacha_log.on_fullmatch(
+    ("抽卡记录", "查看抽卡记录", "gacha", "ckjl"),
+    to_ai="""查询用户已导入的鸣潮抽卡记录统计图（各卡池总抽数、距离保底、出货历史、欧非指数等）。
+
+当用户问「我的抽卡 / 抽卡记录 / 出货怎样 / 多少保底了」时调用。需绑定 cookie + 已导入抽卡记录。
+若没有抽卡数据，AI 应告知用户先 `抽卡帮助` 看如何导入。
+
+Args:
+    text: 无需参数。
+""",
+)
 async def send_gacha_log_card_info(bot: Bot, ev: Event):
     await bot.logger.info("[鸣潮]开始执行 抽卡记录")
     uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
@@ -184,29 +287,25 @@ async def get_gacha_log_by_file(bot: Bot, ev: Event):
     # 没有uid 就别导了吧
     uid = await WavesBind.get_uid_by_game(ev.user_id, ev.bot_id)
     if not uid:
-        await bot.logger.info(f"[JSON导入抽卡] 用户 {ev.user_id} 未绑定UID，忽略此次导入")
+        await bot.logger.info(f"[鸣潮·JSON导入抽卡] 用户 {ev.user_id} 未绑定UID，忽略此次导入")
         return
     _, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
     if not ck:
-        await bot.logger.info(f"[JSON导入抽卡] 用户 {ev.user_id} (UID:{uid}) 未登录或Cookie失效，忽略此次导入")
+        await bot.logger.info(f"[鸣潮·JSON导入抽卡] 用户 {ev.user_id} (UID:{uid}) 未登录或Cookie失效，忽略此次导入。这是为了避免被别人绑定uid后上传json覆盖真实玩家的抽卡数据")
         return
 
-    # 检查冷却
-    remaining_time = can_import_gacha(ev.user_id, uid)
-    if remaining_time > 0:
+    if not gacha_import_lock.acquire(f"{ev.user_id}_{uid}"):
         return
-
-    if ev.file and ev.file_type:
-        # 误触就不说话了
-        # await bot.send("正在尝试导入抽卡记录中，请耐心等待……")
-        im = await import_gachalogs(ev, ev.file, ev.file_type, uid)
-
-        # 设置冷却缓存
-        set_gacha_import_cache(ev.user_id, uid)
-
-        return await bot.send(im)
-    else:
-        return await bot.send("导入抽卡记录异常...")
+    try:
+        if ev.file and ev.file_type:
+            # 误触就不说话了
+            # await bot.send("正在尝试导入抽卡记录中，请耐心等待……")
+            im = await import_gachalogs(ev, ev.file, ev.file_type, uid)
+            return await bot.send(im)
+        else:
+            return await bot.send("导入抽卡记录异常...")
+    finally:
+        gacha_import_lock.release(f"{ev.user_id}_{uid}")
 
 
 @sv_export_json_gacha_log.on_fullmatch(("导出抽卡记录"))
@@ -236,43 +335,47 @@ async def delete_gacha_history(bot: Bot, ev: Event):
         return await bot.send(f"请附带特征码，例如【{PREFIX}删除抽卡记录123456789】")
 
     is_self, ck = await waves_api.get_ck_result(uid, ev.user_id, ev.bot_id)
+    user_pref = await get_hide_uid_pref(uid, ev.user_id, ev.bot_id)
     if (not ck or not is_self) and not ev.user_pm == 0:
-        return await bot.send(f"UID{uid}未登录或Cookie失效，不允许删除抽卡记录")
+        return await bot.send(f"UID{hide_uid(uid, user_pref)}未登录或Cookie失效，不允许删除抽卡记录")
 
-    player_dir = PLAYER_PATH / uid
-    gacha_log_file = player_dir / "gacha_logs.json"
-    if not gacha_log_file.exists():
-        return await bot.send(f"UID{uid}暂无抽卡记录文件")
-
-    GACHA_BACKUP_PATH.mkdir(parents=True, exist_ok=True)
-    backup_dir = GACHA_BACKUP_PATH / uid
-    backup_dir.mkdir(parents=True, exist_ok=True)
-
-    dst_file = backup_dir / "gacha_logs.json"
-    if dst_file.exists():
-        dst_file = backup_dir / f"gacha_logs_{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.json"
-
+    if not gacha_import_lock.acquire(f"{ev.user_id}_{uid}"):
+        return await bot.send(f"UID{hide_uid(uid, user_pref)}抽卡导入正在进行，请稍后再试")
     try:
-        # 备份抽卡记录到 backup/gacha_backup/{uid}/ 目录
-        shutil.move(str(gacha_log_file), dst_file)
-    except Exception as e:
-        return await bot.send(f"移动抽卡记录失败：{e}")
+        player_dir = PLAYER_PATH / uid
+        gacha_log_file = player_dir / "gacha_logs.json"
+        if not gacha_log_file.exists():
+            return await bot.send(f"UID{hide_uid(uid, user_pref)}暂无抽卡记录文件")
 
-    await bot.send(f"UID{uid}抽卡记录已删除！")
+        backup_dir = GACHA_BACKUP_PATH / uid
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        dst_file = backup_dir / f"delete_gacha_logs_{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.json"
+
+        try:
+            shutil.move(str(gacha_log_file), dst_file)
+        except Exception as e:
+            logger.exception(f"[鸣潮·抽卡删除] 移动失败 uid={uid}: {e}")
+            return await bot.send("移动抽卡记录失败，请稍后重试")
+        prune_gacha_backups(uid, "delete")
+
+        await bot.send(f"UID{hide_uid(uid, user_pref)}抽卡记录已删除！")
+    finally:
+        gacha_import_lock.release(f"{ev.user_id}_{uid}")
 
 
 @sv_delete_import_gacha_log.on_command(("删除抽卡导入", "删除导入记录", "删除导入抽卡"), block=True)
 async def delete_import_gacha_files(bot: Bot, ev: Event):
     delete_count = 0
-    for player_dir in PLAYER_PATH.iterdir():
-        if not player_dir.is_dir():
-            continue
-        for file_path in player_dir.glob("import_gacha_logs_*.json"):
-            try:
-                file_path.unlink()
-                delete_count += 1
-            except Exception as e:
-                await bot.logger.warning(f"删除导入记录失败 {file_path}: {e}")
+    if GACHA_BACKUP_PATH.exists():
+        for uid_dir in GACHA_BACKUP_PATH.iterdir():
+            if not uid_dir.is_dir():
+                continue
+            for file_path in uid_dir.glob("import_gacha_logs_*.json"):
+                try:
+                    file_path.unlink()
+                    delete_count += 1
+                except Exception as e:
+                    await bot.logger.warning(f"删除导入记录失败 {file_path}: {e}")
 
     await bot.send(f"删除导入记录{delete_count}个")
 
@@ -280,6 +383,16 @@ async def delete_import_gacha_files(bot: Bot, ev: Event):
 @sv_gacha_rank.on_command(
     ("抽卡排行", "抽卡排名", "群抽卡排行", "群抽卡排名", "ckph", "ckpm"),
     block=True,
+    to_ai="""查询本群抽卡排行（要求在群聊中使用）。
+
+当用户在群聊问「群里谁最欧 / 抽卡排行欧 / 谁抽得最多」时调用。
+text 可附筛选: "欧" (按5星出货数) / "非" (按歪4星比例) / "抽数" (按总抽数)。
+
+私聊调用会被拒绝。
+
+Args:
+    text: 可选 "欧" / "非" / "抽数"，留空默认按抽数。
+""",
 )
 async def send_gacha_rank_info(bot: Bot, ev: Event):
     if not ev.group_id:
@@ -299,11 +412,13 @@ async def send_gacha_web_link(bot: Bot, ev: Event):
     if not uid:
         return await bot.send(ERROR_CODE[WAVES_CODE_103])
 
+    user_pref = await get_hide_uid_pref(uid, ev.user_id, ev.bot_id)
+
     url, msg = await make_gacha_web_url(uid, ev)
     if not url:
         return await bot.send(msg)
 
-    title = f"[鸣潮] UID{uid} 的抽卡记录网页"
+    title = f"[鸣潮] UID{hide_uid(uid, user_pref)} 的抽卡记录网页"
     expire = "该链接 10 分钟内有效，过期后请重新发送指令。"
     if not ev.group_id and ev.bot_id == "onebot":
         # 私聊+onebot 不支持转发节点，回退为多行单条

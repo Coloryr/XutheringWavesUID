@@ -18,7 +18,17 @@ from .draw_role_info import draw_role_img
 waves_role_info = SV("waves查询信息")
 
 
-@waves_role_info.on_fullmatch(("查询", "卡片", "kp"), block=True)
+@waves_role_info.on_fullmatch(
+    ("查询", "卡片", "kp"),
+    block=True,
+    to_ai="""查询自己的鸣潮账号总览卡片（等级 / 活跃天数 / 已激活角色数 / 探索进度等基本信息）。
+
+当用户问「我账号怎样 / 卡片 / 看下我的总览」时调用。需绑定 cookie。
+
+Args:
+    text: 无需参数，留空即可。
+""",
+)
 async def send_role_info(bot: Bot, ev: Event):
     if check_request_rate_limit():
         return hint.error_reply(WAVES_CODE_108)

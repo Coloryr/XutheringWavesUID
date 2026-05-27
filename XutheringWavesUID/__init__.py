@@ -16,8 +16,13 @@ from gsuid_core.data_store import get_res_path
 if "XutheringWavesUID" not in SL.plugins:
     Plugins(name="XutheringWavesUID", force_prefix=["ww"], allow_empty_prefix=False)
 
+# 扩展(.pyd/.so)被 import 前先落盘新构建; Windows 下 .pyd 加载后锁定无法替换
+from .utils.download_utils import copy_build_files
+copy_build_files()
+
 # 安装 Bot 消息发送 Hook
 from .utils.bot_send_hook import install_bot_hooks
+from .utils.database.models import WavesUser
 from .utils.database.waves_subscribe import WavesSubscribe
 from .utils.database.waves_user_activity import WavesUserActivity
 from .utils.database.waves_user_sdk import WavesUserSdk  # noqa: F401
@@ -25,7 +30,8 @@ from .utils.plugin_checker import is_from_waves_plugin
 
 # ===== 活跃度批量写入缓冲 =====
 # 内存中暂存活跃度记录，定时批量写入，避免高并发写入损坏数据库
-_activity_buffer: dict[str, tuple[str, str, str]] = {}  # key -> (user_id, bot_id, bot_self_id)
+# value: (user_id, bot_id, bot_self_id, sender_avatar)
+_activity_buffer: dict[str, tuple[str, str, str, str]] = {}
 _FLUSH_INTERVAL = 60  # 秒
 
 
@@ -36,11 +42,16 @@ async def _flush_activity_buffer():
     pending = dict(_activity_buffer)
     _activity_buffer.clear()
 
-    for key, (user_id, bot_id, bot_self_id) in pending.items():
+    for key, (user_id, bot_id, bot_self_id, sender_avatar) in pending.items():
         try:
             await WavesUserActivity.update_user_activity(user_id, bot_id, bot_self_id)
         except Exception as e:
             logger.warning(f"[XutheringWavesUID] 批量活跃度写入失败: {e}")
+        if sender_avatar:
+            try:
+                await WavesUser.update_avatar_url(user_id, bot_id, sender_avatar)
+            except Exception as e:
+                logger.warning(f"[XutheringWavesUID] 头像更新失败: {e}")
 
 
 _shutdown_event = asyncio.Event()
@@ -89,7 +100,12 @@ async def waves_bot_check_hook(group_id: str, bot_self_id: str):
             logger.warning(f"[XutheringWavesUID] Bot检测失败: {e}")
 
 # 注册用户活跃度 hook
-async def waves_user_activity_hook(user_id: str, bot_id: str, bot_self_id: str):
+async def waves_user_activity_hook(
+    user_id: str,
+    bot_id: str,
+    bot_self_id: str,
+    sender_avatar: str = "",
+):
     """XutheringWavesUID 的用户活跃度 hook
 
     只记录由本插件触发的消息的用户活跃度
@@ -101,8 +117,13 @@ async def waves_user_activity_hook(user_id: str, bot_id: str, bot_self_id: str):
     if not user_id:
         return
 
-    # 写入缓冲区（同一用户只保留最新一条，自动去重）
-    _activity_buffer[f"{user_id}:{bot_id}:{bot_self_id}"] = (user_id, bot_id, bot_self_id)
+    key = f"{user_id}:{bot_id}:{bot_self_id}"
+    # 同一刷写周期内空头像不应覆盖已缓存的非空值
+    if not sender_avatar:
+        existing = _activity_buffer.get(key)
+        if existing:
+            sender_avatar = existing[3]
+    _activity_buffer[key] = (user_id, bot_id, bot_self_id, sender_avatar)
 
 # 安装 hooks 并注册
 install_bot_hooks()
@@ -116,6 +137,13 @@ logger.debug("[XutheringWavesUID] 用户活跃度 hook 已注册")
 # 初始化本地化
 from .utils.localization import init_localization
 init_localization()
+
+# 构建自定义图 hash 索引 (面板/背景/体力), 用于 hash → 路径 O(1) 查询。
+try:
+    from .wutheringwaves_charinfo.card_hash_index import build as _build_card_hash_index
+    _build_card_hash_index()
+except Exception as _e:
+    logger.warning(f"[XutheringWavesUID] 自定义图 hash 索引构建失败: {_e}")
 
 
 # 迁移: 删除旧的 login_cache.db (已重命名为 url_cache.db)

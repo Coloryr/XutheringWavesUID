@@ -27,6 +27,7 @@ from ..utils.fonts.waves_fonts import (
 )
 from .period import get_slash_period_number
 from ..utils.hint import error_reply
+from ..utils.util import hide_uid, get_hide_uid_pref
 from ..utils.waves_api import waves_api
 from ..utils.error_reply import WAVES_CODE_102
 from ..utils.api.model import (
@@ -79,6 +80,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
         if not ck:
             return error_reply(WAVES_CODE_102)
+        user_pref = await get_hide_uid_pref(uid, user_id, ev.bot_id)
 
         command = ev.command
         text = ev.text.strip()
@@ -166,8 +168,11 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
 
                 # 加载分数背景
                 rank = challenge.get_rank()
-                score_bg = Image.open(TEXT_PATH / f"score_{rank}.png")
-                score_bg_url = pil_to_b64(score_bg, quality=75)
+                if rank:
+                    score_bg = Image.open(TEXT_PATH / f"score_{rank}.png")
+                    score_bg_url = pil_to_b64(score_bg, quality=75)
+                else:
+                    score_bg_url = ""
 
                 # 构建半场数据
                 half_list = []
@@ -256,7 +261,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
 
         context = {
             "user_name": account_info.name,
-            "user_id": account_info.id,
+            "user_id": hide_uid(account_info.id, user_pref=user_pref),
             "level": account_info.level,
             "world_level": account_info.worldLevel,
             "show_stats": account_info.is_full,
@@ -270,9 +275,13 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
             "chain_colors": chain_colors,
         }
 
+        sender_avatar = (ev.sender or {}).get("avatar") or ""
+        if not (isinstance(sender_avatar, str) and sender_avatar.startswith(("http://", "https://"))):
+            sender_avatar = ""
+
         # 保存和上传记录
         await save_slash_record(uid, slash_detail)
-        await upload_slash_record(is_self_ck, uid, slash_detail)
+        await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar)
 
         logger.debug("[鸣潮] 准备通过HTML渲染冥海卡片")
         img_bytes = await render_html(waves_templates, "abyss/slash_card.html", context)

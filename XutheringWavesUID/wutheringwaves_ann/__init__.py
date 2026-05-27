@@ -9,31 +9,110 @@ from gsuid_core.aps import scheduler
 from gsuid_core.bot import Bot
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
+from gsuid_core.server import on_core_start
 from gsuid_core.subscribe import gs_subscribe
 
 from .ann_card import ann_list_card, ann_detail_card
-from .data_review_card import data_review_card
+from .anniv_report import anniv_report
+from ..utils.single_flight import SingleFlightLock
 from ..utils.waves_api import waves_api
 from ..utils.limit_request import check_request_rate_limit
 from ..utils.hint import error_reply
 from ..utils.at_help import ruser_id
 from ..utils.error_reply import WAVES_CODE_102
-from ..utils.database.models import WavesBind
+from ..utils.constants import WAVES_GAME_ID
+from ..utils.database.models import WavesBind, WavesUser
+from ..utils.database.waves_user_sdk import WavesUserSdk
 from ..wutheringwaves_config import WutheringWavesConfig
 from ..wutheringwaves_config.ann_config import get_ann_new_ids, set_ann_new_ids
 from ..utils.resource.RESOURCE_PATH import ANN_CARD_PATH, BAKE_PATH, CALENDAR_PATH, WIKI_CACHE_PATH
+from ..wutheringwaves_resource.panel_editor.storage import PANEL_EDIT_TMP
 from ..utils.database.waves_subscribe import WavesSubscribe
 
 sv_ann = SV("鸣潮公告")
 sv_ann_clear_cache = SV("鸣潮公告缓存清理", pm=0, priority=3)
 sv_ann_sub = SV("订阅鸣潮公告", pm=3)
-# sv_data_review = SV("鸣潮年度报告")
+sv_anniv_report = SV("鸣潮周年庆")
 
 task_name_ann = "订阅鸣潮公告"
 ann_minute_check: int = WutheringWavesConfig.get_config("AnnMinuteCheck").data
+ann_push_tasks: set[asyncio.Task] = set()
+ANN_PUSH_CONCURRENCY = 4
+
+# 周年报告触发锁
+anniv_report_lock = SingleFlightLock()
 
 
-@sv_ann.on_command("公告")
+async def _send_ann_to_one_subscribe(subscribe, img, ann_id, semaphore: asyncio.Semaphore) -> bool:
+    async with semaphore:
+        try:
+            await asyncio.sleep(random.uniform(0.2, 1.2))
+            await subscribe.send(img)  # type: ignore
+            return True
+        except Exception as e:
+            target_id = subscribe.group_id or subscribe.user_id
+            logger.exception(
+                f"[鸣潮公告] 公告 {ann_id} 推送到订阅 {target_id} 失败: {e}"
+            )
+            return False
+
+
+async def _push_new_announcements(new_ann_need_send, datas) -> None:
+    logger.info(
+        f"[鸣潮公告] 后台推送开始: 公告数={len(new_ann_need_send)}, 订阅数={len(datas)}"
+    )
+    semaphore = asyncio.Semaphore(ANN_PUSH_CONCURRENCY)
+
+    for ann_id in new_ann_need_send:
+        try:
+            img = await ann_detail_card(ann_id, is_check_time=True)
+            if isinstance(img, str):
+                logger.info(f"[鸣潮公告] 公告 {ann_id} 跳过推送: {img}")
+                continue
+
+            results = await asyncio.gather(
+                *[
+                    _send_ann_to_one_subscribe(subscribe, img, ann_id, semaphore)
+                    for subscribe in datas
+                ]
+            )
+            success_count = sum(1 for result in results if result is True)
+            logger.info(
+                f"[鸣潮公告] 公告 {ann_id} 推送完成: {success_count}/{len(datas)}"
+            )
+        except Exception as e:
+            logger.exception(f"[鸣潮公告] 公告 {ann_id} 后台推送失败: {e}")
+
+    logger.info("[鸣潮公告] 推送完毕")
+
+
+def _create_ann_push_task(new_ann_need_send, datas) -> None:
+    task = asyncio.create_task(_push_new_announcements(list(new_ann_need_send), list(datas)))
+    ann_push_tasks.add(task)
+
+    def _on_done(done_task: asyncio.Task) -> None:
+        ann_push_tasks.discard(done_task)
+        try:
+            done_task.result()
+        except Exception as e:
+            logger.exception(f"[鸣潮公告] 后台推送任务异常: {e}")
+
+    task.add_done_callback(_on_done)
+
+
+@sv_ann.on_command(
+    "公告",
+    to_ai="""查询鸣潮游戏公告。
+
+无参数: 列出当前公告索引列表（图）。
+text 是 "#<id>": 查看指定公告全文。例: text="#1456"。
+
+当用户问「最新公告 / 鸣潮公告 / 看下公告」时调用列表；用户给具体编号时查明细。
+
+Args:
+    text: 留空查公告列表；或 "#<公告ID>" 查指定公告明细。例: "#1456"。
+""",
+)
 async def ann_(bot: Bot, ev: Event):
     ann_id = ev.text
     if not ann_id or ann_id.strip() == "列表":
@@ -67,29 +146,72 @@ async def ann_(bot: Bot, ev: Event):
     return await bot.send(img)  # type: ignore
 
 
-# @sv_data_review.on_fullmatch(("时光机", "年度报告", "年报"), block=True)
-# async def data_review_(bot: Bot, ev: Event):
-#     """查询库街区年度报告"""
-#     logger.info("[鸣潮]开始执行[年度报告]")
-#     user_id = ruser_id(ev)
-#     uid = await WavesBind.get_uid_by_game(user_id, ev.bot_id)
-#     if not uid:
-#         return await bot.send(error_reply(WAVES_CODE_102))
-#
-#     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
-#     if not ck or not is_self_ck:
-#         return await bot.send(error_reply(WAVES_CODE_102))
-#
-#     im = await data_review_card(ck)
-#     if im:
-#         await bot.send(im)
+@sv_anniv_report.on_fullmatch(("周年庆", "周年报", "周年回顾"), block=True)
+async def anniv_report_(bot: Bot, ev: Event):
+    """查询鸣潮 2 周年《探秘！记忆程序》报告"""
+    logger.info("[鸣潮]开始执行[周年庆]")
+    user_id = ruser_id(ev)
+    uid = await WavesBind.get_uid_by_game(user_id, ev.bot_id)
+    if not uid:
+        return await bot.send(error_reply(WAVES_CODE_102))
+
+    if not anniv_report_lock.acquire(f"{user_id}_{uid}"):
+        return
+    try:
+        waves_token = WutheringWavesConfig.get_config("WavesToken").data
+        if not waves_token:
+            return await bot.send("未配置 WavesToken（总排行 token），请先在配置中填写")
+
+        waves_user = await WavesUser.select_waves_user(
+            uid, user_id, ev.bot_id, game_id=WAVES_GAME_ID
+        )
+        if not waves_user or not waves_user.cookie:
+            return await bot.send(error_reply(WAVES_CODE_102))
+
+        result = await anniv_report(
+            uid,
+            waves_token,
+            waves_user.cookie,
+            waves_user.did or "",
+        )
+        if isinstance(result, str):
+            return await bot.send(result)
+        if result.new_token or result.new_bat:
+            update_data = {"status": ""}
+            if result.new_token:
+                update_data["cookie"] = result.new_token
+            if result.new_bat:
+                update_data["bat"] = result.new_bat
+            if waves_user.did:
+                update_data["did"] = waves_user.did
+            await WavesUser.update_data_by_data(
+                select_data={
+                    "user_id": user_id,
+                    "bot_id": ev.bot_id,
+                    "uid": uid,
+                    "game_id": WAVES_GAME_ID,
+                },
+                update_data=update_data,
+            )
+            if result.bat_expires_in > 0:
+                await WavesUserSdk.update_bat_expires_at(
+                    user_id,
+                    ev.bot_id,
+                    uid,
+                    int(time.time()) + result.bat_expires_in,
+                )
+        from base64 import b64encode
+        from gsuid_core.segment import MessageSegment
+        nodes = [f"base64://{b64encode(p).decode()}" for p in result.parts]
+        if ev.group_id:
+            await bot.send(" 周年报告已完成", at_sender=True)
+        await bot.send(MessageSegment.node(nodes))
+    finally:
+        anniv_report_lock.release(f"{user_id}_{uid}")
 
 
 @sv_ann_sub.on_fullmatch(("订阅公告", "訂閱公告"))
 async def sub_ann_(bot: Bot, ev: Event):
-    if ev.bot_id != "onebot" and ev.bot_id != "feishu" and ev.bot_id != "lark":
-        logger.debug(f"非onebot/feishu/lark禁止订阅鸣潮公告 【{ev.bot_id}】")
-        return
 
     if ev.group_id is None:
         return await bot.send("请在群聊中订阅")
@@ -126,9 +248,6 @@ async def sub_ann_(bot: Bot, ev: Event):
 
 @sv_ann_sub.on_fullmatch(("取消订阅公告", "取消公告", "退订公告", "取消訂閱公告", "退訂公告"))
 async def unsub_ann_(bot: Bot, ev: Event):
-    if ev.bot_id != "onebot" and ev.bot_id != "feishu" and ev.bot_id != "lark":
-        logger.debug(f"非onebot禁止订阅鸣潮公告 【{ev.bot_id}】")
-        return
 
     if ev.group_id is None:
         return await bot.send("请在群聊中取消订阅")
@@ -186,18 +305,8 @@ async def check_waves_ann_state():
     save_ids = sorted(ids, reverse=True) + new_ann_ids
     set_ann_new_ids(list(set(save_ids)))
 
-    for ann_id in new_ann_need_send:
-        try:
-            img = await ann_detail_card(ann_id, is_check_time=True)
-            if isinstance(img, str):
-                continue
-            for subscribe in datas:
-                await subscribe.send(img)  # type: ignore
-                await asyncio.sleep(random.uniform(1, 3))
-        except Exception as e:
-            logger.exception(e)
-
-    logger.info("[鸣潮公告] 推送完毕")
+    _create_ann_push_task(new_ann_need_send, datas)
+    logger.info("[鸣潮公告] 已创建后台推送任务")
 
 
 def clean_old_cache_files(directory: Path, days: int) -> tuple[int, float]:
@@ -302,6 +411,15 @@ async def clean_cache_directories(days: int) -> str:
         total_count += bake_count
         total_space += bake_space / 1024 / 1024
 
+    # 面板编辑临时目录（无条件全清，不计入统计）
+    if PANEL_EDIT_TMP.exists():
+        for f in PANEL_EDIT_TMP.iterdir():
+            if f.is_file():
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+
     if total_count == 0:
         return f"没有找到需要清理的缓存文件(公告/日历/烘焙保留{days}天内的文件，wiki全部删除)"
 
@@ -314,7 +432,7 @@ async def clean_cache_directories(days: int) -> str:
 async def clean_cache_(bot: Bot, ev: Event):
     """手动清理缓存指令"""
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data
-    logger.info(f"[缓存清理] 手动触发清理，保留{days}天内的文件")
+    logger.info(f"[鸣潮·缓存清理] 手动触发清理，保留{days}天内的文件")
 
     result = await clean_cache_directories(days)
     await bot.send(result)
@@ -324,22 +442,22 @@ async def clean_cache_(bot: Bot, ev: Event):
 async def waves_auto_clean_cache_daily():
     """每天凌晨3点自动清理缓存"""
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data
-    logger.info(f"[缓存清理] 定时任务: 开始清理缓存，保留{days}天内的文件")
+    logger.info(f"[鸣潮·缓存清理] 定时任务: 开始清理缓存，保留{days}天内的文件")
 
     result = await clean_cache_directories(days)
-    logger.info(f"[缓存清理] {result}")
+    logger.info(f"[鸣潮·缓存清理] {result}")
 
 
-@scheduler.scheduled_job("date")
+@on_core_start
 async def waves_clean_cache_on_startup():
     """启动时清理一次缓存"""
     await asyncio.sleep(5)
 
     days = WutheringWavesConfig.get_config("CacheDaysToKeep").data
-    logger.info(f"[缓存清理] 启动时清理，保留{days}天内的文件")
+    logger.info(f"[鸣潮·缓存清理] 启动时清理，保留{days}天内的文件")
 
     result = await clean_cache_directories(days)
-    logger.info(f"[缓存清理] {result}")
+    logger.info(f"[鸣潮·缓存清理] {result}")
 
 
 def migrate_ann_config_to_json():

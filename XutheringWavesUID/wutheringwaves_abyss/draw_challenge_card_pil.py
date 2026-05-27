@@ -9,6 +9,7 @@ from gsuid_core.models import Event
 from gsuid_core.utils.image.convert import convert_img
 
 from ..utils.hint import error_reply
+from ..utils.util import hide_uid, get_hide_uid_pref
 from ..utils.image import (
     GOLD,
     GREY,
@@ -41,10 +42,12 @@ ERROR_OPEN = "您未打开库街区[全息挑战]的对外展示"
 ERROR_NO_CHALLENGE = "您未通关任何全息战略"
 
 
+# TODO: PIL 卸到线程池 (挑战/角色双层循环里 await draw_pic / pic_download_from_url 等)
 async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]:
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return error_reply(WAVES_CODE_102)
+    user_pref = await get_hide_uid_pref(uid, user_id, ev.bot_id)
 
     # 全息数据
     challenge_data = await waves_api.get_challenge_data(uid, ck)
@@ -82,7 +85,7 @@ async def draw_challenge_img(ev: Event, uid: str, user_id: str) -> Union[bytes, 
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
+    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
     card_img.paste(base_info_bg, (15, 20), base_info_bg)
 
     # 头像 头像环

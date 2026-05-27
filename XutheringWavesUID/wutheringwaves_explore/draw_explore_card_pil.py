@@ -6,10 +6,12 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 from gsuid_core.models import Event
+from gsuid_core.pool import to_thread
 from gsuid_core.utils.image.utils import sget
 from gsuid_core.utils.image.convert import convert_img
 
 from ..utils import hint
+from ..utils.util import get_hide_uid_pref, hide_uid
 from ..utils.image import (
     GOLD,
     GREY,
@@ -81,10 +83,28 @@ def get_progress_color(progress):
     return result
 
 
+def _change_color_sync(chain, color, w=None, h=None):
+    pixels = chain.load()
+    if w is None:
+        w = chain.size[0]
+    if h is None:
+        h = chain.size[1]
+    if not isinstance(h, int) or not isinstance(w, int):
+        return chain
+    if len(color) == 4:
+        color = color[:3]
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = pixels[x, y]
+            pixels[x, y] = color + (a,)
+    return chain
+
+
 async def draw_explore_img(ev: Event, uid: str, user_id: str):
     is_self_ck, ck = await waves_api.get_ck_result(uid, user_id, ev.bot_id)
     if not ck:
         return hint.error_reply(WAVES_CODE_102)
+    user_pref = await get_hide_uid_pref(uid, user_id, ev.bot_id)
     # 账户数据
     account_info = await waves_api.get_base_info(uid, ck)
     if not account_info.success:
@@ -115,10 +135,49 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
         if _explore.areaInfoList:
             h += math.ceil(len(_explore.areaInfoList) / 3) * explore_frame_h
 
-    img = get_waves_bg(2000, h, "bg3")
-
     # 头像部分
     avatar, avatar_ring = await draw_pic_with_ring(ev)
+
+    # 预取每个大区图标
+    country_icons = []
+    for _explore in explore_data.exploreList[::-1]:
+        try:
+            country_icons.append(
+                Image.open(BytesIO((await sget(_explore.country.homePageIcon)).content)).convert("RGBA")
+            )
+        except Exception:
+            country_icons.append(None)
+
+    img = await _compose_explore_img(
+        h,
+        base_info_h,
+        explore_title_h,
+        explore_frame_h,
+        account_info,
+        explore_data,
+        avatar,
+        avatar_ring,
+        country_icons,
+        user_pref,
+    )
+    img = await convert_img(img)
+    return img
+
+
+@to_thread
+def _compose_explore_img(
+    h,
+    base_info_h,
+    explore_title_h,
+    explore_frame_h,
+    account_info,
+    explore_data,
+    avatar,
+    avatar_ring,
+    country_icons,
+    user_pref,
+) -> Image.Image:
+    img = get_waves_bg(2000, h, "bg3")
     img.paste(avatar, (85, 70), avatar)
     img.paste(avatar_ring, (95, 80), avatar_ring)
 
@@ -126,7 +185,13 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {account_info.id}", GOLD, waves_font_25, "lm")
+    base_info_draw.text(
+        (226, 173),
+        f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}",
+        GOLD,
+        waves_font_25,
+        "lm",
+    )
     img.paste(base_info_bg, (75, 20), base_info_bg)
 
     # 账号基本信息，由于可能会没有，放在一起
@@ -149,10 +214,11 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
     for mi, _explore in enumerate(explore_data.exploreList[::-1]):
         _explore: ExploreArea
         _explore_title = explore_title.copy()
-        _explore_title = await change_color(_explore_title, country_color_map.get(_explore.country.countryName, YELLOW))
+        _explore_title = _change_color_sync(_explore_title, country_color_map.get(_explore.country.countryName, YELLOW))
         # 大区域探索度
-        content_img = Image.open(BytesIO((await sget(_explore.country.homePageIcon)).content)).convert("RGBA")
-        _explore_title.alpha_composite(content_img, (150, 30))
+        content_img = country_icons[mi] if mi < len(country_icons) else None
+        if content_img is not None:
+            _explore_title.alpha_composite(content_img, (150, 30))
         _explore_title_draw = ImageDraw.Draw(_explore_title)
         _explore_title_draw.text((370, 100), f"{_explore.country.countryName}", "white", waves_font_42, "lm")
         _explore_title_draw.text(
@@ -170,7 +236,7 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
         for ni, _subArea in enumerate(_explore.areaInfoList or []):
             _subArea: AreaInfo
             _explore_frame = explore_frame.copy()
-            _explore_frame = await change_color(_explore_frame, get_progress_color(_subArea.areaProgress), h=83)
+            _explore_frame = _change_color_sync(_explore_frame, get_progress_color(_subArea.areaProgress), h=83)
             _explore_frame_draw = ImageDraw.Draw(_explore_frame)
 
             _explore_frame_draw.text((30, 50), f"{_subArea.areaName}", "white", waves_font_36, "lm")
@@ -229,5 +295,4 @@ async def draw_explore_img(ev: Event, uid: str, user_id: str):
         hi += math.ceil(len(_explore.areaInfoList or []) / 3) * explore_frame_h + explore_title_h
 
     img = add_footer(img)
-    img = await convert_img(img)
     return img

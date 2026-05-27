@@ -17,11 +17,20 @@ invalid_code_list = ("MINGCHAO",)
 url = "https://newsimg.5054399.com/comm/mlcxqcommon/static/wap/js/data_102.js?{}&callback=?&_={}"
 
 
-@sv_waves_code.on_fullmatch(("code", "兑换码", "兌換碼"))
+@sv_waves_code.on_fullmatch(
+    ("code", "兑换码", "兌換碼"),
+    to_ai="""查询鸣潮当前所有可用的兑换码 + 奖励内容 + 过期时间。
+
+当用户问「有什么兑换码 / 前瞻兑换码」时调用。不需要绑定。
+
+Args:
+    text: 无需参数，留空即可。
+""",
+)
 async def get_sign_func(bot: Bot, ev: Event):
     code_list = await get_code_list()
     if not code_list:
-        return await bot.send("[获取兑换码失败] 请稍后再试")
+        return await bot.send("[鸣潮·获取兑换码失败] 请稍后再试")
 
     msgs = []
     for code in code_list:
@@ -48,11 +57,11 @@ async def get_code_list():
         async with httpx.AsyncClient(timeout=None) as client:
             res = await client.get(new_url, timeout=10)
             json_data = res.text.split("=", 1)[1].strip().rstrip(";")
-            logger.debug(f"[获取兑换码] url:{new_url}, codeList:{json_data}")
+            logger.debug(f"[鸣潮·获取兑换码] url:{new_url}, codeList:{json_data}")
             return json.loads(json_data)
 
     except Exception as e:
-        logger.exception("[获取兑换码失败] ", e)
+        logger.exception("[鸣潮·获取兑换码失败] ", e)
         return
 
 
