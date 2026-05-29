@@ -49,6 +49,6 @@ if _LIBC is not None:
     except Exception as e:
         logger.debug(f"[鸣潮·内存] mallopt 调参跳过: {e}")
 
-    @scheduler.scheduled_job("interval", minutes=10, id="waves_malloc_trim", replace_existing=True)
+    @scheduler.scheduled_job("interval", minutes=10, id="waves_malloc_trim")
     async def _waves_periodic_malloc_trim():
         await asyncio.get_running_loop().run_in_executor(None, malloc_trim)
