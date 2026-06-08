@@ -45,6 +45,12 @@ _register({
         "jp": "千の扉",
         "kr": "수많은 문",
     },
+    "周度游历": {
+        "cht": "週度遊歷",
+        "en": "Weekly Journey",
+        "jp": "週度の遊歴",
+        "kr": "주간 유람",
+    },
     "逆境深塔": {
         "cht": "逆境深塔",
         "en": "Tower of Adversity",
