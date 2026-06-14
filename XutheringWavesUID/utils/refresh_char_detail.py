@@ -37,6 +37,35 @@ async def refresh_lock(uid: str, scope: str):
 
 from ..utils.limit_request import check_request_rate_limit
 
+def schedule_silent_diff_refresh(
+    ev: Event,
+    uid: str,
+    user_id: str,
+    ck: str,
+    is_self_ck: bool,
+    is_self: bool,
+    role_ids: List[int],
+):
+    """后台静默补全本地缺失角色面板, 走正常保存+上传链路"""
+
+    async def _silent_refresh():
+        try:
+            async with refresh_lock(uid, "single"):
+                await refresh_char(
+                    ev, uid, user_id, ck=ck,
+                    is_self_ck=is_self_ck,
+                    refresh_type=[str(rid) for rid in role_ids],
+                    is_self=is_self,
+                    is_silent_diff=True,
+                )
+        except Exception as e:
+            logger.warning(f"[鸣潮·角色状态] 静默补全刷新失败 uid={uid}: {e}")
+
+    task = asyncio.create_task(_silent_refresh())
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
+
+
 async def save_base_info_cache(uid: str, account_info: _AccountBaseInfo):
     """将账户基本信息（世界等级等）缓存到文件"""
     _dir = PLAYER_PATH / uid
@@ -369,6 +398,7 @@ async def refresh_char(
     is_self_ck: bool = False,
     refresh_type: Union[str, List[str]] = "all",
     is_self: bool = True,
+    is_silent_diff: bool = False,
 ) -> Union[str, List]:
     if check_request_rate_limit():
         return error_reply(WAVES_CODE_108)
@@ -399,7 +429,8 @@ async def refresh_char(
         elif str(refresh_type).isdigit():
             request_role_ids = [int(refresh_type)]
 
-    if request_role_ids:
+    silent_diff_ids: List[int] = []
+    if request_role_ids and not is_silent_diff:
         local_roles = await get_all_roleid_detail_info_int(uid)
         has_local_role = bool(local_roles and any(rid in local_roles for rid in request_role_ids))
         if not has_local_role and is_self_ck:
@@ -408,7 +439,18 @@ async def refresh_char(
                 return owned_role_info.throw_msg()
             owned_role_info = OwnedRoleInfoResponse.model_validate(owned_role_info.data)
             owned_role_ids = {r.roleId for r in owned_role_info.roleInfoList}
+            local_role_ids = set(local_roles) if local_roles else set()
+            silent_diff_ids = [
+                rid for rid in owned_role_ids
+                if rid not in local_role_ids
+                and rid not in request_role_ids
+                and rid not in SPECIAL_CHAR_INT_ALL
+            ]
             if not any(rid in owned_role_ids for rid in request_role_ids):
+                if silent_diff_ids:
+                    schedule_silent_diff_refresh(
+                        ev, uid, user_id, ck, is_self_ck, is_self, silent_diff_ids
+                    )
                 return error_reply(code=-110, msg="未拥有该角色，无法刷新面板")
 
     semaphore = await semaphore_manager.get_semaphore()
@@ -519,6 +561,9 @@ async def refresh_char(
         sender_avatar=sender_avatar,
         is_self=is_self,
     )
+
+    if silent_diff_ids and waves_datas:
+        schedule_silent_diff_refresh(ev, uid, user_id, ck, is_self_ck, is_self, silent_diff_ids)
 
     if not waves_datas:
         if refresh_type == "all":

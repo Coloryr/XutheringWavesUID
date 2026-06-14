@@ -2,6 +2,7 @@ import copy
 import json
 import base64
 import asyncio
+from collections import Counter
 from typing import Dict, List, Tuple, Union, Optional
 from pathlib import Path
 from datetime import datetime
@@ -32,6 +33,8 @@ gacha_type_meta_data = {
     "新手自选唤取（感恩定向唤取）": "7",
     "角色新旅唤取": "8",
     "武器新旅唤取": "9",
+    "角色联动唤取": "10",
+    "武器联动唤取": "11",
 }
 
 gacha_type_meta_data_reverse = {v: k for k, v in gacha_type_meta_data.items()}
@@ -46,6 +49,8 @@ gachalogs_history_meta = {
     "新手自选唤取（感恩定向唤取）": [],
     "角色新旅唤取": [],
     "武器新旅唤取": [],
+    "角色联动唤取": [],
+    "武器联动唤取": [],
 }
 
 ERROR_MSG_INVALID_LINK = "当前抽卡链接已经失效，请重新导入抽卡链接"
@@ -82,14 +87,17 @@ def find_longest_common_subarray_indices(
 def merge_gacha_logs_by_common_subarray(a: List[GachaLog], b: List[GachaLog]) -> List[GachaLog]:
     common_indices = find_longest_common_subarray_indices(a, b)
     if not common_indices:
-        # 无公共子串：a/b 两侧均无 match_key 相等的元素，但任一侧自身可能含重复，按 match_key 保序去重
-        seen = set()
+        # 无公共子串：保留单侧内部的重复抽数，只合并两侧之间的重叠记录。
+        target_counts = Counter(log.match_key() for log in a) | Counter(
+            log.match_key() for log in b
+        )
+        used_counts = Counter()
         merged = []
         for log in a + b:
             key = log.match_key()
-            if key in seen:
+            if used_counts[key] >= target_counts[key]:
                 continue
-            seen.add(key)
+            used_counts[key] += 1
             merged.append(log)
         return sorted(
             merged,
@@ -149,7 +157,7 @@ async def get_new_gachalog_for_file(
     new = {}
     new_count = {}
 
-    if str(full_data) == str(import_data):
+    if is_same_gachalogs(full_data, import_data):
         for gacha_name, logs in full_data.items():
             new[gacha_name] = list(logs)
             new_count[gacha_name] = 0
@@ -163,8 +171,34 @@ async def get_new_gachalog_for_file(
         gacha_log = [GachaLog(**log.model_dump()) for log in item]
         new_gacha_log = merge_gacha_logs_by_common_subarray(full_data[gacha_name], gacha_log)
         new[gacha_name] = new_gacha_log
-        new_count[gacha_name] = len(new_gacha_log)
+        full_logs = Counter(log.match_key() for log in full_data[gacha_name])
+        import_logs = Counter(log.match_key() for log in gacha_log)
+        new_count[gacha_name] = sum((import_logs - full_logs).values())
     return None, new, new_count
+
+
+def count_new_gachalogs(
+    full_data: Dict[str, List[GachaLog]],
+    import_data: Dict[str, List[GachaLog]],
+) -> Dict[str, int]:
+    new_count = {}
+    for gacha_name in gacha_type_meta_data:
+        full_logs = Counter(log.match_key() for log in full_data.get(gacha_name, []))
+        import_logs = Counter(log.match_key() for log in import_data.get(gacha_name, []))
+        new_count[gacha_name] = sum((import_logs - full_logs).values())
+    return new_count
+
+
+def is_same_gachalogs(
+    full_data: Dict[str, List[GachaLog]],
+    import_data: Dict[str, List[GachaLog]],
+) -> bool:
+    for gacha_name in gacha_type_meta_data:
+        full_logs = Counter(log.match_key() for log in full_data.get(gacha_name, []))
+        import_logs = Counter(log.match_key() for log in import_data.get(gacha_name, []))
+        if full_logs != import_logs:
+            return False
+    return True
 
 
 def prune_gacha_backups(uid: str, type: str, limit: int = GACHA_BACKUP_LIMIT):
@@ -278,10 +312,9 @@ async def save_gachalogs(
             import_data,  # type: ignore
         )
     else:
-        code, gachalogs_new, gachalogs_count_add = await get_new_gachalog_for_file(
-            import_data,
-            import_data,  # type: ignore
-        )
+        code = None
+        gachalogs_new = import_data
+        gachalogs_count_add = count_new_gachalogs(gachalogs_history, import_data)  # type: ignore
 
     if isinstance(code, str) or not gachalogs_new:
         return code or ERROR_MSG_INVALID_LINK

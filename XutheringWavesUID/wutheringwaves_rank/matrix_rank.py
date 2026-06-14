@@ -27,6 +27,7 @@ from ..utils.image import (
     pic_download_from_url,
 )
 from .rank_badge import draw_bot_name_badge, draw_rank_badge
+from .slash_rank import is_limited_5star
 from .rank_avatar import get_avatar
 from ..utils.resource.RESOURCE_PATH import MATRIX_PATH
 from ..utils.api.model import MatrixDetail
@@ -38,7 +39,7 @@ from ..utils.api.wwapi import (
 )
 from ..utils.ascension.char import get_char_model
 from ..utils.database.models import WavesBind, WavesUser
-from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL, NORMAL_LIST_IDS, randomize_special_char_id
+from ..utils.resource.constant import randomize_special_char_id
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
     waves_font_12,
@@ -103,7 +104,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
     else:
         pages = 1
     pages = max(pages, 1)
-    pages = min(pages, 5)
+    pages = min(pages, 50)
     page_num = 20
     item = MatrixRankItem(
         page=pages,
@@ -610,21 +611,19 @@ async def draw_matrix_rank_list(bot: Bot, ev: Event):
         rank_id = rank_temp_index + 1
         draw_rank_badge(role_bg, rank_id)
 
-        # 计算所有队伍出场限定角色的金数（去重，排除常驻和漂泊者）
         char_gold_total = 0
         seen_ids = set()
         for role_id in rankInfo.all_char_ids:
             if role_id in seen_ids:
                 continue
             seen_ids.add(role_id)
-            if role_id in SPECIAL_CHAR_INT_ALL or role_id in NORMAL_LIST_IDS:
+            if not is_limited_5star(role_id):
                 continue
-            char_model = get_char_model(role_id)
-            if char_model and char_model.starLevel == 5:
-                chain_count = await get_role_chain_count(rankInfo.uid, role_id)
-                char_gold_total += (chain_count + 1) if chain_count >= 0 else 0
+            chain_count = await get_role_chain_count(rankInfo.uid, role_id)
+            if chain_count >= 0:
+                char_gold_total += chain_count + 1
 
-        role_bg_draw.text((210, 40), f"限定角色金数: {char_gold_total}", "white", waves_font_18, "lm")
+        role_bg_draw.text((210, 40), f"角色限定{char_gold_total}金", "white", waves_font_18, "lm")
 
         # 特征码
         uid_color = "white"

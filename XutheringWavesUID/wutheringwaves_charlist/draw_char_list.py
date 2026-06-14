@@ -124,19 +124,22 @@ async def draw_char_list_img(
     waves_char_rank.sort(key=lambda i: (i.score, i.starLevel, i.level, i.chain, i.roleId), reverse=True)
 
     total_count = len(waves_char_rank)
-    # 默认: 角色多于 25 仅五星, 否则全部
-    if star_filter is None:
-        star_filter = "all" if total_count <= 25 else "5"
+    is_default = star_filter is None
+    if is_default:
+        star_filter = "all"
     if star_filter == "5":
         display_rank = [r for r in waves_char_rank if r.starLevel == 5]
     elif star_filter == "4":
         display_rank = [r for r in waves_char_rank if r.starLevel == 4]
     else:
         display_rank = list(waves_char_rank)
+    # 默认视图: 角色 >50 时隐藏 0 分角色 (显式传星级参数不过滤)
+    if is_default and total_count > 50:
+        display_rank = [r for r in display_rank if r.score > 0]
     if not display_rank:
         return "[鸣潮] 暂无对应星级的角色"
 
-    two_col = total_count > 25
+    two_col = total_count > 30
 
     # 头像 头像环
     avatar = await draw_pic_with_ring(ev, is_peek)
@@ -390,12 +393,14 @@ def _compose_char_list(
     else:
         card_img.paste(info_bg, (0, 230), info_bg)
 
-    # 角色 bar: 单列纵向; 双列高→低一行两个 (左高右次)
+    # 角色 bar: 单列纵向; 双列左侧先排前半, 右侧接后半
     for index, asset in enumerate(char_assets):
         bar_star = _render_bar(asset)
         if two_col:
-            _x = (index % 2) * 1000
-            _y = header_h + (index // 2) * bar_star_h
+            col = 0 if index < rows else 1
+            row = index if col == 0 else index - rows
+            _x = col * 1000
+            _y = header_h + row * bar_star_h
         else:
             _x = 0
             _y = header_h + index * bar_star_h
