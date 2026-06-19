@@ -185,17 +185,31 @@ def get_char_detail2(role) -> WavesCharResult:
 
 def get_char_id(char_name, loose: bool = False) -> Optional[str]:
     ensure_data_loaded()
-    if not loose:
-        return next((_id for _id, value in char_id_data.items() if value["name"] == char_name), None)
-    else:
-        for _id, value in char_id_data.items():
-            if char_name in value["name"] or value["name"] in char_name:
-                return _id
-        return None
+    exact = next((_id for _id, value in char_id_data.items() if value["name"] == char_name), None)
+    if exact is not None or not loose:
+        return exact
+    # 子串兜底取公共名最长的候选, 避免撞名 (如 秧秧 / 秧秧·玄翎) 受遍历顺序影响取错头像
+    best_id = None
+    best_len = -1
+    for _id, value in sorted(char_id_data.items()):
+        name = value["name"]
+        if not name:
+            continue
+        if char_name in name or name in char_name:
+            overlap = min(len(char_name), len(name))
+            if overlap > best_len:
+                best_len = overlap
+                best_id = _id
+    return best_id
 
 
 def get_char_model(char_id: Union[str, int]) -> Optional[CharacterModel]:
     ensure_data_loaded()
     if str(char_id) not in char_id_data:
         return None
-    return CharacterModel(**char_id_data[str(char_id)])
+    model = CharacterModel(**char_id_data[str(char_id)])
+    if not model.name:
+        from ..name_convert import easy_id_to_name
+
+        model.name = easy_id_to_name(str(char_id))
+    return model
