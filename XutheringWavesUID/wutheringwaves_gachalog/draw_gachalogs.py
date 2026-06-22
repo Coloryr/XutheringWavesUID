@@ -116,7 +116,7 @@ async def draw_card_help():
         [
             "PC获取方式",
             "1.打开游戏抽卡界面，点开唤取记录后确保显示了想要导入的记录",
-            "2.下载抽卡助手：https://ww3.loping151.cn/XutheringWavesUID/resource/gacha/gacha-helper.exe",
+            "2.下载抽卡助手：https://ww3.loping151.cn/XutheringWavesUID/resource/gacha/gacha-helper.zip",
             "3.点击获取抽卡记录链接",
         ]
     )
