@@ -112,29 +112,23 @@ async def draw_card_help():
         ]
     )
 
-    # pc = "\n".join(
-    #     [
-    #         "PC获取方式（已失效，建议使用上方两种获取方式）",
-    #         "1.打开游戏抽卡界面，点开换取记录",
-    #         "2.在鸣潮安装的目录下进入目录：`Wuthering Waves\\Wuthering Waves Game\\Client\\Saved\\Logs`",
-    #         "3.找到文件`Client.log`并用记事本打开",
-    #         "4.搜索关键字：aki-gm-resources.aki-game",
-    #         "5.复制一整行链接"
-    #     ]
-    # )
+    pc = "\n".join(
+        [
+            "PC获取方式",
+            "1.打开游戏抽卡界面，点开唤取记录后确保显示了想要导入的记录",
+            "2.下载抽卡助手：https://ww3.loping151.cn/XutheringWavesUID/resource/gacha/gacha-helper.exe",
+            "3.点击获取抽卡记录链接",
+        ]
+    )
 
-    android = "\n".join(
+    mobile = "\n".join(
         [
             "安卓手机获取链接方式",
             "1.打开游戏抽卡界面",
             "2.关闭网络或打开飞行模式",
             "3.点开换取记录",
-            "4.长按左上角区域，全选，复制"
-        ]
-    )
-
-    ios = "\n".join(
-        [
+            "4.长按左上角区域，全选，复制",
+            "",
             "苹果手机获取方式",
             "1.使用Stream抓包（详细教程网上搜索）",
             "2.关键字搜索:[game2]的请求",
@@ -153,7 +147,7 @@ async def draw_card_help():
         ]
     )
 
-    msg = [text, yun, android, ios, wechat]
+    msg = [text, yun, pc, mobile, wechat]
     return msg
 
 
