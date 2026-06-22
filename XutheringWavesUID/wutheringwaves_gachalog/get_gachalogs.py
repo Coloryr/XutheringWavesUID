@@ -9,6 +9,8 @@ from datetime import datetime
 
 import msgspec
 import aiofiles
+import aiohttp
+from aiohttp import TCPConnector
 
 from gsuid_core.logger import logger
 from gsuid_core.models import Event
@@ -386,6 +388,26 @@ async def import_gachalogs(ev: Event, history_url: str, type: str, uid: str, for
     history_data: Dict = {}
     if type == "json":
         history_data = json.loads(history_url)
+    elif type == "url":
+        try:
+            async with aiohttp.ClientSession(connector=TCPConnector(ssl=False)) as session:
+                async with session.get(history_url, timeout=30) as response:
+                    if response.status != 200:
+                        return f"下载文件失败，HTTP状态码: {response.status}"
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        history_data = await response.json()
+                    else:
+                        data_bytes = await response.read()
+                        try:
+                            history_data = json.loads(data_bytes.decode("utf-8"))
+                        except UnicodeDecodeError:
+                            try:
+                                history_data = json.loads(data_bytes.decode("gbk"))
+                            except UnicodeDecodeError:
+                                return "无法解码文件内容，请检查文件编码格式"
+        except Exception as e:
+            return f"下载文件失败: {str(e)}"
     else:
         data_bytes = base64.b64decode(history_url)
         try:

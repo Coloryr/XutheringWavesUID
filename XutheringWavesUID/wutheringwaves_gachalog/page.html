@@ -272,6 +272,8 @@ body::after {
   -webkit-overflow-scrolling: touch;
 }
 .tab-strip::-webkit-scrollbar { display: none; }
+.tab-strip.dragging { cursor: grabbing; user-select: none; }
+.tab-strip.dragging .tab { pointer-events: none; }
 .tab-strip .inner {
   display: flex;
   gap: 4px;
@@ -1100,6 +1102,46 @@ function bindTabs() {
       document.querySelectorAll('.pool-section').forEach(s => s.classList.toggle('active', s.id === id));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+  });
+  
+  document.querySelectorAll('.tab-strip').forEach(strip => {
+    let isDragging = false;
+    let startX = 0;
+    let scrollLeft = 0;
+    let hasMoved = false;
+
+    strip.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      hasMoved = false;
+      startX = e.pageX - strip.offsetLeft;
+      scrollLeft = strip.scrollLeft;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const x = e.pageX - strip.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      if (Math.abs(walk) > 5) {
+        hasMoved = true;
+        strip.classList.add('dragging');
+        e.preventDefault();
+        strip.scrollLeft = scrollLeft - (x - startX);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        strip.classList.remove('dragging');
+      }
+    });
+
+    strip.addEventListener('click', (e) => {
+      if (hasMoved) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    }, true);
   });
 }
 
