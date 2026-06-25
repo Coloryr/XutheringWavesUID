@@ -237,8 +237,6 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
 
                         avatar = await draw_pic(role.roleId)
                         char_bg = Image.open(TEXT_PATH / f"char_bg{role.starLevel}.png")
-                        char_bg_draw = ImageDraw.Draw(char_bg)
-                        char_bg_draw.text((90, 150), f"{role.roleName}", "white", waves_font_18, "mm")
                         slot = Image.new("RGBA", char_bg.size, (255, 255, 255, 0))
                         slot.paste(avatar, (0, 0), avatar)
                         slot.alpha_composite(char_bg)
@@ -257,7 +255,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             )
                             char_bg.paste(info_block, (121, 30), info_block)
 
-                        paste_skill_branch_emblem(char_bg, role.roleId, _role.skillBranchIndex, (90, 150))
+                        paste_skill_branch_emblem(char_bg, role.roleId, _role.skillBranchIndex, (138, 130))
 
                         abyss_bg_temp.alpha_composite(char_bg, (300 + role_index * 150, -20))
 

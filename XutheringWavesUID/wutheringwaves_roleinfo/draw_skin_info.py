@@ -28,7 +28,7 @@ from ..utils.render_utils import (
 from ..utils.resource.RESOURCE_PATH import BAKE_PATH, waves_templates
 from ..utils.image import (
     pil_to_b64,
-    get_custom_waves_bg,
+    get_waves_bg,
     get_event_avatar,
     pic_download_from_url,
 )
@@ -132,7 +132,7 @@ async def draw_skin_img(uid: str, ck: str, ev: Event):
 
         avatar = await get_event_avatar(ev)
         avatar_url = pil_to_b64(avatar, quality=75)
-        bg_img = get_custom_waves_bg(bg="bg3", crop=False)
+        bg_img = get_waves_bg(bg="bg", crop=False)
         bg_url = pil_to_b64(bg_img, quality=75)
 
         current_date = (

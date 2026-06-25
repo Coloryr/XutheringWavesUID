@@ -458,7 +458,7 @@ async def draw_matrix_detail_img(
 
             if role_idx < len(team.roleList):
                 _r = team.roleList[role_idx]
-                paste_skill_branch_emblem(card_img, _r.roleId, _r.skillBranchIndex, (box_x + 64, box_y + 64))
+                paste_skill_branch_emblem(card_img, _r.roleId, _r.skillBranchIndex, (box_x + 11, box_y + 71))
 
         divider_x = 514
         draw.line((divider_x, row_y + 28, divider_x, row_y + 94), fill=(255, 255, 255, 35), width=2)

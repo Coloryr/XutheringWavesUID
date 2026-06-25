@@ -122,8 +122,8 @@ def build_motor_blocks(motor_data: MotorData):
 
     blocks = [
         {"title": "涂装", "header": "header_motor_sticker.png", "cols": 8, "wide": False, "items": items(si.stickerList)},
-        {"title": "车架", "header": "header_motor_frame.png", "cols": 2, "wide": True, "items": items(si.frameList)},
-        {"title": "外观定制", "header": "header_motor_deco.png", "cols": 8, "wide": False, "items": items(si.decorationList)},
+        {"title": "车架模组", "header": "header_motor_frame.png", "cols": 2, "wide": True, "items": items(si.frameList)},
+        {"title": "摩托饰品", "header": "header_motor_deco.png", "cols": 8, "wide": False, "items": items(si.decorationList)},
     ]
     return [b for b in blocks if b["items"]]
 

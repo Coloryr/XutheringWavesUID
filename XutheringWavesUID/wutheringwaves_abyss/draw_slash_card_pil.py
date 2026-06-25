@@ -295,14 +295,6 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                         char_star = char_model.starLevel
                     avatar = await draw_pic(slash_role.roleId)
                     char_bg = Image.open(TEXT_PATH / f"char_bg{char_star}.png")
-                    char_bg_draw = ImageDraw.Draw(char_bg)
-                    char_bg_draw.text(
-                        (90, 150),
-                        f"{char_name}",
-                        "white",
-                        waves_font_18,
-                        "mm",
-                    )
                     slot = Image.new("RGBA", char_bg.size, (255, 255, 255, 0))
                     slot.paste(avatar, (0, 0), avatar)
                     slot.alpha_composite(char_bg)
@@ -321,7 +313,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                         )
                         char_bg.paste(info_block, (121, 30), info_block)
 
-                    paste_skill_branch_emblem(char_bg, slash_role.roleId, slash_role.skillBranchIndex, (90, 150))
+                    paste_skill_branch_emblem(char_bg, slash_role.roleId, slash_role.skillBranchIndex, (138, 130))
 
                     role_hang_bg.alpha_composite(char_bg, (350 + role_index * info_h // 2, -20))
 
