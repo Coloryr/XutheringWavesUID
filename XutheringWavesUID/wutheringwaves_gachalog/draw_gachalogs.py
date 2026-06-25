@@ -18,6 +18,7 @@ from gsuid_core.utils.image.image_tools import crop_center_img
 
 from ..utils import hint
 from ..utils.util import hide_uid, get_hide_uid_pref
+from ..utils.imagetool import draw_base_info_bg
 from ..utils.image import (
     GOLD,
     add_footer,
@@ -829,10 +830,11 @@ async def draw_uid_avatar(uid, ev, card_img):
             return f"用户未展示数据, 请尝试【{PREFIX}登录】"
         account_info = AccountBaseInfo.model_validate(account_info.data)
 
-        base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-        base_info_draw = ImageDraw.Draw(base_info_bg)
-        base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-        base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
+        base_info_bg = draw_base_info_bg(
+            f"{account_info.name[:10]}",
+            f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}",
+            TEXT_PATH,
+        )
         base_info_bg = base_info_bg.resize((900, 450))
         card_img.alpha_composite(base_info_bg, (110, 30))
         #

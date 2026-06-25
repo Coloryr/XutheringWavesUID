@@ -12,6 +12,7 @@ from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
 from ..utils.api.model import (
     Role,
     RoleList,
+    SkinData,
     CalabashData,
     RoleDetailData,
     AccountBaseInfo,
@@ -93,8 +94,22 @@ async def draw_role_img(uid: str, ck: str, ev: Event):
                 {"key": "中型信标", "value": f"{account_info.bigCount}", "highlight": True},
             ]
 
+            # 服饰数量(共鸣者服饰 quality>3) + 饰品数量, 失败不影响卡片
+            try:
+                skin_resp = await waves_api.get_skin_data(uid, ck)
+                if skin_resp.success:
+                    skin_data = SkinData.model_validate(skin_resp.data)
+                    costume_num = sum(1 for s in skin_data.roleSkinList if (s.quality or 0) > 3)
+                    base_info_list.append({"key": "服饰数量", "value": f"{costume_num}", "highlight": False})
+                    base_info_list.append({"key": "饰品数量", "value": f"{len(skin_data.roleDecorationList)}", "highlight": True})
+            except Exception as e:
+                logger.warning(f"[鸣潮·角色信息] 获取服饰数量失败: {e}")
+
             for bid, b in enumerate(account_info.treasureBoxList or []):
                 base_info_list.append({"key": b.name, "value": f"{b.num}", "highlight": bid % 2})
+
+            for bid, b in enumerate(account_info.phantomBoxList or []):
+                base_info_list.append({"key": b.name, "value": f"{b.num}", "highlight": bid % 2 == 0})
 
         # 获取详细角色信息
         role_detail_info_map = await get_all_roleid_detail_info_int(uid)

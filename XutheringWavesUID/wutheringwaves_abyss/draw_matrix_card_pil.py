@@ -24,6 +24,7 @@ from ..utils.image import (
     get_waves_bg,
     make_smooth_rounded_mask,
     pic_download_from_url,
+    paste_skill_branch_emblem,
 )
 from ._colors import (
     CRYSTAL_SENTINEL,
@@ -189,6 +190,7 @@ def _compose_user_header_sync(
 ):
     draw = ImageDraw.Draw(card_img, "RGBA")
 
+    # base_info 特例: _load_texture 防御式加载 + _draw_text/alpha_composite, 不接公共 draw_base_info_bg
     base_info_bg = _load_texture("base_info_bg.png")
     if base_info_bg:
         base_info_draw = ImageDraw.Draw(base_info_bg, "RGBA")
@@ -453,6 +455,10 @@ async def draw_matrix_detail_img(
                 )
                 draw.rectangle((box_x + 78, box_y + 59, box_x + 82, box_y + 82), fill=chain_color)
                 _draw_text(draw, (box_x + 76, box_y + 70), chain_name, "white", waves_font_18, "rm")
+
+            if role_idx < len(team.roleList):
+                _r = team.roleList[role_idx]
+                paste_skill_branch_emblem(card_img, _r.roleId, _r.skillBranchIndex, (box_x + 64, box_y + 64))
 
         divider_x = 514
         draw.line((divider_x, row_y + 28, divider_x, row_y + 94), fill=(255, 255, 255, 35), width=2)

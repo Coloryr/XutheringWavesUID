@@ -514,6 +514,7 @@ async def draw_fixed_img(img, avatar, account_info, role_detail, locale="", uid=
     avatar_ring = avatar_ring.resize((180, 180))
     img.paste(avatar_ring, (55, 30), avatar_ring)
 
+    # base_info 特例: 名字/特征码走 draw_text_with_fallback(emoji)+i18n, 不接公共 draw_base_info_bg
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     # account_info 缺失时(baseinfo API 失败) 用 uid 兜底

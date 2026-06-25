@@ -11,7 +11,6 @@ from gsuid_core.utils.image.image_tools import crop_center_img
 from ..utils.hint import error_reply
 from ..utils.util import hide_uid, get_hide_uid_pref
 from ..utils.image import (
-    GOLD,
     GREY,
     CHAIN_COLOR,
     SPECIAL_GOLD,
@@ -39,7 +38,6 @@ from ..utils.fonts.waves_fonts import (
     waves_font_20,
     waves_font_22,
     waves_font_24,
-    waves_font_25,
     waves_font_26,
     waves_font_30,
     waves_font_38,
@@ -49,7 +47,7 @@ from ..utils.fonts.waves_fonts import (
 from ..utils.resource.constant import NORMAL_LIST, NORMAL_LIST_IDS, SPECIAL_CHAR_NAME
 from ..utils.refresh_char_detail import refresh_char, refresh_lock
 from ..utils.resource.download_file import get_skill_img
-from ..utils.imagetool import get_weapon_icon_bg
+from ..utils.imagetool import get_weapon_icon_bg, draw_base_info_bg
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
@@ -362,10 +360,11 @@ def _compose_char_list(
     card_img = get_custom_waves_bg(width, h, "bg3")
 
     # 基础信息 名字 特征码
-    base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-    base_info_draw = ImageDraw.Draw(base_info_bg)
-    base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
+    base_info_bg = draw_base_info_bg(
+        f"{account_info.name[:10]}",
+        f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}",
+        TEXT_PATH,
+    )
     card_img.paste(base_info_bg, (15, 20), base_info_bg)
 
     avatar_ring = Image.open(TEXT_PATH / "avatar_ring.png")

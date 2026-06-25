@@ -20,6 +20,7 @@ from ..utils.util import get_version, hide_uid, build_uid_masker
 from ..utils.image import (
     RED,
     GREY,
+    CHAIN_COLOR,
     get_ICON,
     add_footer,
     get_waves_bg,
@@ -255,7 +256,7 @@ async def draw_all_matrix_rank_card(bot: Bot, ev: Event):
                 if char_chain != -1:
                     info_block = Image.new("RGBA", (20, 20), color=(255, 255, 255, 0))
                     info_block_draw = ImageDraw.Draw(info_block)
-                    info_block_draw.rectangle([0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255)))
+                    info_block_draw.rectangle([0, 0, 20, 20], fill=CHAIN_COLOR[char_chain] + (int(0.9 * 255),))
                     info_block_draw.text(
                         (8, 8),
                         f"{char_chain}",
@@ -663,7 +664,7 @@ async def draw_matrix_rank_list(bot: Bot, ev: Event):
                         if chain_count != -1:
                             info_block = Image.new("RGBA", (20, 20), color=(255, 255, 255, 0))
                             info_block_draw = ImageDraw.Draw(info_block)
-                            info_block_draw.rectangle([0, 0, 20, 20], fill=(96, 12, 120, int(0.9 * 255)))
+                            info_block_draw.rectangle([0, 0, 20, 20], fill=CHAIN_COLOR[chain_count] + (int(0.9 * 255),))
                             info_block_draw.text(
                                 (8, 8),
                                 f"{chain_count}",

@@ -1,0 +1,273 @@
+import asyncio
+from pathlib import Path
+from typing import Optional
+
+from PIL import Image, ImageDraw
+
+from gsuid_core.models import Event
+from gsuid_core.pool import to_thread
+from gsuid_core.logger import logger
+from gsuid_core.data_store import get_res_path
+from gsuid_core.utils.image.convert import convert_img
+
+from ..wutheringwaves_config import PREFIX
+from ..utils.at_help import ruser_id
+from ..utils.util import get_hide_uid_pref, hide_uid
+from ..utils.waves_api import waves_api
+from ..utils.api.model import SkinData, AccountBaseInfo
+from ..utils.image import GOLD, GREY, add_footer, get_waves_bg, pic_download_from_url
+from ..utils.imagetool import draw_pic_with_ring
+from .draw_role_info_pil import draw_identity_header
+from ..utils.fonts.waves_fonts import (
+    fit_text,
+    waves_font_12,
+    waves_font_14,
+    waves_font_16,
+    waves_font_18,
+    waves_font_30,
+)
+
+TEXT_PATH = Path(__file__).parent / "texture2d"
+SKIN_TEX_PATH = TEXT_PATH / "skin"
+SKIN_ICON_CACHE = get_res_path("XutheringWavesUID") / "skin_icon"
+
+# 品质底色边框
+QUALITY_BORDER = {5: (212, 177, 99), 4: (160, 110, 200), 3: (90, 120, 190)}
+
+
+def _eff_quality(q):
+    """特别定制(501)及 quality>5 视为 5; 兜底下限 3"""
+    return min(max(q or 3, 3), 5)
+
+
+def _sort_items(items):
+    """按 quality 降序, 同档用接口 priority 降序"""
+    return sorted(items, key=lambda it: (it["quality"], it.get("priority", 0)), reverse=True)
+
+
+def build_skin_blocks(skin_data: SkinData):
+    """按官方收藏图鉴分块: 共鸣者服饰(排除三星) / 服饰饰品 / 武器投影 / 声骸换影 / 终端替换"""
+    blocks = [
+        {
+            "title": "共鸣者服饰",
+            "header": "header_role.png",
+            "items": _sort_items([
+                {
+                    "icon": s.skinIcon,
+                    "name": s.skinName,
+                    "quality": _eff_quality(s.quality),
+                    "priority": s.priority or 0,
+                    "type_icon": "type_role_weapon.png" if s.isAddition else "type_role.png",
+                }
+                for s in skin_data.roleSkinList
+                if (s.quality or 0) > 3
+            ]),
+        },
+        {
+            "title": "服饰饰品",
+            "header": "header_decoration.png",
+            "items": _sort_items([
+                {"icon": d.icon, "name": d.name, "quality": _eff_quality(d.quality), "type_icon": "type_decoration.png"}
+                for d in skin_data.roleDecorationList
+            ]),
+        },
+        {
+            "title": "武器投影",
+            "header": "header_weapon.png",
+            "items": _sort_items([
+                {
+                    "icon": w.skinIcon,
+                    "name": w.skinName,
+                    "quality": _eff_quality(w.quality),
+                    "priority": w.priority or 0,
+                    "type_icon": "type_weapon.png",
+                }
+                for w in skin_data.weaponSkinList
+            ]),
+        },
+        {
+            "title": "声骸换影",
+            "header": "header_equip.png",
+            "items": _sort_items([
+                {"icon": e.skinIcon, "name": e.skinName, "quality": _eff_quality(e.quality), "type_icon_url": e.skinTypeIcon}
+                for e in skin_data.equipSkinList
+            ]),
+        },
+        {
+            "title": "终端替换",
+            "header": "header_calabash.png",
+            "items": _sort_items([
+                {"icon": c.skinIcon, "name": c.skinName, "quality": _eff_quality(c.quality), "type_icon": "type_calabash.png"}
+                for c in skin_data.calabashSkinList
+            ]),
+        },
+    ]
+    return [b for b in blocks if b["items"]]
+
+
+async def _safe_download(url: str) -> Optional[Image.Image]:
+    if not url:
+        return None
+    try:
+        return await pic_download_from_url(SKIN_ICON_CACHE, url)
+    except Exception as e:
+        logger.warning(f"[鸣潮·服饰] 下载图片失败: {url}, {e}")
+        return None
+
+
+async def draw_skin_img(uid: str, ck: str, ev: Event):
+    user_pref = await get_hide_uid_pref(uid, ruser_id(ev), ev.bot_id)
+
+    # 服饰数据
+    skin_resp = await waves_api.get_skin_data(uid, ck)
+    if not skin_resp.success:
+        return skin_resp.throw_msg()
+    skin_data = SkinData.model_validate(skin_resp.data)
+
+    # 账户数据(仅用于头部, 不请求角色列表)
+    account_info = None
+    account_resp = await waves_api.get_base_info(uid, ck)
+    if account_resp.success and account_resp.data:
+        account_info = AccountBaseInfo.model_validate(account_resp.data)
+
+    blocks = build_skin_blocks(skin_data)
+    if not blocks:
+        return f"未获取到服饰数据, 请尝试【{PREFIX}登录】"
+
+    # 预取所有图片(异步IO), 留给 PIL 线程
+    for b in blocks:
+        b["header_img"] = (
+            Image.open(SKIN_TEX_PATH / b["header"]).convert("RGBA") if (SKIN_TEX_PATH / b["header"]).exists() else None
+        )
+
+        async def _prep(item):
+            item["icon_img"] = await _safe_download(item.get("icon"))
+            if item.get("type_icon_url"):
+                item["type_img"] = await _safe_download(item["type_icon_url"])
+            elif item.get("type_icon") and (SKIN_TEX_PATH / item["type_icon"]).exists():
+                item["type_img"] = Image.open(SKIN_TEX_PATH / item["type_icon"]).convert("RGBA")
+            else:
+                item["type_img"] = None
+
+        await asyncio.gather(*(_prep(it) for it in b["items"]))
+
+    # 头像 头像环
+    avatar, avatar_ring = await draw_pic_with_ring(ev)
+
+    card_img = await _compose_skin_img(account_info, skin_data, blocks, avatar, avatar_ring, uid, user_pref)
+    return await convert_img(card_img)
+
+
+# 网格参数
+COLS = 6
+CELL = 150
+GAP = 16
+MARGIN = 50
+HEAD_Y = 300  # base_info_bg 高度
+
+
+@to_thread
+def _compose_skin_img(
+    account_info: Optional[AccountBaseInfo],
+    skin_data: SkinData,
+    blocks,
+    avatar,
+    avatar_ring,
+    uid,
+    user_pref,
+):
+    w = MARGIN * 2 + COLS * CELL + (COLS - 1) * GAP
+    grid_w = COLS * CELL + (COLS - 1) * GAP
+
+    # 预算高度
+    block_title_h = 70
+    h = HEAD_Y
+    for b in blocks:
+        rows = (len(b["items"]) + COLS - 1) // COLS
+        h += block_title_h + rows * (CELL + 40) + 30
+    h += 100
+
+    card_img = get_waves_bg(w, h)
+
+    # 顶部: 与卡片一致
+    draw_identity_header(
+        card_img,
+        account_info.name[:10] if account_info else "鸣潮",
+        f"特征码:  {hide_uid(account_info.id if account_info else uid, user_pref=user_pref)}",
+        avatar,
+        avatar_ring,
+    )
+
+    def _draw_title(_y: int, title: str, header_img):
+        bar = Image.new("RGBA", (grid_w, 50), (0, 0, 0, 0))
+        bd = ImageDraw.Draw(bar)
+        bd.rounded_rectangle([0, 0, grid_w, 50], radius=8, fill=(20, 22, 26, 200))
+        bd.rectangle([0, 0, 5, 50], fill=GOLD)
+        tx = 20
+        if header_img is not None:
+            ic = header_img.resize((34, 34))
+            bar.paste(ic, (tx, 8), ic)
+            tx += 44
+        bd.text((tx, 25), title, "white", waves_font_30, "lm")
+        card_img.paste(bar, (MARGIN, _y), bar)
+
+    def _draw_item(_x: int, _y: int, item):
+        quality = item.get("quality", 3)
+        # 品质底图
+        qpath = SKIN_TEX_PATH / f"quality_{quality if quality in (3, 4, 5) else 3}.png"
+        if qpath.exists():
+            bg = Image.open(qpath).convert("RGBA").resize((CELL, CELL))
+        else:
+            bg = Image.new("RGBA", (CELL, CELL), (40, 44, 52, 255))
+        cell = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
+        cell.paste(bg, (0, 0), bg)
+
+        icon_img = item.get("icon_img")
+        if icon_img is not None:
+            th = CELL - 30  # 统一主体高度, 宽度自适应(过宽则居中裁切)
+            ic = icon_img.convert("RGBA")
+            bb = ic.getchannel("A").getbbox()  # 裁掉透明边
+            if bb:
+                ic = ic.crop(bb)
+            scale = th / ic.height
+            nw, nh = max(1, round(ic.width * scale)), th
+            ic = ic.resize((nw, nh))
+            cell.paste(ic, ((CELL - nw) // 2, (CELL - nh) // 2), ic)
+
+        # 左上角类型图标
+        type_img = item.get("type_img")
+        if type_img is not None:
+            t = type_img.convert("RGBA").resize((30, 30))
+            cell.paste(t, (6, 6), t)
+
+        # 品质边框
+        cd = ImageDraw.Draw(cell)
+        cd.rounded_rectangle([1, 1, CELL - 2, CELL - 2], radius=10, outline=QUALITY_BORDER.get(quality, GREY), width=2)
+
+        card_img.paste(cell, (_x, _y), cell)
+
+        # 名称: 实测宽度自适应字号, 过窄才截断
+        nd = ImageDraw.Draw(card_img)
+        name_font, nm = fit_text(
+            nd,
+            item.get("name") or "",
+            CELL - 8,
+            (waves_font_18, waves_font_16, waves_font_14, waves_font_12),
+        )
+        nd.text((_x + CELL // 2, _y + CELL + 18), nm, "white", name_font, "mm")
+
+    y = HEAD_Y
+    for b in blocks:
+        _draw_title(y, b["title"], b.get("header_img"))
+        y += block_title_h
+        for idx, item in enumerate(b["items"]):
+            col = idx % COLS
+            row = idx // COLS
+            _x = MARGIN + col * (CELL + GAP)
+            _y = y + row * (CELL + 40)
+            _draw_item(_x, _y, item)
+        rows = (len(b["items"]) + COLS - 1) // COLS
+        y += rows * (CELL + 40) + 30
+
+    card_img = add_footer(card_img, 600, 20)
+    return card_img

@@ -23,7 +23,7 @@ from ..utils.resource.constant import SPECIAL_CHAR_INT_ALL
 from ..utils.queues.const import QUEUE_MATRIX_RECORD
 from ..utils.queues.queues import push_item
 from ..utils.resource.RESOURCE_PATH import PLAYER_PATH, MATRIX_PATH, waves_templates
-from ..utils.image import pil_to_b64, get_waves_bg, get_event_avatar, CHAIN_COLOR
+from ..utils.image import pil_to_b64, get_waves_bg, get_event_avatar, CHAIN_COLOR, get_skill_branch_emblem_b64
 from ._colors import get_matrix_score_class
 from .period import get_matrix_period_number
 from .draw_matrix_card_pil import (
@@ -511,10 +511,12 @@ async def _draw_matrix_detail_html(
                     char_id = team_char_ids[role_idx] if role_idx < len(team_char_ids) else None
                     chain_num, chain_name = lookup_chain(role_detail_info_map, char_id)
 
+                    _r = team.roleList[role_idx] if role_idx < len(team.roleList) else None
                     roles_data.append({
                         "icon_url": role_b64,
                         "chain": chain_num,
                         "chain_name": chain_name,
+                        "branch_icon": get_skill_branch_emblem_b64(_r.roleId, _r.skillBranchIndex) if _r else "",
                     })
 
                 # 不足3人时补占位

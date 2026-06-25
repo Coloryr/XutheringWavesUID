@@ -378,3 +378,22 @@ ww_font_70 = ww_font_origin(70)
 ww_font_84 = ww_font_origin(84)
 
 emoji_font = emoji_font_origin(_EMOJI_FONT_SIZE)
+
+
+def fit_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    max_width: float,
+    fonts: Tuple[ImageFont.FreeTypeFont, ...],
+) -> Tuple[ImageFont.FreeTypeFont, str]:
+    """从大到小选首个宽度不超 max_width 的字体; 最小号仍超宽则按字宽截断加省略号。
+
+    fonts 需按字号从大到小传入。返回 (字体, 可能被截断的文本)。
+    """
+    for font in fonts:
+        if draw.textlength(text, font=font) <= max_width:
+            return font, text
+    font = fonts[-1]
+    while len(text) > 1 and draw.textlength(text + "…", font=font) > max_width:
+        text = text[:-1]
+    return font, (text + "…" if text else text)

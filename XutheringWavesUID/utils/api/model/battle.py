@@ -7,6 +7,7 @@ from pydantic import Field, BaseModel, model_validator
 class AbyssRole(BaseModel):
     roleId: int
     iconUrl: Optional[str] = None
+    skillBranchIndex: Optional[int] = None  # 技能分支
 
 
 # 定义楼层模型
@@ -122,6 +123,7 @@ class ExploreList(BaseModel):
 class SlashRole(BaseModel):
     iconUrl: str  # 角色头像
     roleId: int  # 角色ID
+    skillBranchIndex: Optional[int] = None  # 技能分支
 
 
 class SlashHalf(BaseModel):

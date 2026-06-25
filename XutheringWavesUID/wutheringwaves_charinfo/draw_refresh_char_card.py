@@ -25,13 +25,12 @@ from ..utils.image import (
 )
 from ..utils.button import WavesButton
 from ..utils.api.model import RoleDetailData
-from ..utils.imagetool import draw_pic_with_ring
+from ..utils.imagetool import draw_pic_with_ring, draw_base_info_bg
 from ..utils.expression_ctx import WavesCharRank, get_waves_char_rank
 from ..utils.char_info_utils import get_all_role_detail_info_list
 from ..utils.database.models import WavesBind
 from ..wutheringwaves_config import PREFIX, WutheringWavesConfig
 from ..utils.fonts.waves_fonts import (
-    waves_font_25,
     waves_font_26,
     waves_font_30,
     waves_font_40,
@@ -369,10 +368,11 @@ async def _draw_refresh_char_detail_img(
     buttons.append(WavesButton("练度统计", "练度统计"))
 
     # 基础信息 名字 特征码
-    base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-    base_info_draw = ImageDraw.Draw(base_info_bg)
-    base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
+    base_info_bg = draw_base_info_bg(
+        f"{account_info.name[:10]}",
+        f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}",
+        TEXT_PATH,
+    )
     img.paste(base_info_bg, (15, 20), base_info_bg)
 
     # 头像 头像环

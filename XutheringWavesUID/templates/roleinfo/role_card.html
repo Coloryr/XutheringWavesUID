@@ -340,6 +340,8 @@
             line-height: 1;
             position: relative;
             z-index: 1;
+            max-width: 100%;
+            white-space: nowrap;
         }
 
         .info-value {
@@ -617,5 +619,17 @@
              {% endif %}
         </div>
     </div>
+    <script>
+        // 数据概览小标题: 超出格子宽度时自适应缩小字号
+        document.querySelectorAll('.base-info-grid .info-key').forEach(function (el) {
+            var size = parseFloat(getComputedStyle(el).fontSize);
+            var guard = 0;
+            while (el.scrollWidth > el.clientWidth && size > 10 && guard < 40) {
+                size -= 1;
+                el.style.fontSize = size + 'px';
+                guard++;
+            }
+        });
+    </script>
 </body>
 </html>
