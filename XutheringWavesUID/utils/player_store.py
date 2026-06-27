@@ -31,10 +31,10 @@ def _load(p: Path) -> Any:
         return json.load(f)
 
 
-def _gzip_dump(path: Path, obj: Any) -> None:
+def _gzip_dump(path: Path, obj: Any, level: int = 6) -> None:
     data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
     with open(path, "wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=6, filename="", mtime=0) as f:
+        with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=level, filename="", mtime=0) as f:
             f.write(data)
 
 
@@ -119,6 +119,21 @@ async def read_player_json(path: PathLike) -> Any:
 
 async def write_player_json(path: PathLike, obj: Any) -> None:
     await asyncio.to_thread(write_player_json_sync, path, obj)
+
+
+def write_gz_json_sync(path: PathLike, obj: Any, level: int = 9) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f"{p.name}.{os.getpid()}.{next(_tmp_counter)}.tmp")
+    try:
+        _gzip_dump(tmp, obj, level)
+        tmp.replace(p)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+async def write_gz_json(path: PathLike, obj: Any, level: int = 9) -> None:
+    await asyncio.to_thread(write_gz_json_sync, path, obj, level)
 
 
 def compress_existing_sync(player_root: PathLike) -> tuple[int, int, int, int]:

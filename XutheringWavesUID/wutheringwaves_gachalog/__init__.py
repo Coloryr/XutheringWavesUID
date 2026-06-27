@@ -164,10 +164,7 @@ async def _merge_mcgf_gacha(bot: Bot, ev: Event, uid: str, target_uid: str):
         original_data = {"info": {}, "list": []}
 
         if export_res["retcode"] == "ok":
-            import aiofiles
-
-            async with aiofiles.open(export_res["url"], "r", encoding="utf-8") as f:
-                original_data = json.loads(await f.read())
+            original_data = export_res["json"]
 
         if len(original_data.get("list", [])) == 0:
             return await bot.send(
@@ -313,10 +310,7 @@ async def get_gacha_log_by_xhh(bot: Bot, ev: Event):
         original_data = {"info": {}, "list": []}
 
         if export_res["retcode"] == "ok":
-            import aiofiles
-
-            async with aiofiles.open(export_res["url"], "r", encoding="utf-8") as f:
-                original_data = json.loads(await f.read())
+            original_data = export_res["json"]
 
         if len(original_data.get("list", [])) == 0:
             return await bot.send(
@@ -484,8 +478,8 @@ async def send_export_gacha_info(bot: Bot, ev: Event):
     export = await export_gachalogs(uid)
     if export["retcode"] == "ok":
         file_name = export["name"]
-        file_path = export["url"]
-        await bot.send(MessageSegment.file(file_path, file_name))
+        file_bytes = json.dumps(export["json"], ensure_ascii=False, indent=4).encode("utf-8")
+        await bot.send(MessageSegment.file(file_bytes, file_name))
         await bot.send("✅导出抽卡记录成功！")
     else:
         await bot.send("导出抽卡记录失败...")
