@@ -50,6 +50,7 @@ from ..utils.image import (
     get_waves_bg,
     get_event_avatar,
     get_square_avatar_path,
+    get_skill_branch_emblem_b64,
     CHAIN_COLOR,
 )
 from ..utils.ascension.char import get_char_model
@@ -219,6 +220,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             "chain": chain_num,
                             "chain_name": chain_name,
                             "icon_url": role_icon_b64,
+                            "branch_icon": get_skill_branch_emblem_b64(slash_role.roleId, slash_role.skillBranchIndex),
                         })
 
                     half_list.append({
@@ -281,7 +283,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
         img_bytes = await render_html(waves_templates, "abyss/slash_card.html", context)
         if img_bytes:
             await save_slash_record(uid, slash_detail)
-            await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar)
+            await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar, user_id, ev.bot_id)
             return img_bytes
         else:
             logger.warning("[鸣潮·冥海渲染] Playwright 返回空, 回退到 PIL")

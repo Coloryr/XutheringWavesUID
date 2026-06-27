@@ -17,10 +17,12 @@ from ..utils.util import hide_uid, get_hide_uid_pref
 from ..utils.image import (
     GOLD,
     GREY,
+    CHAIN_COLOR,
     SPECIAL_GOLD,
     add_footer,
     get_waves_bg,
     pic_download_from_url,
+    paste_skill_branch_emblem,
 )
 from ..utils.api.model import (
     SlashDetail,
@@ -28,7 +30,7 @@ from ..utils.api.model import (
     AccountBaseInfo,
 )
 from ..utils.api.wwapi import SlashDetailRequest
-from ..utils.imagetool import draw_pic, draw_pic_with_ring
+from ..utils.imagetool import draw_pic, draw_pic_with_ring, draw_base_info_bg
 from ..utils.waves_api import waves_api
 from ..utils.error_reply import WAVES_CODE_102
 from ..utils.queues.const import QUEUE_SLASH_RECORD
@@ -170,10 +172,11 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
     card_img = get_waves_bg(1100, h, "bg9")
 
     # 绘制个人信息
-    base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
-    base_info_draw = ImageDraw.Draw(base_info_bg)
-    base_info_draw.text((275, 120), f"{account_info.name[:10]}", "white", waves_font_30, "lm")
-    base_info_draw.text((226, 173), f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}", GOLD, waves_font_25, "lm")
+    base_info_bg = draw_base_info_bg(
+        f"{account_info.name[:10]}",
+        f"特征码:  {hide_uid(account_info.id, user_pref=user_pref)}",
+        TEXT_PATH,
+    )
     card_img.paste(base_info_bg, (15, 20), base_info_bg)
 
     # 头像 头像环
@@ -292,20 +295,15 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                         char_star = char_model.starLevel
                     avatar = await draw_pic(slash_role.roleId)
                     char_bg = Image.open(TEXT_PATH / f"char_bg{char_star}.png")
-                    char_bg_draw = ImageDraw.Draw(char_bg)
-                    char_bg_draw.text(
-                        (90, 150),
-                        f"{char_name}",
-                        "white",
-                        waves_font_18,
-                        "mm",
-                    )
-                    char_bg.paste(avatar, (0, 0), avatar)
+                    slot = Image.new("RGBA", char_bg.size, (255, 255, 255, 0))
+                    slot.paste(avatar, (0, 0), avatar)
+                    slot.alpha_composite(char_bg)
+                    char_bg = slot
                     if role_detail_info_map and str(slash_role.roleId) in role_detail_info_map:
                         temp: RoleDetailData = role_detail_info_map[str(slash_role.roleId)]
                         info_block = Image.new("RGBA", (40, 20), color=(255, 255, 255, 0))
                         info_block_draw = ImageDraw.Draw(info_block)
-                        info_block_draw.rectangle([0, 0, 40, 20], fill=(96, 12, 120, int(0.9 * 255)))
+                        info_block_draw.rectangle([0, 0, 40, 20], fill=CHAIN_COLOR[temp.get_chain_num()] + (int(0.9 * 255),))
                         info_block_draw.text(
                             (2, 10),
                             f"{temp.get_chain_name()}",
@@ -313,7 +311,9 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             waves_font_18,
                             "lm",
                         )
-                        char_bg.paste(info_block, (110, 35), info_block)
+                        char_bg.paste(info_block, (121, 30), info_block)
+
+                    paste_skill_branch_emblem(char_bg, slash_role.roleId, slash_role.skillBranchIndex, (138, 130))
 
                     role_hang_bg.alpha_composite(char_bg, (350 + role_index * info_h // 2, -20))
 
@@ -334,7 +334,7 @@ async def draw_slash_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
     card_img = add_footer(card_img, 600, 20)
     card_img = await convert_img(card_img)
     await save_slash_record(uid, slash_detail)
-    await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar)
+    await upload_slash_record(is_self_ck, uid, slash_detail, sender_avatar, user_id, ev.bot_id)
     return card_img
 
 
@@ -364,8 +364,11 @@ async def upload_slash_record(
     waves_id: str,
     slash_data: SlashDetail,
     sender_avatar: str = "",
+    user_id: str = "",
+    bot_id: str = "",
 ):
     from ..wutheringwaves_config import WutheringWavesConfig, PREFIX
+    from ..utils.util import resolve_hide_uid
 
     WavesToken = WutheringWavesConfig.get_config("WavesToken").data
     if not WavesToken:
@@ -416,6 +419,7 @@ async def upload_slash_record(
             "rank": challenge.get_rank(),
             "score": challenge.score,
             "sender_avatar": sender_avatar,
+            "hide_uid": await resolve_hide_uid(waves_id, user_id, bot_id),
         }
     )
     # logger.info(f"[鸣潮·冥海保存] 上传冥海记录: {slash_item.model_dump()}")

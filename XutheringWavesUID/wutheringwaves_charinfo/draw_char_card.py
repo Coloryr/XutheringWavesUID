@@ -117,6 +117,16 @@ from ..utils.limit_request import check_request_rate_limit
 
 TEXT_PATH = Path(__file__).parent / "texture2d"
 
+
+def _weapon_reson_text(level, locale: str = "") -> str:
+    # 谐振阶: zh N阶 / cht N階 / en·jp·kr 官方 Rank(ランク/튜닝)→R 前缀
+    if locale == "cht":
+        return f"{level}階"
+    if locale in ("en", "jp", "kr"):
+        return f"R{level}"
+    return f"{level}阶"
+
+
 ph_sort_name = [
     [("生命", "0"), ("攻击", "0"), ("防御", "0"), ("共鸣效率", "0%")],
     [
@@ -506,6 +516,7 @@ async def draw_fixed_img(img, avatar, account_info, role_detail, locale="", uid=
     avatar_ring = avatar_ring.resize((180, 180))
     img.paste(avatar_ring, (55, 30), avatar_ring)
 
+    # base_info 特例: 名字/特征码走 draw_text_with_fallback(emoji)+i18n, 不接公共 draw_base_info_bg
     base_info_bg = Image.open(TEXT_PATH / "base_info_bg.png")
     base_info_draw = ImageDraw.Draw(base_info_bg)
     # account_info 缺失时(baseinfo API 失败) 用 uid 兜底
@@ -903,7 +914,7 @@ async def draw_char_detail_img(
     wrc_fill = WEAPON_RESONLEVEL_COLOR[weaponData.resonLevel] + (int(0.8 * 255),)  # type: ignore
     weapon_bg_temp_draw.rounded_rectangle([_x - 15, _y - 15, _x + 50, _y + 15], radius=7, fill=wrc_fill)
 
-    draw_text_with_fallback(weapon_bg_temp_draw, (_x, _y), f"{t('精', locale)}{weaponData.resonLevel}", "white", waves_font_24, "lm")
+    draw_text_with_fallback(weapon_bg_temp_draw, (_x, _y), _weapon_reson_text(weaponData.resonLevel, locale), "white", waves_font_24, "lm")
 
     weapon_breach = get_breach(weaponData.breach, weaponData.level)
     for i in range(0, weapon_breach):  # type: ignore
@@ -1917,7 +1928,7 @@ async def draw_char_optimize_img(ev: Event, uid: str, char: str, user_id: str, w
     _y = weapon_name_y + 7
     wrc_fill = WEAPON_RESONLEVEL_COLOR[weaponData.resonLevel] + (int(0.8 * 255),)
     weapon_bg_temp_draw.rounded_rectangle([_x - 15, _y - 15, _x + 50, _y + 15], radius=7, fill=wrc_fill)
-    draw_text_with_fallback(weapon_bg_temp_draw, (_x, _y), f"{t('精', locale)}{weaponData.resonLevel}", "white", waves_font_24, "lm")
+    draw_text_with_fallback(weapon_bg_temp_draw, (_x, _y), _weapon_reson_text(weaponData.resonLevel, locale), "white", waves_font_24, "lm")
 
     weapon_breach = get_breach(weaponData.breach, weaponData.level)
     for i in range(0, weapon_breach):

@@ -11,7 +11,7 @@ from gsuid_core.models import Event
 
 from .hint import error_reply
 from .at_help import safe_sender_avatar
-from .util import get_version, hide_uid
+from .util import get_version, hide_uid, resolve_hide_uid
 from .api.model import RoleList, AccountBaseInfo, OwnedRoleInfoResponse
 from .waves_api import waves_api
 from .resource.constant import SPECIAL_CHAR_INT_ALL
@@ -155,6 +155,7 @@ async def send_card(
     role_info: Optional[RoleList] = None,
     waves_data: Optional[List] = None,
     sender_avatar: str = "",
+    bot_id: str = "",
 ):
     WavesToken = WutheringWavesConfig.get_config("WavesToken").data
     if not WavesToken:
@@ -180,6 +181,8 @@ async def send_card(
         )
         return
 
+    hide_uid_flag = await resolve_hide_uid(uid, user_id, bot_id)
+
     def _build_meta(rank):
         meta = {
             "user_id": user_id,
@@ -191,6 +194,7 @@ async def send_card(
             "char_info": [r.to_rank_dict() for r in rank],
             "role_num": account_info.roleNum,
             "single_refresh": 1 if len(waves_data) == 1 else 0,
+            "hide_uid": hide_uid_flag,
         }
         if sender_avatar:
             meta["sender_avatar"] = sender_avatar
@@ -230,6 +234,7 @@ async def save_card_info(
     role_info: Optional[RoleList] = None,
     sender_avatar: str = "",
     is_self: bool = True,
+    bot_id: str = "",
 ):
     if len(waves_data) == 0:
         return
@@ -279,7 +284,7 @@ async def save_card_info(
         except Exception as e:
             logger.warning(f"[鸣潮·角色状态] refresh 状态记录失败 uid={uid}: {e}")
 
-    await send_card(uid, user_id, save_data, is_self_ck, token, role_info, waves_data, sender_avatar)
+    await send_card(uid, user_id, save_data, is_self_ck, token, role_info, waves_data, sender_avatar, bot_id)
 
     try:
         # 移除所有 URL 后再保存
@@ -560,6 +565,7 @@ async def refresh_char(
         role_info=role_info,
         sender_avatar=sender_avatar,
         is_self=is_self,
+        bot_id=ev.bot_id,
     )
 
     if silent_diff_ids and waves_datas:

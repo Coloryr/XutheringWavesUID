@@ -29,6 +29,7 @@ from ..utils.image import (
     get_waves_bg,
     get_event_avatar,
     get_square_avatar_path,
+    get_skill_branch_emblem_b64,
     CHAIN_COLOR,
 )
 from ..utils.char_info_utils import get_all_roleid_detail_info, lookup_chain
@@ -157,6 +158,7 @@ async def draw_abyss_img(ev: Event, uid: str, user_id: str) -> Union[bytes, str]
                             "chain_num": chain_num,
                             "chain_name": chain_name,
                             "icon_url": role_icon_b64,
+                            "branch_icon": get_skill_branch_emblem_b64(_role.roleId, _role.skillBranchIndex),
                         })
 
                 floors_data.append({
