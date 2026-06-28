@@ -1103,7 +1103,7 @@ function render5Star(fs, poolName) {
 
 function render4Tray(items, isStub) {
   if (isStub && (!items || !items.length)) {
-    return `<div class="tray tray-stub">旧版接口未区分 4★（2025-11 之前），无 4★ 详情</div>`;
+    return `<div class="tray tray-stub">无 4★</div>`;
   }
   if (!items || !items.length) return '';
   return `

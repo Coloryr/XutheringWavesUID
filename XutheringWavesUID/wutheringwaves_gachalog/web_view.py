@@ -437,7 +437,11 @@ async def gacha_web_index(token: str):
         return HTMLResponse(_NOT_FOUND_HTML)
     if not _TEMPLATE_PATH.exists():
         return HTMLResponse("<h1>page template missing</h1>", status_code=500)
-    return FileResponse(_TEMPLATE_PATH, media_type="text/html; charset=utf-8")
+    return FileResponse(
+        _TEMPLATE_PATH,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/waves/gacha/{token}/data")
@@ -469,7 +473,8 @@ async def gacha_web_data(token: str):
             "data_time": raw.get("data_time", ""),
             "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "pools": pools,
-        }
+        },
+        headers={"Cache-Control": "no-store"},
     )
 
 

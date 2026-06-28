@@ -571,13 +571,14 @@ async def draw_matrix_rank_list(bot: Bot, ev: Event):
     title_text = "#矩阵群排行"
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
-    title_bg_draw.text(
-        (225, 360),
-        f"第{get_matrix_period_number()}期",
-        GREY,
-        waves_font_20,
-        "lm",
-    )
+    period_label = f"第{get_matrix_period_number()}期"
+    title_bg_draw.text((225, 360), period_label, GREY, waves_font_20, "lm")
+    date_text = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    try:
+        period_width = title_bg_draw.textlength(period_label, font=waves_font_20)
+    except Exception:
+        period_width = waves_font_20.getsize(period_label)[0]
+    title_bg_draw.text((225 + period_width + 16, 360), date_text, GREY, waves_font_20, "lm")
 
     # 遮罩
     char_mask = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")

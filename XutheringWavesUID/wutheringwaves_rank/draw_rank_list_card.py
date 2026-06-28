@@ -468,6 +468,8 @@ def _compose_rank_list(card_img, bar, rankInfoList_display, display_rank_ids, re
     title_text = "#练度群排行"
     title_bg_draw = ImageDraw.Draw(title_bg)
     title_bg_draw.text((220, 290), title_text, "white", waves_font_58, "lm")
+    date_text = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    title_bg_draw.text((225, 360), date_text, GREY, waves_font_20, "lm")
 
     char_mask_img = Image.open(TEXT_PATH / "char_mask.png").convert("RGBA")
     char_mask_img = char_mask_img.resize((width, char_mask_img.height * width // char_mask_img.width))
